@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from wsgiref.util import setup_testing_defaults
 
-from forum_read_only.repository import group_threads, list_board_tags, load_posts
+from forum_read_only.repository import group_threads, list_board_tags, list_threads_by_board, load_posts
 from forum_read_only.templates import load_asset_text, load_template, render_page
 
 
@@ -16,10 +16,11 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def render_home() -> str:
+def render_board_index() -> str:
     posts = load_posts(get_repo_root() / "records" / "posts")
     threads = group_threads(posts)
     board_tags = list_board_tags(posts)
+    board_sections = list_threads_by_board(threads)
 
     stats_html = (
         '<div class="stat-grid">'
@@ -29,29 +30,39 @@ def render_home() -> str:
         "</div>"
     )
 
-    tag_items = "".join(
-        f'<li class="tag-chip">{html.escape(tag)}</li>'
-        for tag in board_tags
-    )
-    thread_items = "".join(
-        "<li class=\"thread-chip\">"
-        f"<strong>{html.escape(thread.root.post_id)}</strong>"
-        f"<span>{html.escape(thread.root.subject or 'Untitled thread')}</span>"
-        "</li>"
-        for thread in threads
-    )
+    tag_items = "".join(f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>' for tag in board_tags)
+    board_sections_html = "".join(render_board_section(tag, section_threads) for tag, section_threads in board_sections)
 
-    content = load_template("home.html").substitute(
+    content = load_template("board_index.html").substitute(
         stats_html=stats_html,
         tags_html=tag_items,
-        threads_html=thread_items,
+        board_sections_html=board_sections_html,
     )
     return render_page(
         title="Forum Reader",
-        hero_kicker="Read-Only Loop",
-        hero_title="Canonical posts, rendered without a database",
-        hero_text="This first shell reads the git-tracked post files directly and proves the sample repository can be loaded into deterministic thread and board-tag structures.",
+        hero_kicker="Board Index",
+        hero_title="Threads gathered straight from canonical text records",
+        hero_text="This board view reads the git-tracked post files directly, groups thread roots by board tags, and keeps the dataset browsable without adding a database or durable index layer.",
         content_html=content,
+    )
+
+
+def render_board_section(tag: str, threads) -> str:
+    thread_cards = "".join(
+        "<article class=\"thread-card\">"
+        f"<p class=\"thread-id\">{html.escape(thread.root.post_id)}</p>"
+        f"<h3><a href=\"/threads/{html.escape(thread.root.post_id)}\">{html.escape(thread.root.subject or 'Untitled thread')}</a></h3>"
+        f"<p>{html.escape(thread.root.body.splitlines()[0])}</p>"
+        f"<p class=\"thread-meta\">{len(thread.replies)} repl{'y' if len(thread.replies) == 1 else 'ies'}</p>"
+        "</article>"
+        for thread in threads
+    )
+    return (
+        f'<section class="panel board-section" id="board-{html.escape(tag)}">'
+        f'<div class="section-head"><h2>/{html.escape(tag)}/</h2>'
+        f'<p>{len(threads)} thread{"s" if len(threads) != 1 else ""} in this board tag.</p></div>'
+        f'<div class="thread-grid">{thread_cards}</div>'
+        "</section>"
     )
 
 
@@ -60,8 +71,8 @@ def render_not_found() -> str:
         title="Not Found",
         hero_kicker="Missing route",
         hero_title="Nothing is published here yet",
-        hero_text="This loop only exposes the minimal read-only shell so far. Board, thread, and permalink routes land in later stages of the same feature.",
-        content_html='<section class="panel"><p>Available now: <a href="/">home</a> and <a href="/assets/site.css">site.css</a>.</p></section>',
+        hero_text="This loop is publishing the board index first. Thread and permalink routes land in later stages of the same feature.",
+        content_html='<section class="panel"><p>Available now: <a href="/">board index</a> and <a href="/assets/site.css">site.css</a>.</p></section>',
     )
 
 
@@ -71,7 +82,7 @@ def application(environ, start_response):
 
     try:
         if path == "/":
-            body = render_home().encode("utf-8")
+            body = render_board_index().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

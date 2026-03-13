@@ -87,3 +87,16 @@ def group_threads(posts: list[Post]) -> list[Thread]:
 def list_board_tags(posts: list[Post]) -> list[str]:
     tags = {tag for post in posts for tag in post.board_tags}
     return sorted(tags)
+
+
+def list_threads_by_board(threads: list[Thread]) -> list[tuple[str, tuple[Thread, ...]]]:
+    threads_by_board: dict[str, list[Thread]] = {}
+    for thread in threads:
+        for tag in thread.root.board_tags:
+            threads_by_board.setdefault(tag, []).append(thread)
+
+    ordered_sections = []
+    for tag in sorted(threads_by_board):
+        section_threads = tuple(sorted(threads_by_board[tag], key=lambda thread: thread.root.post_id))
+        ordered_sections.append((tag, section_threads))
+    return ordered_sections
