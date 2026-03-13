@@ -1,0 +1,7 @@
+Post-ID: reply-001
+Board-Tags: general meta
+Thread-ID: root-001
+Parent-ID: root-001
+
+This is a reply to the first thread.
+It shows the minimal reply linkage shape.

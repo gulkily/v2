@@ -1,0 +1,6 @@
+Post-ID: root-001
+Board-Tags: general meta
+Subject: First thread
+
+Hello world.
+This is the root post for the sample dataset.

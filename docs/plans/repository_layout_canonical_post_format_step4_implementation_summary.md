@@ -17,3 +17,14 @@
   - Manually read the spec and confirmed the root and reply examples are understandable from raw text alone.
 - Notes:
   - The identifiers in this slice are simple local post IDs for sample data, not the final long-term identity scheme.
+
+## Stage 3 - Sample canonical post dataset
+- Changes:
+  - Added one thread root sample file in `records/posts/root-001.txt`.
+  - Added one reply sample file in `records/posts/reply-001.txt`.
+  - Kept the dataset hand-authored and small enough to inspect directly in raw text and git history.
+- Verification:
+  - Opened both sample files directly and confirmed the root, reply linkage, and board tags are understandable without custom tooling.
+  - Checked the `records/posts/` directory to confirm the dataset is easy to locate from the repository tree.
+- Notes:
+  - The sample dataset is illustrative only and should not be treated as the final canonical identifier scheme.
