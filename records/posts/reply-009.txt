@@ -1,0 +1,7 @@
+Post-ID: reply-009
+Board-Tags: craft general
+Thread-ID: root-004
+Parent-ID: root-004
+
+Proverbs 15:1 says, "A soft answer turneth away wrath."
+The same spirit helps in engineering: interfaces should reduce needless friction.

@@ -1,0 +1,7 @@
+Post-ID: root-004
+Board-Tags: craft general
+Subject: Build gently
+
+A system meant for humans and agents alike should reward clarity over cleverness.
+If a thing is difficult to explain, it may still be too early to freeze it.
+Gentle design is not weak design; it is design that survives contact with real use.
