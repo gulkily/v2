@@ -1,0 +1,12 @@
+## Stage 1 - Web shell and canonical post reader
+- Changes:
+  - Added a small standard-library WSGI app and local run script for the read-only renderer.
+  - Added deterministic canonical post loading and thread grouping helpers over `records/posts/`.
+  - Added separate HTML and CSS templates so the app shell can render without embedding page content in code.
+- Verification:
+  - Ran `FORUM_PORT=8010 python3 scripts/run_read_only.py` and confirmed the local server started successfully.
+  - Fetched `/` and confirmed the shell page rendered `17` posts, `5` threads, and `6` board tags from the repository state.
+  - Fetched `/assets/site.css` and confirmed the separate stylesheet was served correctly.
+  - Ran a direct repository check through `load_posts`, `group_threads`, and `list_board_tags` and confirmed the same `17 / 5 / 6` counts.
+- Notes:
+  - This stage intentionally stops at a shell page that proves direct repository loading; board index, thread view, and permalink rendering land in later stages.
