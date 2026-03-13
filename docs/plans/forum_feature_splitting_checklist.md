@@ -6,7 +6,7 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
 
 ## Recommended Early Demonstration Path
 
-- [ ] Loop 1: Repository layout and canonical post format
+- [x] Loop 1: Repository layout and canonical post format
   - Goal: define the on-disk shape for posts and a tiny sample dataset.
   - Includes: repository directories, one-file-per-post rule, header/body format, ASCII-only constraints, sample records.
   - Demonstrable result: a repo with hand-authored sample posts that can be inspected directly in a text editor and in git history.
