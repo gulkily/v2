@@ -5,7 +5,14 @@ import os
 from pathlib import Path
 from wsgiref.util import setup_testing_defaults
 
-from forum_read_only.repository import group_threads, list_board_tags, list_threads_by_board, load_posts
+from forum_read_only.repository import (
+    group_threads,
+    index_posts,
+    index_threads,
+    list_board_tags,
+    list_threads_by_board,
+    load_posts,
+)
 from forum_read_only.templates import load_asset_text, load_template, render_page
 
 
@@ -52,7 +59,7 @@ def render_board_section(tag: str, threads) -> str:
         "<article class=\"thread-card\">"
         f"<p class=\"thread-id\">{html.escape(thread.root.post_id)}</p>"
         f"<h3><a href=\"/threads/{html.escape(thread.root.post_id)}\">{html.escape(thread.root.subject or 'Untitled thread')}</a></h3>"
-        f"<p>{html.escape(thread.root.body.splitlines()[0])}</p>"
+        f"<p>{html.escape(first_line(thread.root.body))}</p>"
         f"<p class=\"thread-meta\">{len(thread.replies)} repl{'y' if len(thread.replies) == 1 else 'ies'}</p>"
         "</article>"
         for thread in threads
@@ -66,13 +73,130 @@ def render_board_section(tag: str, threads) -> str:
     )
 
 
+def render_thread(thread_id: str) -> str:
+    posts = load_posts(get_repo_root() / "records" / "posts")
+    threads = index_threads(group_threads(posts))
+    thread = threads.get(thread_id)
+    if thread is None:
+        raise LookupError(f"unknown thread: {thread_id}")
+
+    content = load_template("thread.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ('/', 'board index'),
+                ('/threads/' + thread.root.post_id, thread.root.subject or thread.root.post_id),
+            ]
+        ),
+        thread_heading=html.escape(thread.root.subject or thread.root.post_id),
+        thread_meta=f"{len(thread.replies)} repl{'y' if len(thread.replies) == 1 else 'ies'} in this thread.",
+        root_post_html=render_post_card(thread.root, root_thread_id=thread.root.post_id),
+        replies_html="".join(render_post_card(reply, root_thread_id=thread.root.post_id) for reply in thread.replies),
+    )
+    return render_page(
+        title=thread.root.subject or thread.root.post_id,
+        hero_kicker="Thread View",
+        hero_title=thread.root.subject or thread.root.post_id,
+        hero_text="The thread page is rendered directly from canonical post files without a database, using deterministic reply ordering from the repository state.",
+        content_html=content,
+    )
+
+
+def render_post(post_id: str) -> str:
+    posts = load_posts(get_repo_root() / "records" / "posts")
+    post = index_posts(posts).get(post_id)
+    if post is None:
+        raise LookupError(f"unknown post: {post_id}")
+
+    thread_target = post.root_thread_id
+    heading = post.subject or post.post_id
+    content = load_template("post.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ('/', 'board index'),
+                ('/threads/' + thread_target, thread_target),
+                ('/posts/' + post.post_id, post.post_id),
+            ]
+        ),
+        post_heading=html.escape(heading),
+        post_card_html=render_post_card(post, root_thread_id=thread_target),
+    )
+    return render_page(
+        title=heading,
+        hero_kicker="Post Permalink",
+        hero_title=heading,
+        hero_text="This permalink shows one canonical post in isolation while preserving links back to the thread and board index.",
+        content_html=content,
+    )
+
+
+def render_post_card(post, *, root_thread_id: str) -> str:
+    board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
+    subject_html = ""
+    if post.subject:
+        subject_html = f'<h3 class="post-subject">{html.escape(post.subject)}</h3>'
+
+    relation_html = ""
+    if not post.is_root:
+        relation_html = (
+            f'<p class="post-relation">thread <a href="/threads/{html.escape(root_thread_id)}">{html.escape(root_thread_id)}</a>'
+            f' · parent <a href="/posts/{html.escape(post.parent_id or "")}">{html.escape(post.parent_id or "")}</a></p>'
+        )
+
+    return (
+        '<article class="post-card">'
+        '<div class="post-meta-row">'
+        f'<p class="post-id">{html.escape(post.post_id)}</p>'
+        f'<p class="post-tags">{board_tags}</p>'
+        "</div>"
+        f"{subject_html}"
+        f"{relation_html}"
+        f'<div class="post-body">{render_body_html(post.body)}</div>'
+        f'<p class="post-link"><a href="/posts/{html.escape(post.post_id)}">permalink</a></p>'
+        "</article>"
+    )
+
+
+def render_body_html(body: str) -> str:
+    lines = body.splitlines() or [""]
+    rendered = []
+    for line in lines:
+        escaped = html.escape(line)
+        if line.startswith(">"):
+            rendered.append(f'<p class="quote-line">{escaped}</p>')
+        else:
+            rendered.append(f"<p>{escaped}</p>")
+    return "".join(rendered)
+
+
+def render_breadcrumb(items: list[tuple[str, str]]) -> str:
+    links = "".join(
+        f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
+        for path, label in items
+    )
+    return f'<nav class="breadcrumb">{links}</nav>'
+
+
+def first_line(body: str) -> str:
+    return body.splitlines()[0] if body.splitlines() else ""
+
+
 def render_not_found() -> str:
     return render_page(
         title="Not Found",
         hero_kicker="Missing route",
         hero_title="Nothing is published here yet",
-        hero_text="This loop is publishing the board index first. Thread and permalink routes land in later stages of the same feature.",
-        content_html='<section class="panel"><p>Available now: <a href="/">board index</a> and <a href="/assets/site.css">site.css</a>.</p></section>',
+        hero_text="This reader publishes a board index, thread pages, and post permalinks. The requested route did not match any known resource.",
+        content_html='<section class="panel"><p>Available now: <a href="/">board index</a>. Thread pages live at <code>/threads/{thread-id}</code> and posts at <code>/posts/{post-id}</code>.</p></section>',
+    )
+
+
+def render_missing_resource(resource_name: str) -> str:
+    return render_page(
+        title="Not Found",
+        hero_kicker="Missing resource",
+        hero_title="This record could not be located",
+        hero_text=f"The requested {resource_name} does not exist in the current repository state.",
+        content_html='<section class="panel"><p>Return to the <a href="/">board index</a> to browse available threads.</p></section>',
     )
 
 
@@ -92,6 +216,32 @@ def application(environ, start_response):
             headers = [("Content-Type", "text/css; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
+
+        if path.startswith("/threads/"):
+            thread_id = path.removeprefix("/threads/")
+            try:
+                body = render_thread(thread_id).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except LookupError:
+                body = render_missing_resource("thread").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+        if path.startswith("/posts/"):
+            post_id = path.removeprefix("/posts/")
+            try:
+                body = render_post(post_id).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except LookupError:
+                body = render_missing_resource("post").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
 
         body = render_not_found().encode("utf-8")
         headers = [("Content-Type", "text/html; charset=utf-8")]

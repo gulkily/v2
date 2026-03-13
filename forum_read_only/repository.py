@@ -100,3 +100,11 @@ def list_threads_by_board(threads: list[Thread]) -> list[tuple[str, tuple[Thread
         section_threads = tuple(sorted(threads_by_board[tag], key=lambda thread: thread.root.post_id))
         ordered_sections.append((tag, section_threads))
     return ordered_sections
+
+
+def index_posts(posts: list[Post]) -> dict[str, Post]:
+    return {post.post_id: post for post in posts}
+
+
+def index_threads(threads: list[Thread]) -> dict[str, Thread]:
+    return {thread.root.post_id: thread for thread in threads}
