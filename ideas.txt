@@ -1,0 +1,9 @@
+URL hierarchy idea for later:
+
+- Add a real collection route at `/threads/` so `/threads/{thread_id}` has a proper parent listing.
+- Update thread breadcrumbs to point to `/threads/` instead of `/`.
+- Consider separate collection routes like `/boards/{tag}/` for board-tag listings.
+- Define and enforce a trailing-slash policy:
+  - collection routes use trailing slashes
+  - item routes do not
+- Keep this shelved for now; do not fold it into the current loop yet.
