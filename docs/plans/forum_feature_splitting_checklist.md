@@ -21,7 +21,7 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
   - Includes: `list_index`, `get_thread`, `get_post`.
   - Demonstrable result: browser UI and API both show the same content from the same repository state.
 
-- [ ] Loop 4: Basic posting without identity richness
+- [x] Loop 4: Basic posting without identity richness
   - Goal: allow creation of new threads and replies with minimal required fields.
   - Includes: `create_thread`, `create_reply`, canonical payload validation, direct git commits.
   - Demonstrable result: a user can create a thread locally and immediately see it in the UI and API.
