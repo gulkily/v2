@@ -11,12 +11,12 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
   - Includes: repository directories, one-file-per-post rule, header/body format, ASCII-only constraints, sample records.
   - Demonstrable result: a repo with hand-authored sample posts that can be inspected directly in a text editor and in git history.
 
-- [ ] Loop 2: Read-only thread and index rendering
+- [x] Loop 2: Read-only thread and index rendering
   - Goal: render the sample repository through a local web interface.
   - Includes: board-tag index, thread view, permalink view, deterministic parsing, no write path yet.
   - Demonstrable result: a local web app that reads text files from the repo and displays browsable threads.
 
-- [ ] Loop 3: Read-only plain-text HTTP API
+- [x] Loop 3: Read-only plain-text HTTP API
   - Goal: expose the same read views through the CGI-style API contract.
   - Includes: `list_index`, `get_thread`, `get_post`.
   - Demonstrable result: browser UI and API both show the same content from the same repository state.
@@ -80,9 +80,9 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
 
 ## Suggested First Three Loops
 
-- [ ] First: repository layout and canonical post format
-- [ ] Second: read-only thread and index rendering
-- [ ] Third: read-only plain-text HTTP API
+- [x] First: repository layout and canonical post format
+- [x] Second: read-only thread and index rendering
+- [x] Third: read-only plain-text HTTP API
 
 These three loops would give you a demonstrable system very early:
 - text-native content in git
