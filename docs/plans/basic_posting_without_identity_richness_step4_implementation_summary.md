@@ -11,3 +11,15 @@
 - Notes:
   - Stage 2 will switch `create_thread` from dry-run preview to real file creation and git commit behavior.
   - Stage 3 will do the same for `create_reply`.
+
+## Stage 2 - create_thread
+- Changes:
+  - Switched `cgi-bin/create_thread.py` from dry-run preview to real write behavior.
+  - Added shared storage-and-commit handling so an accepted root payload now writes `records/posts/<post-id>.txt` and creates a deterministic git commit.
+  - Kept `create_reply` in dry-run mode so the loop still advances one write command at a time.
+- Verification:
+  - Ran `cgi-bin/create_thread.py` against a temporary local clone and confirmed a `200 OK` response with `Record-ID`, `Thread-ID`, `Commit-ID`, and `Stored-Path`.
+  - Confirmed the command created `records/posts/stage2-created-thread.txt` in the temporary clone and produced git commit subject `create_thread: stage2-created-thread`.
+  - Confirmed the new thread was immediately visible through `/api/get_thread?thread_id=stage2-created-thread` and `/threads/stage2-created-thread` when the existing reader was pointed at the temporary clone.
+- Notes:
+  - Success responses now return `Record-ID`, `Thread-ID`, `Commit-ID`, and `Stored-Path`, matching the Loop 4 write contract for thread creation.

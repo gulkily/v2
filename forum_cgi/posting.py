@@ -114,6 +114,17 @@ def write_post_file(post: Post, repo_root: Path, payload_text: str) -> Path:
     return post_path
 
 
+def store_post(command_name: str, post: Post, repo_root: Path, payload_text: str) -> tuple[str, str]:
+    ensure_post_id_available(post, repo_root)
+    post_path = write_post_file(post, repo_root, payload_text)
+    commit_id = commit_post(
+        repo_root,
+        post_path,
+        message=build_commit_message(command_name, post.post_id),
+    )
+    return commit_id, str(post_path.relative_to(repo_root))
+
+
 def commit_post(repo_root: Path, post_path: Path, *, message: str) -> str:
     env = os.environ.copy()
     env.setdefault("GIT_AUTHOR_NAME", "Forum CGI")

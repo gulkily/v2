@@ -9,10 +9,16 @@ from forum_cgi.posting import (
     get_repo_root,
     parse_payload,
     read_ascii_payload,
+    store_post,
     validate_create_reply,
     validate_create_thread,
 )
-from forum_cgi.text import render_cgi_response, render_error_body, render_preview_body
+from forum_cgi.text import (
+    render_cgi_response,
+    render_error_body,
+    render_preview_body,
+    render_success_body,
+)
 
 
 def run_create_thread() -> int:
@@ -21,15 +27,14 @@ def run_create_thread() -> int:
         post = parse_payload(payload_text)
         repo_root = get_repo_root()
         validate_create_thread(post)
-        preview = build_preview("create_thread", post, repo_root)
+        commit_id, stored_path = store_post("create_thread", post, repo_root, payload_text)
         response = render_cgi_response(
             "200 OK",
-            render_preview_body(
-                command_name=preview.command_name,
-                record_id=preview.record_id,
-                thread_id=preview.thread_id,
-                stored_path=preview.stored_path,
-                commit_message=preview.commit_message,
+            render_success_body(
+                record_id=post.post_id,
+                thread_id=post.post_id,
+                commit_id=commit_id,
+                stored_path=stored_path,
             ),
         )
     except PostingError as exc:
