@@ -7,3 +7,28 @@ URL hierarchy idea for later:
   - collection routes use trailing slashes
   - item routes do not
 - Keep this shelved for now; do not fold it into the current loop yet.
+
+Board-index scaling idea for later:
+
+- The current `/` page renders every tag section and every matching thread card on each request.
+- With around 100 threads in one tag, the page will become too long and awkward even if it still renders correctly.
+- With around 100 tags, the tag chip list and the number of rendered sections will become unwieldy, especially because multi-tag threads appear in multiple sections.
+- Likely fixes:
+  - make `/` a summary page instead of the full board dump
+  - add `/boards/{tag}/` pages for one tag at a time
+  - paginate or cap threads per board page
+  - later, consider derived indexes if direct-read rendering becomes too slow
+- Keep this shelved for now; do not fold it into the current loop yet.
+
+Multi-repo content idea for later:
+
+- Multiple content repos are likely a good long-term fit for decentralization, policy variation, and smaller clone sizes.
+- Prefer designing for multi-source aggregation before making `git subtree` the main live-storage mechanism.
+- A future instance could read several content repos as one logical forum view while writing new posts to one chosen target repo.
+- `git subtree` may still be useful for imports or archival snapshots, but it is probably awkward as the default write path for active content.
+- Before this becomes real, the protocol likely needs:
+  - globally unique record IDs rather than only repo-local `Post-ID` values
+  - explicit source-repo identity in the read model
+  - rules for whether threads can span repos
+  - rules for which repo receives new posts
+- Keep this shelved for now; do not fold it into the current loop yet.
