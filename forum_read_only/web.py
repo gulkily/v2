@@ -3,8 +3,10 @@ from __future__ import annotations
 import html
 import os
 from pathlib import Path
+from urllib.parse import parse_qs
 from wsgiref.util import setup_testing_defaults
 
+from forum_read_only.api_text import render_api_home_text
 from forum_read_only.repository import (
     group_threads,
     index_posts,
@@ -23,10 +25,15 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def render_board_index() -> str:
+def load_repository_state():
     posts = load_posts(get_repo_root() / "records" / "posts")
     threads = group_threads(posts)
     board_tags = list_board_tags(posts)
+    return posts, threads, board_tags
+
+
+def render_board_index() -> str:
+    posts, threads, board_tags = load_repository_state()
     board_sections = list_threads_by_board(threads)
 
     stats_html = (
@@ -74,8 +81,8 @@ def render_board_section(tag: str, threads) -> str:
 
 
 def render_thread(thread_id: str) -> str:
-    posts = load_posts(get_repo_root() / "records" / "posts")
-    threads = index_threads(group_threads(posts))
+    posts, grouped_threads, _ = load_repository_state()
+    threads = index_threads(grouped_threads)
     thread = threads.get(thread_id)
     if thread is None:
         raise LookupError(f"unknown thread: {thread_id}")
@@ -102,7 +109,7 @@ def render_thread(thread_id: str) -> str:
 
 
 def render_post(post_id: str) -> str:
-    posts = load_posts(get_repo_root() / "records" / "posts")
+    posts, _, _ = load_repository_state()
     post = index_posts(posts).get(post_id)
     if post is None:
         raise LookupError(f"unknown post: {post_id}")
@@ -200,11 +207,27 @@ def render_missing_resource(resource_name: str) -> str:
     )
 
 
+def render_api_home() -> str:
+    posts, threads, board_tags = load_repository_state()
+    return render_api_home_text(
+        post_count=len(posts),
+        thread_count=len(threads),
+        board_tags=board_tags,
+    )
+
+
 def application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
+    _query_params = parse_qs(environ.get("QUERY_STRING", ""))
 
     try:
+        if path == "/api/":
+            body = render_api_home().encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
         if path == "/":
             body = render_board_index().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
