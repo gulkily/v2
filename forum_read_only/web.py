@@ -7,6 +7,7 @@ from urllib.parse import parse_qs
 from wsgiref.util import setup_testing_defaults
 
 from forum_read_only.api_text import render_api_home_text
+from forum_read_only.api_text import render_bad_request_text, render_index_text
 from forum_read_only.repository import (
     group_threads,
     index_posts,
@@ -216,16 +217,42 @@ def render_api_home() -> str:
     )
 
 
+def render_api_list_index(board_tag: str | None) -> str:
+    _, threads, board_tags = load_repository_state()
+    if board_tag and board_tag not in board_tags:
+        return render_bad_request_text(f"unknown board_tag: {board_tag}")
+
+    if board_tag:
+        threads = [
+            thread
+            for thread in threads
+            if board_tag in thread.root.board_tags
+        ]
+
+    return render_index_text(threads, board_tag=board_tag)
+
+
 def application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
-    _query_params = parse_qs(environ.get("QUERY_STRING", ""))
+    query_params = parse_qs(environ.get("QUERY_STRING", ""))
 
     try:
         if path == "/api/":
             body = render_api_home().encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response("200 OK", headers)
+            return [body]
+
+        if path == "/api/list_index":
+            board_tag = query_params.get("board_tag", [""])[0].strip() or None
+            body_text = render_api_list_index(board_tag)
+            status = "200 OK"
+            if body_text.startswith("Error-Code: bad_request"):
+                status = "400 Bad Request"
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
             return [body]
 
         if path == "/":

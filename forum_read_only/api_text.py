@@ -21,8 +21,13 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     return "\n".join(lines) + "\n"
 
 
-def render_index_text(threads: list[Thread]) -> str:
-    lines = [f"Entry-Count: {len(threads)}", ""]
+def render_index_text(threads: list[Thread], *, board_tag: str | None = None) -> str:
+    lines = [
+        "Command: list_index",
+        f"Board-Tag: {board_tag or 'all'}",
+        f"Entry-Count: {len(threads)}",
+        "",
+    ]
     for thread in threads:
         lines.append(
             "\t".join(
