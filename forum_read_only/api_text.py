@@ -45,8 +45,7 @@ def render_index_text(threads: list[Thread], *, board_tag: str | None = None) ->
 def render_thread_text(thread: Thread) -> str:
     lines = [
         f"Thread-ID: {thread.root.post_id}",
-        f"Root-Subject: {thread.root.subject or ''}",
-        f"Reply-Count: {len(thread.replies)}",
+        f"Record-Count: {1 + len(thread.replies)}",
         "",
         render_post_block(thread.root),
     ]

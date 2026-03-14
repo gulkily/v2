@@ -19,3 +19,17 @@
   - Called `/api/list_index?board_tag=missing` and confirmed a stable `400 Bad Request` plain-text error.
 - Notes:
   - The response rows currently expose thread ID, subject, board tags, and reply count, which is enough for CLI and agent inspection in this slice.
+
+## Stage 3 - get_thread and get_post
+- Changes:
+  - Added the `/api/get_thread` and `/api/get_post` read endpoints to the existing WSGI app.
+  - Reused the canonical repository reader so thread and post API lookups stay aligned with the browser views.
+  - Added stable plain-text `bad_request` and `not_found` handling for missing query parameters and unknown records.
+- Verification:
+  - Called `/api/get_thread?thread_id=oak-gate-quiet-work` and confirmed a `200 OK` response with `Record-Count: 4` and deterministic post order matching the repository grouping logic.
+  - Called `/api/get_post?post_id=reply-009` and confirmed the response body matches the canonical post block in `records/posts/reply-009.txt`.
+  - Called `/api/get_thread` without a query parameter and confirmed a stable `400 Bad Request` plain-text error.
+  - Called `/api/get_post?post_id=missing` and confirmed a stable `404 Not Found` plain-text error.
+- Notes:
+  - `get_post` returns the canonical post block for the requested post.
+  - `get_thread` returns a simple thread envelope followed by the canonical post blocks in deterministic thread order.

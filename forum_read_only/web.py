@@ -6,8 +6,14 @@ from pathlib import Path
 from urllib.parse import parse_qs
 from wsgiref.util import setup_testing_defaults
 
-from forum_read_only.api_text import render_api_home_text
-from forum_read_only.api_text import render_bad_request_text, render_index_text
+from forum_read_only.api_text import (
+    render_api_home_text,
+    render_bad_request_text,
+    render_index_text,
+    render_not_found_text,
+    render_post_text,
+    render_thread_text,
+)
 from forum_read_only.repository import (
     group_threads,
     index_posts,
@@ -232,6 +238,30 @@ def render_api_list_index(board_tag: str | None) -> str:
     return render_index_text(threads, board_tag=board_tag)
 
 
+def render_api_get_thread(thread_id: str | None) -> tuple[str, str]:
+    if not thread_id:
+        return "400 Bad Request", render_bad_request_text("missing required query parameter: thread_id")
+
+    _, grouped_threads, _ = load_repository_state()
+    thread = index_threads(grouped_threads).get(thread_id)
+    if thread is None:
+        return "404 Not Found", render_not_found_text("thread", thread_id)
+
+    return "200 OK", render_thread_text(thread)
+
+
+def render_api_get_post(post_id: str | None) -> tuple[str, str]:
+    if not post_id:
+        return "400 Bad Request", render_bad_request_text("missing required query parameter: post_id")
+
+    posts, _, _ = load_repository_state()
+    post = index_posts(posts).get(post_id)
+    if post is None:
+        return "404 Not Found", render_not_found_text("post", post_id)
+
+    return "200 OK", render_post_text(post)
+
+
 def application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
@@ -250,6 +280,22 @@ def application(environ, start_response):
             status = "200 OK"
             if body_text.startswith("Error-Code: bad_request"):
                 status = "400 Bad Request"
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/get_thread":
+            thread_id = query_params.get("thread_id", [""])[0].strip() or None
+            status, body_text = render_api_get_thread(thread_id)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/get_post":
+            post_id = query_params.get("post_id", [""])[0].strip() or None
+            status, body_text = render_api_get_post(post_id)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
