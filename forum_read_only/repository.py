@@ -29,23 +29,22 @@ class Thread:
     replies: tuple[Post, ...]
 
 
-def parse_post(path: Path) -> Post:
-    raw_text = path.read_text(encoding="ascii")
+def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
     header_text, separator, body_text = raw_text.partition("\n\n")
     if not separator:
-        raise ValueError(f"post file is missing header/body separator: {path}")
+        raise ValueError("post text is missing header/body separator")
 
     headers: dict[str, str] = {}
     for line in header_text.splitlines():
         if ": " not in line:
-            raise ValueError(f"invalid header line in {path}: {line!r}")
+            raise ValueError(f"invalid header line: {line!r}")
         key, value = line.split(": ", 1)
         headers[key] = value.strip()
 
     post_id = headers.get("Post-ID")
     board_tags = headers.get("Board-Tags")
     if not post_id or not board_tags:
-        raise ValueError(f"post file is missing required headers: {path}")
+        raise ValueError("post text is missing required headers")
 
     subject = headers.get("Subject", "")
     thread_id = headers.get("Thread-ID")
@@ -58,8 +57,12 @@ def parse_post(path: Path) -> Post:
         thread_id=thread_id,
         parent_id=parent_id,
         body=body_text.rstrip("\n"),
-        path=path,
+        path=source_path or Path("<request>"),
     )
+
+
+def parse_post(path: Path) -> Post:
+    return parse_post_text(path.read_text(encoding="ascii"), source_path=path)
 
 
 def load_posts(records_dir: Path) -> list[Post]:

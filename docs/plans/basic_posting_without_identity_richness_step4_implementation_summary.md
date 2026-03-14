@@ -1,0 +1,13 @@
+## Stage 1 - CGI command shell and shared helpers
+- Changes:
+  - Added a small `forum_cgi` helper package for write-command parsing, validation, storage-path selection, commit preparation, and plain-text CGI response rendering.
+  - Added separate `cgi-bin/create_thread.py` and `cgi-bin/create_reply.py` entrypoints.
+  - Refactored canonical post parsing so both read and write paths can parse the same payload text directly.
+  - Kept both write commands in dry-run mode for this stage so the shell and shared helpers are proven without creating repository changes yet.
+- Verification:
+  - Called `cgi-bin/create_thread.py` with a valid root payload and confirmed a `200 OK` dry-run preview showing the future record ID, storage path, and commit message.
+  - Called `cgi-bin/create_reply.py` with a valid reply payload targeting `root-002` and confirmed a `200 OK` dry-run preview including `Parent-ID`.
+  - Called `cgi-bin/create_thread.py` with an empty request body and confirmed a stable `400 Bad Request` CGI response.
+- Notes:
+  - Stage 2 will switch `create_thread` from dry-run preview to real file creation and git commit behavior.
+  - Stage 3 will do the same for `create_reply`.
