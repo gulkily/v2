@@ -23,3 +23,16 @@
   - Confirmed the new thread was immediately visible through `/api/get_thread?thread_id=stage2-created-thread` and `/threads/stage2-created-thread` when the existing reader was pointed at the temporary clone.
 - Notes:
   - Success responses now return `Record-ID`, `Thread-ID`, `Commit-ID`, and `Stored-Path`, matching the Loop 4 write contract for thread creation.
+
+## Stage 3 - create_reply
+- Changes:
+  - Switched `cgi-bin/create_reply.py` from dry-run preview to real write behavior.
+  - Reused the shared validation, storage, and commit helpers so replies now produce canonical post files and deterministic git commits.
+  - Preserved stable error handling for missing thread targets, missing parent targets, and invalid cross-thread parent references.
+- Verification:
+  - Ran `cgi-bin/create_reply.py` against a temporary local clone and confirmed a `200 OK` response with `Record-ID`, `Thread-ID`, `Parent-ID`, `Commit-ID`, and `Stored-Path`.
+  - Confirmed the command created `records/posts/stage3-created-reply.txt` in the temporary clone and produced git commit subject `create_reply: stage3-created-reply`.
+  - Confirmed the new reply was immediately visible through `/api/get_thread?thread_id=root-002` and `/posts/stage3-created-reply` when the existing reader was pointed at the temporary clone.
+  - Called `cgi-bin/create_reply.py` with an unknown thread target and confirmed a stable `404 Not Found` CGI response with `Error-Code: not_found`.
+- Notes:
+  - Success responses now return `Record-ID`, `Thread-ID`, `Parent-ID`, `Commit-ID`, and `Stored-Path`, matching the Loop 4 write contract for reply creation.

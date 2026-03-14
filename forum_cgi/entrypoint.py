@@ -5,7 +5,6 @@ import sys
 
 from forum_cgi.posting import (
     PostingError,
-    build_preview,
     get_repo_root,
     parse_payload,
     read_ascii_payload,
@@ -16,7 +15,6 @@ from forum_cgi.posting import (
 from forum_cgi.text import (
     render_cgi_response,
     render_error_body,
-    render_preview_body,
     render_success_body,
 )
 
@@ -54,16 +52,15 @@ def run_create_reply() -> int:
         post = parse_payload(payload_text)
         repo_root = get_repo_root()
         validate_create_reply(post, repo_root)
-        preview = build_preview("create_reply", post, repo_root)
+        commit_id, stored_path = store_post("create_reply", post, repo_root, payload_text)
         response = render_cgi_response(
             "200 OK",
-            render_preview_body(
-                command_name=preview.command_name,
-                record_id=preview.record_id,
-                thread_id=preview.thread_id,
-                parent_id=preview.parent_id,
-                stored_path=preview.stored_path,
-                commit_message=preview.commit_message,
+            render_success_body(
+                record_id=post.post_id,
+                thread_id=post.thread_id or post.post_id,
+                parent_id=post.parent_id,
+                commit_id=commit_id,
+                stored_path=stored_path,
             ),
         )
     except PostingError as exc:
