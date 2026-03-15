@@ -1,0 +1,9 @@
+Task-ID: T07
+Title: Compose advanced signing UX
+Status: proposed
+Presentability-Impact: 0.81
+Implementation-Difficulty: 0.44
+Depends-On: T02 T06
+Sources: ideas.txt; todo.txt
+
+Preserve technical-details state, allow payload edits before submission, and show the server response inline so signing is more understandable and less brittle.

@@ -1,0 +1,9 @@
+Task-ID: T22
+Title: Multi-implementation parity harness
+Status: proposed
+Presentability-Impact: 0.53
+Implementation-Difficulty: 0.73
+Depends-On: T19
+Sources: docs/plans/forum_feature_splitting_checklist.md
+
+Build shared fixtures and byte-for-byte response comparison so multiple implementations can prove they speak the same protocol on the same repository state.

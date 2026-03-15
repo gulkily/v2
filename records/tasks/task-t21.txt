@@ -1,0 +1,9 @@
+Task-ID: T21
+Title: External import pipeline for subreddit and archive content
+Status: proposed
+Presentability-Impact: 0.58
+Implementation-Difficulty: 0.79
+Depends-On: T09 T19
+Sources: todo.txt
+
+Import large third-party discussion archives with author metadata, range limits, and incremental updates without overwhelming the repository layout.

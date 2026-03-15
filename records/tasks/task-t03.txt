@@ -1,0 +1,9 @@
+Task-ID: T03
+Title: Node configuration and instance status page
+Status: proposed
+Presentability-Impact: 0.88
+Implementation-Difficulty: 0.37
+Depends-On: T01
+Sources: todo.txt
+
+Publish retention policy, moderation settings, admin/contact info, commit ID, install date, and other instance-level facts in one obvious place.

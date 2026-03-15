@@ -1,0 +1,8 @@
+Task-ID: T24
+Title: Local dev server polish and v2 command cleanup
+Status: proposed
+Presentability-Impact: 0.59
+Implementation-Difficulty: 0.34
+Sources: todo.txt
+
+Add watch and reload behavior, cleaner shutdown handling, and a less confusing top-level command so local iteration feels intentional instead of improvised.

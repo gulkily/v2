@@ -1,0 +1,8 @@
+Task-ID: T05
+Title: User directory and profile discovery
+Status: proposed
+Presentability-Impact: 0.86
+Implementation-Difficulty: 0.39
+Sources: todo.txt
+
+Add a browsable directory of visible identities so profile pages are easier to reach without already knowing specific post IDs or key fingerprints.

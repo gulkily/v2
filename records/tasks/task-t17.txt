@@ -1,0 +1,9 @@
+Task-ID: T17
+Title: Hard purge tolerance
+Status: proposed
+Presentability-Impact: 0.69
+Implementation-Difficulty: 0.84
+Depends-On: T09 T16
+Sources: docs/plans/forum_feature_splitting_checklist.md
+
+Keep the forum serving coherent results after sensitive records are removed from repo state or history is rewritten, including sane placeholders and index rebuild behavior.

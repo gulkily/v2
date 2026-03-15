@@ -1,0 +1,9 @@
+Task-ID: T14
+Title: Automated spam and harm detection
+Status: proposed
+Presentability-Impact: 0.66
+Implementation-Difficulty: 0.85
+Depends-On: T13
+Sources: todo.txt
+
+Add model-assisted triage for spam and abuse after a human moderation workflow exists, rather than introducing opaque automation before moderators have review tools.

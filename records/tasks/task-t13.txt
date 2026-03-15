@@ -1,0 +1,8 @@
+Task-ID: T13
+Title: Flagging workflow and moderator dashboard
+Status: proposed
+Presentability-Impact: 0.87
+Implementation-Difficulty: 0.63
+Sources: todo.txt
+
+Let users report content, give moderators a review queue, and seed some realistic moderation fixtures so the workflow can be exercised before production pressure arrives.
