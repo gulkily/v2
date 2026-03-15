@@ -16,10 +16,11 @@ from forum_core.moderation import (
     post_is_hidden,
     thread_is_hidden,
 )
+from forum_cgi.identity_links import submit_identity_link
 from forum_cgi.moderation import submit_moderation
 from forum_cgi.posting import PostingError
 from forum_cgi.service import submit_create_reply, submit_create_thread
-from forum_cgi.text import render_error_body, render_moderation_result, render_submission_result
+from forum_cgi.text import render_error_body, render_identity_link_result, render_moderation_result, render_submission_result
 from forum_read_only.api_text import (
     render_api_home_text,
     render_bad_request_text,
@@ -667,6 +668,20 @@ def render_api_moderate(environ, *, default_dry_run: bool) -> tuple[str, str]:
     return "200 OK", render_moderation_result(result)
 
 
+def render_api_link_identity(environ, *, default_dry_run: bool) -> tuple[str, str]:
+    payload = read_json_request(environ)
+    repo_root = get_repo_root()
+    result = submit_identity_link(
+        read_optional_text(payload, "payload") or "",
+        repo_root,
+        dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
+        signature_text=read_optional_text(payload, "signature"),
+        public_key_text=read_optional_text(payload, "public_key"),
+        require_signature=True,
+    )
+    return "200 OK", render_identity_link_result(result)
+
+
 def application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
@@ -705,6 +720,18 @@ def application(environ, start_response):
                 start_response("405 Method Not Allowed", headers)
                 return [body]
             status, body_text = render_api_moderate(environ, default_dry_run=False)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/link_identity":
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body_text = render_api_link_identity(environ, default_dry_run=False)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)

@@ -9,7 +9,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     lines = [
         "FORUM-API/1",
         "Mode: mixed",
-        "Available-Commands: list_index get_thread get_post get_profile get_moderation_log create_thread create_reply moderate",
+        "Available-Commands: list_index get_thread get_post get_profile get_moderation_log create_thread create_reply moderate link_identity",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
@@ -19,6 +19,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
         "/api/create_thread",
         "/api/create_reply",
         "/api/moderate",
+        "/api/link_identity",
         "/api/list_index",
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",
