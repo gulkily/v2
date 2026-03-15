@@ -34,6 +34,7 @@ from forum_cgi.text import (
 )
 from forum_web.api_text import (
     render_api_home_text,
+    render_llms_text,
     render_bad_request_text,
     render_index_text,
     render_llm_result_text,
@@ -1366,6 +1367,12 @@ def application(environ, start_response):
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
+            return [body]
+
+        if path == "/llms.txt":
+            body = render_llms_text().encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response("200 OK", headers)
             return [body]
 
         if path == "/":

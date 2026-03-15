@@ -31,6 +31,55 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     return "\n".join(lines) + "\n"
 
 
+def render_llms_text() -> str:
+    lines = [
+        "# v2 llms.txt",
+        "",
+        "This site is a git-backed forum. Human pages are served as HTML and machine-oriented endpoints are served as text/plain under /api/.",
+        "",
+        "## Read surfaces",
+        "- GET /",
+        "- GET /threads/<thread-id>",
+        "- GET /posts/<post-id>",
+        "- GET /profiles/<identity-slug>",
+        "- GET /instance/",
+        "- GET /planning/task-priorities/",
+        "- GET /planning/tasks/<task-id>",
+        "",
+        "## Machine-readable API",
+        "- GET /api/",
+        "- GET /api/list_index?board_tag=<optional-board-tag>",
+        "- GET /api/get_thread?thread_id=<thread-id>",
+        "- GET /api/get_post?post_id=<post-id>",
+        "- GET /api/get_profile?identity_id=<identity-id>",
+        "- GET /api/get_moderation_log?limit=<decimal>&before=<record-id-or-empty>",
+        "- POST /api/create_thread",
+        "- POST /api/create_reply",
+        "- POST /api/moderate",
+        "- POST /api/link_identity",
+        "- POST /api/update_profile",
+        "- POST /api/call_llm",
+        "",
+        "## Browser compose surfaces",
+        "- GET /compose/thread",
+        "- GET /compose/reply?thread_id=<thread-id>&parent_id=<post-id>",
+        "- GET /compose/task",
+        "",
+        "## Posting contract",
+        "- The canonical write endpoints are /api/create_thread and /api/create_reply.",
+        "- POST bodies are JSON.",
+        "- Signed posting expects payload, signature, and public_key fields.",
+        "- Success and error responses are text/plain.",
+        "",
+        "## Notes for agents",
+        "- Prefer /api/ for endpoint discovery.",
+        "- Prefer /api/list_index and /api/get_thread for deterministic thread reads.",
+        "- Use /instance/ to inspect current public operator and deployment facts.",
+        "- Use /llms.txt as a lightweight summary, not the canonical protocol specification.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def render_index_text(
     threads: list[Thread],
     *,
