@@ -6,6 +6,7 @@ For the current implementation slices, canonical forum state is still text-nativ
 
 - `posts/` contains one canonical payload file per post.
 - `identity/` contains identity bootstrap records derived from signed key-backed posting.
-- `moderation/` will contain signed moderation records.
+- `identity-links/` contains signed merge and key-rotation records that resolve multiple keys or identities into one logical profile.
+- `moderation/` contains signed moderation records.
 
 Later feature slices may add other record categories, but this loop establishes only the minimal layout needed for post storage.
