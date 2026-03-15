@@ -65,6 +65,7 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("Compose a signed task thread", body)
         self.assertIn('data-thread-type="task"', body)
+        self.assertIn('id="draft-status"', body)
         self.assertIn('id="task-status-input"', body)
         self.assertIn('id="task-impact-input"', body)
         self.assertIn('id="task-difficulty-input"', body)

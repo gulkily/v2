@@ -83,6 +83,7 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn("Second line for context.", body)
         self.assertIn("/posts/reply-001", body)
         self.assertIn('id="signed-post-form"', body)
+        self.assertIn('id="draft-status"', body)
 
     def test_compose_reply_page_does_not_leak_hidden_parent_post(self) -> None:
         self.write_record(
