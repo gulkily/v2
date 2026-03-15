@@ -36,6 +36,36 @@ function normalizeBoardTags(text) {
   return text.trim().split(/\s+/).filter(Boolean).join(" ");
 }
 
+function normalizeSingleLineAscii(value, fieldName) {
+  const trimmed = requiredTrimmed(value, fieldName);
+  if (trimmed.includes("\n") || trimmed.includes("\r")) {
+    throw new Error(`${fieldName} must be a single line`);
+  }
+  ensureAscii(trimmed, fieldName);
+  return trimmed;
+}
+
+function normalizeRating(value, fieldName) {
+  const trimmed = requiredTrimmed(value, fieldName);
+  const number = Number.parseFloat(trimmed);
+  if (Number.isNaN(number) || number < 0 || number > 1) {
+    throw new Error(`${fieldName} must be a decimal rating between 0 and 1`);
+  }
+  return number.toFixed(2);
+}
+
+function normalizeSpaceSeparatedList(text) {
+  return text.trim().split(/\s+/).filter(Boolean).join(" ");
+}
+
+function normalizeSemicolonList(text) {
+  return text
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
 function firstNonEmptyLine(text) {
   for (const line of normalizeNewlines(text).split("\n")) {
     const trimmed = line.trim();
@@ -149,6 +179,11 @@ function formState(commandName) {
   }
   return {
     body: $("body-input"),
+    taskStatus: $("task-status-input"),
+    taskImpact: $("task-impact-input"),
+    taskDifficulty: $("task-difficulty-input"),
+    taskDependencies: $("task-dependencies-input"),
+    taskSources: $("task-sources-input"),
   };
 }
 
@@ -157,6 +192,7 @@ function defaultContext(root) {
     boardTags: normalizeBoardTags(root.dataset.boardTags || "general"),
     threadId: (root.dataset.threadId || "").trim(),
     parentId: (root.dataset.parentId || "").trim(),
+    threadType: (root.dataset.threadType || "").trim(),
     sourceIdentityId: (root.dataset.sourceIdentityId || "").trim(),
     profileSlug: (root.dataset.profileSlug || "").trim(),
   };
@@ -179,6 +215,7 @@ function buildCanonicalPostPayload(form, commandName, defaults) {
   const postId = generatePostId(commandName, body);
   const boardTags = requiredTrimmed(defaults.boardTags, "Board-Tags");
   const subject = commandName === "create_thread" ? deriveSubjectFromBody(body) : "";
+  const threadType = defaults.threadType ? normalizeSingleLineAscii(defaults.threadType, "Thread-Type") : "";
 
   ensureAscii(postId, "Post-ID");
   ensureAscii(boardTags, "Board-Tags");
@@ -193,6 +230,28 @@ function buildCanonicalPostPayload(form, commandName, defaults) {
   ];
   if (subject) {
     headers.push(`Subject: ${subject}`);
+  }
+  if (threadType) {
+    headers.push(`Thread-Type: ${threadType}`);
+    if (threadType === "task") {
+      const taskStatus = normalizeSingleLineAscii(form.taskStatus?.value || "", "Task-Status");
+      const taskImpact = normalizeRating(form.taskImpact?.value || "", "Task-Presentability-Impact");
+      const taskDifficulty = normalizeRating(form.taskDifficulty?.value || "", "Task-Implementation-Difficulty");
+      const taskDependencies = normalizeSpaceSeparatedList(form.taskDependencies?.value || "");
+      const taskSources = normalizeSemicolonList(form.taskSources?.value || "");
+
+      headers.push(`Task-Status: ${taskStatus}`);
+      headers.push(`Task-Presentability-Impact: ${taskImpact}`);
+      headers.push(`Task-Implementation-Difficulty: ${taskDifficulty}`);
+      if (taskDependencies) {
+        ensureAscii(taskDependencies, "Task-Depends-On");
+        headers.push(`Task-Depends-On: ${taskDependencies}`);
+      }
+      if (taskSources) {
+        ensureAscii(taskSources, "Task-Sources");
+        headers.push(`Task-Sources: ${taskSources}`);
+      }
+    }
   }
 
   if (commandName === "create_reply") {
@@ -404,12 +463,23 @@ async function main() {
     return "Signed post accepted. Redirecting...";
   }
 
-  const previewInput = commandName === "update_profile" ? state.displayName : state.body;
-  previewInput.addEventListener("input", () => {
-    updatePayloadPreview(state, commandName, defaults);
-    signatureOutput.value = "";
-    responseOutput.value = "";
-  });
+  const previewInputs = commandName === "update_profile"
+    ? [state.displayName]
+    : [
+        state.body,
+        state.taskStatus,
+        state.taskImpact,
+        state.taskDifficulty,
+        state.taskDependencies,
+        state.taskSources,
+      ].filter(Boolean);
+  for (const input of previewInputs) {
+    input.addEventListener("input", () => {
+      updatePayloadPreview(state, commandName, defaults);
+      signatureOutput.value = "";
+      responseOutput.value = "";
+    });
+  }
 
   $("generate-key-button").addEventListener("click", async () => {
     setStatus("key-status", "Generating a new local signing key...");

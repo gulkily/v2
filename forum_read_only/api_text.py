@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from forum_core.moderation import ModerationRecord
 from forum_core.identity import ProfileSummary, render_profile_summary_text
-from forum_read_only.repository import Post, Thread
+from forum_read_only.repository import Post, Thread, is_task_root, root_thread_type
 
 
 def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list[str]) -> str:
@@ -101,6 +101,21 @@ def render_post_block(post: Post, *, hidden: bool = False) -> str:
         headers.append(f"Thread-ID: {post.thread_id}")
     if post.parent_id:
         headers.append(f"Parent-ID: {post.parent_id}")
+    if root_thread_type(post):
+        headers.append(f"Thread-Type: {root_thread_type(post)}")
+    if is_task_root(post):
+        assert post.task_metadata is not None
+        headers.extend(
+            [
+                f"Task-Status: {post.task_metadata.status}",
+                f"Task-Presentability-Impact: {post.task_metadata.presentability_impact:.2f}",
+                f"Task-Implementation-Difficulty: {post.task_metadata.implementation_difficulty:.2f}",
+            ]
+        )
+        if post.task_metadata.dependencies:
+            headers.append(f"Task-Depends-On: {' '.join(post.task_metadata.dependencies)}")
+        if post.task_metadata.sources:
+            headers.append(f"Task-Sources: {'; '.join(post.task_metadata.sources)}")
     if hidden:
         headers.append("Moderation-State: hidden")
         return "\n".join(headers + ["", "[hidden by moderation]"])

@@ -13,11 +13,15 @@
 
 ## Stage 2 - Make task creation and task-thread reading work through the native thread flow
 - Changes:
-  - Pending.
+  - Added a dedicated `/compose/task` entrypoint on top of the existing signed thread creation flow, with task-specific fields for status, ratings, dependencies, and sources.
+  - Extended the browser-side canonical payload builder so `create_thread` can emit `Thread-Type: task` roots without changing the reply flow.
+  - Rendered typed task metadata directly on `/threads/<thread-id>` and surfaced typed-root badges in the main board index.
+  - Added a board-index link for composing task threads through the normal web interface.
 - Verification:
-  - Pending.
+  - `python -m unittest tests.test_task_thread_pages`
+  - `python -m py_compile forum_read_only/web.py forum_read_only/api_text.py`
 - Notes:
-  - Pending.
+  - The task-thread creation path is generic at the protocol layer: future typed root kinds can reuse the same `Thread-Type` hook without changing reply semantics.
 
 ## Stage 3 - Derive planning/task browse surfaces from typed task threads
 - Changes:

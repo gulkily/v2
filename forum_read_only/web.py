@@ -44,8 +44,10 @@ from forum_read_only.repository import (
     group_threads,
     index_posts,
     index_threads,
+    is_task_root,
     list_board_tags,
     load_posts,
+    root_thread_type,
 )
 from forum_read_only.tasks import index_tasks as index_task_records, load_tasks, task_records_dir
 from forum_read_only.templates import load_asset_text, load_template, render_page
@@ -119,11 +121,12 @@ def parse_limit_value(raw_value: str | None, *, default: int = 20) -> int:
     return limit
 
 
-def render_thread_status_badges(thread_id: str, moderation_state) -> str:
-    return "".join(
-        f'<span class="thread-badge">{"locked" if label == "locked" else "pinned"}</span>'
-        for label in thread_status_labels(thread_id, moderation_state)
-    )
+def render_thread_status_badges(thread_id: str, moderation_state, *, thread_type: str | None = None) -> str:
+    badges = []
+    if thread_type:
+        badges.append(thread_type)
+    badges.extend("locked" if label == "locked" else "pinned" for label in thread_status_labels(thread_id, moderation_state))
+    return "".join(f'<span class="thread-badge">{html.escape(label)}</span>' for label in badges)
 
 
 def resolved_profile_identity_id(identity_context, identity_id: str | None) -> str | None:
@@ -175,7 +178,7 @@ def render_board_index() -> str:
 def render_board_section(tag: str, threads, moderation_state) -> str:
     thread_cards = "".join(
         "<article class=\"thread-card\">"
-        f"{render_thread_status_badges(thread.root.post_id, moderation_state)}"
+        f"{render_thread_status_badges(thread.root.post_id, moderation_state, thread_type=root_thread_type(thread.root))}"
         f"<p class=\"thread-id\">{html.escape(thread.root.post_id)}</p>"
         f"<h3><a href=\"/threads/{html.escape(thread.root.post_id)}\">{html.escape(thread.root.subject or 'Untitled thread')}</a></h3>"
         f"<p>{html.escape(first_line(thread.root.body))}</p>"
@@ -207,6 +210,8 @@ def render_thread(thread_id: str) -> str:
     )
     thread_labels = thread_status_labels(thread_id, moderation_state)
     thread_meta = f"{visible_reply_count(thread, moderation_state)} visible repl{'y' if visible_reply_count(thread, moderation_state) == 1 else 'ies'} in this thread."
+    if root_thread_type(thread.root):
+        thread_meta = f"{root_thread_type(thread.root)} thread. {thread_meta}"
     if thread_labels:
         thread_meta += " " + " ".join(thread_labels) + "."
 
@@ -220,6 +225,7 @@ def render_thread(thread_id: str) -> str:
         thread_heading=html.escape(thread.root.subject or thread.root.post_id),
         thread_meta=thread_meta,
         reply_link_html=reply_link_html,
+        root_context_html=render_thread_root_context(thread),
         root_post_html=render_post_card(
             thread.root,
             root_thread_id=thread.root.post_id,
@@ -239,7 +245,11 @@ def render_thread(thread_id: str) -> str:
         title=thread.root.subject or thread.root.post_id,
         hero_kicker="Thread View",
         hero_title=thread.root.subject or thread.root.post_id,
-        hero_text="The thread page is rendered directly from canonical post files without a database, using deterministic reply ordering from the repository state.",
+        hero_text=(
+            "Task threads are typed root posts: the root carries structured task metadata, and replies stay ordinary task comments."
+            if is_task_root(thread.root)
+            else "The thread page is rendered directly from canonical post files without a database, using deterministic reply ordering from the repository state."
+        ),
         content_html=content,
     )
 
@@ -535,6 +545,60 @@ def first_line(body: str) -> str:
     return body.splitlines()[0] if body.splitlines() else ""
 
 
+def render_task_dependency_targets(
+    dependencies: tuple[str, ...],
+    *,
+    href_prefix: str,
+) -> str:
+    if not dependencies:
+        return "None"
+    return ", ".join(
+        f'<a href="{html.escape(href_prefix + dependency)}">{html.escape(dependency)}</a>'
+        for dependency in dependencies
+    )
+
+
+def render_task_dependency_links(
+    dependencies: tuple[str, ...],
+    *,
+    href_prefix: str = "/planning/tasks/",
+) -> str:
+    return f'<p class="dep-list">{render_task_dependency_targets(dependencies, href_prefix=href_prefix)}</p>'
+
+
+def render_task_source_targets(sources: tuple[str, ...]) -> str:
+    if not sources:
+        return "None"
+    return "".join(f"<code>{html.escape(source)}</code>" for source in sources)
+
+
+def render_task_source_list(sources: tuple[str, ...]) -> str:
+    return f'<p class="source-list">{render_task_source_targets(sources)}</p>'
+
+
+def render_thread_root_context(thread) -> str:
+    if not is_task_root(thread.root):
+        return ""
+
+    task = thread.root.task_metadata
+    assert task is not None
+    return (
+        '<div class="task-thread-context">'
+        '<div class="section-head"><h3>Task metadata</h3>'
+        '<p>This typed root post is the current task record. Replies in this thread are task comments.</p></div>'
+        '<div class="stat-grid">'
+        f'<article class="stat-card"><span class="stat-number">{html.escape(task.status)}</span><span class="stat-label">status</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{task.presentability_impact:.2f}</span><span class="stat-label">presentability impact</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{task.implementation_difficulty:.2f}</span><span class="stat-label">implementation difficulty</span></article>'
+        "</div>"
+        '<div class="profile-grid">'
+        f'<div><strong>Dependencies:</strong> {render_task_dependency_links(task.dependencies, href_prefix="/threads/")}</div>'
+        f'<div><strong>Sources:</strong> {render_task_source_list(task.sources)}</div>'
+        "</div>"
+        "</div>"
+    )
+
+
 def render_not_found() -> str:
     return render_page(
         title="Not Found",
@@ -601,10 +665,6 @@ def render_task_priorities_row(task, *, threads, moderation_state) -> str:
         moderation_state=moderation_state,
     )
     dependency_html = render_task_dependency_links(task.dependencies)
-    sources_html = "".join(
-        f"<code>{html.escape(source)}</code>"
-        for source in task.sources
-    )
     return (
         f'<tr id="task-{html.escape(task.task_id)}"'
         f' data-id="{html.escape(task.task_id)}"'
@@ -623,19 +683,10 @@ def render_task_priorities_row(task, *, threads, moderation_state) -> str:
         f'<td><span class="rating-value">{task.presentability_impact:.2f}</span></td>'
         f'<td><span class="rating-value">{task.implementation_difficulty:.2f}</span></td>'
         f"<td>{dependency_html}</td>"
-        f'<td><p class="source-list">{sources_html}</p></td>'
+        f'<td>{render_task_source_list(task.sources)}</td>'
         f"<td>{discussion_html}</td>"
         "</tr>"
     )
-
-
-def render_task_dependency_links(dependencies: tuple[str, ...]) -> str:
-    if not dependencies:
-        return '<p class="dep-list">None</p>'
-    return '<p class="dep-list">' + ", ".join(
-        f'<a href="/planning/tasks/{html.escape(dependency)}">{html.escape(dependency)}</a>'
-        for dependency in dependencies
-    ) + "</p>"
 
 
 def render_task_discussion_summary(discussion_thread_id: str | None, *, threads, moderation_state) -> tuple[str, str]:
@@ -676,10 +727,6 @@ def render_task_detail_page(task_id: str) -> str:
         threads=threads,
         moderation_state=moderation_state,
     )
-    sources_html = "".join(
-        f"<code>{html.escape(source)}</code>"
-        for source in task.sources
-    )
     content = load_template("task_detail.html").substitute(
         breadcrumb_html=render_breadcrumb(
             [
@@ -695,7 +742,7 @@ def render_task_detail_page(task_id: str) -> str:
         task_impact=f"{task.presentability_impact:.2f}",
         task_difficulty=f"{task.implementation_difficulty:.2f}",
         dependency_html=render_task_dependency_links(task.dependencies),
-        source_html=sources_html,
+        source_html=render_task_source_targets(task.sources),
         discussion_html=discussion_html,
     )
     return render_page(
@@ -854,6 +901,22 @@ def describe_board_tags(board_tags: str) -> str:
     return " ".join(f"/{tag}/" for tag in board_tags.split())
 
 
+def render_task_compose_fields() -> str:
+    return (
+        '<section class="compose-card task-compose-fields">'
+        '<div class="section-head"><h2>Task metadata</h2>'
+        '<p>This root post becomes the current task record for the thread. Future task-state history can move into task-update records without changing the reply model.</p></div>'
+        '<div class="field-grid">'
+        '<label class="field-stack" for="task-status-input"><span>Task status</span><input id="task-status-input" name="task_status" type="text" value="proposed" maxlength="40" required></label>'
+        '<label class="field-stack" for="task-impact-input"><span>Presentability impact</span><input id="task-impact-input" name="task_impact" type="number" min="0" max="1" step="0.01" value="0.50" required></label>'
+        '<label class="field-stack" for="task-difficulty-input"><span>Implementation difficulty</span><input id="task-difficulty-input" name="task_difficulty" type="number" min="0" max="1" step="0.01" value="0.50" required></label>'
+        '<label class="field-stack" for="task-dependencies-input"><span>Dependencies</span><input id="task-dependencies-input" name="task_dependencies" type="text" value="" placeholder="T01 T02"></label>'
+        '<label class="field-stack field-grid-span" for="task-sources-input"><span>Sources</span><input id="task-sources-input" name="task_sources" type="text" value="" placeholder="todo.txt; ideas.txt"></label>'
+        "</div>"
+        "</section>"
+    )
+
+
 def render_compose_page(
     *,
     command_name: str,
@@ -866,10 +929,17 @@ def render_compose_page(
     thread_id: str = "",
     parent_id: str = "",
     reply_target_html: str = "",
+    compose_path: str = "",
+    breadcrumb_label: str = "signed compose",
+    thread_type: str = "",
+    extra_fields_html: str = "",
 ) -> str:
     breadcrumb_items = [
         ("/", "board index"),
-        ("/compose/thread" if command_name == "create_thread" else "/compose/reply", "signed compose"),
+        (
+            compose_path or ("/compose/thread" if command_name == "create_thread" else "/compose/reply"),
+            breadcrumb_label,
+        ),
     ]
     content = load_template("compose.html").substitute(
         breadcrumb_html=render_breadcrumb(breadcrumb_items),
@@ -883,7 +953,9 @@ def render_compose_page(
         board_tags_value=html.escape(board_tags),
         thread_id_value=html.escape(thread_id),
         parent_id_value=html.escape(parent_id),
+        thread_type_value=html.escape(thread_type),
         body_value="",
+        extra_fields_html=extra_fields_html,
         submit_label="Sign and preview" if dry_run else "Sign and submit",
     )
     return render_page(
@@ -1152,18 +1224,41 @@ def application(environ, start_response):
                 start_response("404 Not Found", headers)
                 return [body]
 
-        if path == "/compose/thread":
-            raw_board_tags = query_params.get("board_tags", [""])[0].strip() or query_params.get("board_tag", ["general"])[0].strip()
+        if path in {"/compose/thread", "/compose/task"}:
+            requested_thread_type = query_params.get("thread_type", [""])[0].strip()
+            if path == "/compose/task":
+                requested_thread_type = "task"
+            default_board = "planning" if requested_thread_type == "task" else "general"
+            raw_board_tags = query_params.get("board_tags", [""])[0].strip() or query_params.get("board_tag", [default_board])[0].strip()
             board_tags = normalize_board_tags_text(raw_board_tags)
-            body = render_compose_page(
-                command_name="create_thread",
-                endpoint_path="/api/create_thread",
-                compose_heading="Compose a signed thread",
-                compose_text="Generate or import a local OpenPGP key, sign a canonical thread payload in the browser, and submit the signed thread directly into repository storage.",
-                dry_run=False,
-                board_tags=board_tags,
-                context_text=f"This page will open a new signed thread in {describe_board_tags(board_tags)}. The post ID and thread title are derived automatically from what you write.",
-            ).encode("utf-8")
+            if requested_thread_type == "task":
+                body = render_compose_page(
+                    command_name="create_thread",
+                    endpoint_path="/api/create_thread",
+                    compose_heading="Compose a signed task thread",
+                    compose_text="Generate or import a local OpenPGP key, sign one task-shaped thread root in the browser, and submit it directly into repository storage.",
+                    dry_run=False,
+                    board_tags=board_tags,
+                    context_text=(
+                        f"This page will open a new task thread in {describe_board_tags(board_tags)}. "
+                        "The root post carries the structured task metadata, and future replies become task comments."
+                    ),
+                    compose_path="/compose/task",
+                    breadcrumb_label="compose task",
+                    thread_type="task",
+                    extra_fields_html=render_task_compose_fields(),
+                ).encode("utf-8")
+            else:
+                body = render_compose_page(
+                    command_name="create_thread",
+                    endpoint_path="/api/create_thread",
+                    compose_heading="Compose a signed thread",
+                    compose_text="Generate or import a local OpenPGP key, sign a canonical thread payload in the browser, and submit the signed thread directly into repository storage.",
+                    dry_run=False,
+                    board_tags=board_tags,
+                    context_text=f"This page will open a new signed thread in {describe_board_tags(board_tags)}. The post ID and thread title are derived automatically from what you write.",
+                    compose_path="/compose/thread",
+                ).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
@@ -1221,6 +1316,8 @@ def application(environ, start_response):
                 context_text=f"This signed reply will go into thread {thread.root.post_id} in {describe_board_tags(board_tags)} under parent {parent_id}. Reply linkage is filled in automatically.",
                 thread_id=thread_id,
                 parent_id=parent_id,
+                compose_path="/compose/reply",
+                breadcrumb_label="compose reply",
                 reply_target_html=render_compose_reference(
                     parent_post,
                     root_thread_id=thread.root.post_id,
