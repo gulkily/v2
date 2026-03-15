@@ -505,6 +505,15 @@ button:disabled {
   font-size: 1rem;
 }
 
+.task-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.task-link:hover {
+  color: var(--accent);
+}
+
 .task-note,
 .task-status,
 .dep-list,
@@ -518,6 +527,11 @@ button:disabled {
 
 .task-note {
   max-width: 32rem;
+}
+
+.task-note--detail {
+  margin-top: 1rem;
+  max-width: 48rem;
 }
 
 .task-status {

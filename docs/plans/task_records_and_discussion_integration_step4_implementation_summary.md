@@ -20,3 +20,15 @@
   - Requested `/assets/task_priorities.js` through the WSGI app and confirmed `200 OK` with `text/javascript; charset=utf-8`.
 - Notes:
   - The planning index now supports linked discussion-state rendering, but the dedicated task detail surface remains Stage 3.
+
+## Stage 3 - Task detail view and discussion linkage
+- Changes:
+  - Added `/planning/tasks/<task-id>` as the canonical task detail route.
+  - Linked task IDs, titles, and dependency references from the planning index into the new detail surface.
+  - Added task-detail discussion summaries that point to the normal thread view and compose-reply flow when a task record declares `Discussion-Thread-ID`.
+- Verification:
+  - Ran `python -m py_compile forum_read_only/web.py`.
+  - Requested `/planning/tasks/T01` through the WSGI app against the current repo and confirmed `200 OK` with the seeded task title.
+  - Ran a temp-repo smoke check with one task record linked to `root-001` and confirmed `/planning/tasks/T99` renders the linked thread URL and compose-reply URL, while `/planning/tasks/T404` returns `404 Not Found` with the existing missing-resource copy.
+- Notes:
+  - The task detail page intentionally summarizes linked discussion state instead of embedding full thread rendering, so comments still live on the normal thread surface.
