@@ -19,3 +19,13 @@
   - Confirmed the route returned `200 OK` and rendered the instance facts section, the canonical route path, and tracked contact information.
 - Notes:
   - The route currently exists without main-page navigation; discoverability is handled in Stage 3 so the route and source contract stay decoupled.
+
+## Stage 3 - Board Index Discoverability
+- Changes:
+  - Added an `instance info` action to the main board-index action row in `templates/board_index.html`.
+  - Kept the link on the existing primary public navigation surface so the page is visible in one click without adding a new global navigation system.
+- Verification:
+  - Ran a focused WSGI smoke check with `python3 -c ...` against `/`.
+  - Confirmed the board index returned `200 OK`, rendered the `instance info` label, and linked directly to `/instance/`.
+- Notes:
+  - The board-index action row now carries four primary public destinations; the wording stays intentionally technical to match the feature’s audience.
