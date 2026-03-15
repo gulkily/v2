@@ -1,0 +1,76 @@
+<section class="panel">
+  ${breadcrumb_html}
+  <div class="section-head">
+    <h2>${compose_heading}</h2>
+    <p>${compose_text}</p>
+  </div>
+</section>
+
+<section id="compose-app" class="panel compose-panel" data-command="${command_name}" data-endpoint="${endpoint_path}" data-dry-run="${dry_run_value}">
+  <div class="compose-grid">
+    <section class="compose-card">
+      <div class="section-head">
+        <h2>Local Key</h2>
+        <p>Generate or import an OpenPGP keypair and keep it in this browser for signed posting.</p>
+      </div>
+      <div class="action-row">
+        <button id="generate-key-button" type="button">Generate Key</button>
+        <button id="import-key-button" type="button">Import Key</button>
+      </div>
+      <p id="key-status" class="status-note">No local key loaded yet.</p>
+      <label class="field-stack" for="private-key-input">
+        <span>ASCII-armored private key</span>
+        <textarea id="private-key-input" rows="10" spellcheck="false"></textarea>
+      </label>
+      <label class="field-stack" for="public-key-output">
+        <span>ASCII-armored public key</span>
+        <textarea id="public-key-output" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+    </section>
+
+    <section class="compose-card">
+      <div class="section-head">
+        <h2>Signed Post</h2>
+        <p>The browser builds a canonical ASCII payload, signs it, and submits the payload plus detached signature.</p>
+      </div>
+      <form id="signed-post-form" class="field-stack">
+        <label class="field-stack" for="post-id-input">
+          <span>Post-ID</span>
+          <input id="post-id-input" name="post_id" value="${post_id_value}" required>
+        </label>
+        <label class="field-stack" for="board-tags-input">
+          <span>Board tags</span>
+          <input id="board-tags-input" name="board_tags" value="${board_tags_value}" required>
+        </label>
+        <label class="field-stack" for="subject-input">
+          <span>Subject</span>
+          <input id="subject-input" name="subject" value="${subject_value}">
+        </label>
+        <label class="field-stack" for="thread-id-input">
+          <span>Thread-ID</span>
+          <input id="thread-id-input" name="thread_id" value="${thread_id_value}" ${thread_id_readonly}>
+        </label>
+        <label class="field-stack" for="parent-id-input">
+          <span>Parent-ID</span>
+          <input id="parent-id-input" name="parent_id" value="${parent_id_value}" ${parent_id_readonly}>
+        </label>
+        <label class="field-stack" for="body-input">
+          <span>Body</span>
+          <textarea id="body-input" name="body" rows="10" spellcheck="true" required>${body_value}</textarea>
+        </label>
+        <div class="action-row">
+          <button id="sign-submit-button" type="submit">${submit_label}</button>
+        </div>
+      </form>
+      <p id="submit-status" class="status-note">Waiting for signed submission.</p>
+      <label class="field-stack" for="signature-output">
+        <span>Detached signature preview</span>
+        <textarea id="signature-output" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field-stack" for="response-output">
+        <span>Server response</span>
+        <textarea id="response-output" rows="10" spellcheck="false" readonly></textarea>
+      </label>
+    </section>
+  </div>
+</section>

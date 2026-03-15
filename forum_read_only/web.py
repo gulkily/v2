@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 from pathlib import Path
 from urllib.parse import parse_qs
 from wsgiref.util import setup_testing_defaults
 
+from forum_cgi.posting import PostingError
+from forum_cgi.service import submit_create_reply, submit_create_thread
+from forum_cgi.text import render_error_body, render_submission_result
 from forum_read_only.api_text import (
     render_api_home_text,
     render_bad_request_text,
@@ -103,6 +107,7 @@ def render_thread(thread_id: str) -> str:
         ),
         thread_heading=html.escape(thread.root.subject or thread.root.post_id),
         thread_meta=f"{len(thread.replies)} repl{'y' if len(thread.replies) == 1 else 'ies'} in this thread.",
+        reply_link_html=f'<p><a class="thread-chip" href="/compose/reply?thread_id={html.escape(thread.root.post_id)}&parent_id={html.escape(thread.root.post_id)}">compose a signed reply</a></p>',
         root_post_html=render_post_card(thread.root, root_thread_id=thread.root.post_id),
         replies_html="".join(render_post_card(reply, root_thread_id=thread.root.post_id) for reply in thread.replies),
     )
@@ -132,6 +137,7 @@ def render_post(post_id: str) -> str:
             ]
         ),
         post_heading=html.escape(heading),
+        reply_link_html=f'<p><a class="thread-chip" href="/compose/reply?thread_id={html.escape(thread_target)}&parent_id={html.escape(post.post_id)}">reply to this post</a></p>',
         post_card_html=render_post_card(post, root_thread_id=thread_target),
     )
     return render_page(
@@ -262,12 +268,150 @@ def render_api_get_post(post_id: str | None) -> tuple[str, str]:
     return "200 OK", render_post_text(post)
 
 
+def render_compose_page(
+    *,
+    command_name: str,
+    endpoint_path: str,
+    compose_heading: str,
+    compose_text: str,
+    dry_run: bool,
+    thread_id: str = "",
+    parent_id: str = "",
+) -> str:
+    breadcrumb_items = [
+        ("/", "board index"),
+        ("/compose/thread" if command_name == "create_thread" else "/compose/reply", "signed compose"),
+    ]
+    content = load_template("compose.html").substitute(
+        breadcrumb_html=render_breadcrumb(breadcrumb_items),
+        compose_heading=html.escape(compose_heading),
+        compose_text=html.escape(compose_text),
+        command_name=html.escape(command_name),
+        endpoint_path=html.escape(endpoint_path),
+        dry_run_value="true" if dry_run else "false",
+        post_id_value="",
+        board_tags_value="general",
+        subject_value="",
+        thread_id_value=html.escape(thread_id),
+        parent_id_value=html.escape(parent_id),
+        body_value="",
+        thread_id_readonly="readonly" if command_name == "create_thread" or thread_id else "",
+        parent_id_readonly="readonly" if command_name == "create_thread" else "",
+        submit_label="Sign and preview" if dry_run else "Sign and submit",
+    )
+    return render_page(
+        title=compose_heading,
+        hero_kicker="Signed Posting",
+        hero_title=compose_heading,
+        hero_text=compose_text,
+        content_html=content,
+        page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
+    )
+
+
+def read_json_request(environ) -> dict[str, object]:
+    content_length = environ.get("CONTENT_LENGTH", "").strip()
+    if not content_length:
+        raise PostingError("bad_request", "missing request body")
+    try:
+        raw_length = int(content_length)
+    except ValueError as exc:
+        raise PostingError("bad_request", "invalid content length") from exc
+
+    raw_body = environ["wsgi.input"].read(raw_length)
+    if not raw_body:
+        raise PostingError("bad_request", "missing request body")
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PostingError("bad_request", "request body must be UTF-8 JSON") from exc
+    if not isinstance(payload, dict):
+        raise PostingError("bad_request", "request body must be a JSON object")
+    return payload
+
+
+def parse_dry_run_flag(value, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    raise PostingError("bad_request", "dry_run must be a boolean")
+
+
+def read_optional_text(payload: dict[str, object], field_name: str) -> str | None:
+    value = payload.get(field_name)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise PostingError("bad_request", f"{field_name} must be a string")
+    return value if value != "" else None
+
+
+def render_api_create_thread(environ, *, default_dry_run: bool) -> tuple[str, str]:
+    payload = read_json_request(environ)
+    repo_root = get_repo_root()
+    result = submit_create_thread(
+        read_optional_text(payload, "payload") or "",
+        repo_root,
+        dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
+        signature_text=read_optional_text(payload, "signature"),
+        public_key_text=read_optional_text(payload, "public_key"),
+        require_signature=True,
+    )
+    return "200 OK", render_submission_result(result)
+
+
+def render_api_create_reply(environ, *, default_dry_run: bool) -> tuple[str, str]:
+    payload = read_json_request(environ)
+    repo_root = get_repo_root()
+    result = submit_create_reply(
+        read_optional_text(payload, "payload") or "",
+        repo_root,
+        dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
+        signature_text=read_optional_text(payload, "signature"),
+        public_key_text=read_optional_text(payload, "public_key"),
+        require_signature=True,
+    )
+    return "200 OK", render_submission_result(result)
+
+
 def application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
+    method = environ.get("REQUEST_METHOD", "GET").upper()
 
     try:
+        if path == "/api/create_thread":
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body_text = render_api_create_thread(environ, default_dry_run=True)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/create_reply":
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body_text = render_api_create_reply(environ, default_dry_run=True)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
         if path == "/api/":
             body = render_api_home().encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
@@ -307,9 +451,49 @@ def application(environ, start_response):
             start_response("200 OK", headers)
             return [body]
 
+        if path == "/compose/thread":
+            body = render_compose_page(
+                command_name="create_thread",
+                endpoint_path="/api/create_thread",
+                compose_heading="Compose a signed thread",
+                compose_text="Generate or import a local OpenPGP key, sign a canonical thread payload in the browser, and preview the signed submission before it is written.",
+                dry_run=True,
+            ).encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/compose/reply":
+            thread_id = query_params.get("thread_id", [""])[0].strip()
+            parent_id = query_params.get("parent_id", [""])[0].strip()
+            body = render_compose_page(
+                command_name="create_reply",
+                endpoint_path="/api/create_reply",
+                compose_heading="Compose a signed reply",
+                compose_text="Generate or import a local OpenPGP key, sign a canonical reply payload in the browser, and preview the signed submission before it is written.",
+                dry_run=True,
+                thread_id=thread_id,
+                parent_id=parent_id,
+            ).encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
         if path == "/assets/site.css":
             body = load_asset_text("site.css").encode("utf-8")
             headers = [("Content-Type", "text/css; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/browser_signing.js":
+            body = load_asset_text("browser_signing.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/vendor/openpgp.min.mjs":
+            body = load_asset_text("vendor/openpgp.min.mjs").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
 
@@ -342,6 +526,11 @@ def application(environ, start_response):
         body = render_not_found().encode("utf-8")
         headers = [("Content-Type", "text/html; charset=utf-8")]
         start_response("404 Not Found", headers)
+        return [body]
+    except PostingError as exc:
+        body = render_error_body(exc.error_code, exc.message).encode("utf-8")
+        headers = [("Content-Type", "text/plain; charset=utf-8")]
+        start_response(exc.status, headers)
         return [body]
     except Exception as exc:  # pragma: no cover - manual smoke checks cover this path
         body = (

@@ -27,6 +27,13 @@ class CommandPreview:
     parent_id: str | None = None
 
 
+@dataclass(frozen=True)
+class StoredArtifacts:
+    post_path: str
+    signature_path: str | None = None
+    public_key_path: str | None = None
+
+
 def get_repo_root() -> Path:
     env_root = os.environ.get("FORUM_REPO_ROOT")
     if env_root:
@@ -97,6 +104,16 @@ def ensure_post_id_available(post: Post, repo_root: Path) -> None:
         raise PostingError("conflict", f"post already exists: {post.post_id}", status="409 Conflict")
 
 
+def ensure_ascii_text(value: str, *, field_name: str) -> str:
+    try:
+        value.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise PostingError("bad_request", f"{field_name} must be ASCII") from exc
+    if not value.strip():
+        raise PostingError("bad_request", f"{field_name} must not be blank")
+    return value
+
+
 def build_preview(command_name: str, post: Post, repo_root: Path) -> CommandPreview:
     return CommandPreview(
         command_name=command_name,
@@ -114,27 +131,68 @@ def write_post_file(post: Post, repo_root: Path, payload_text: str) -> Path:
     return post_path
 
 
-def store_post(command_name: str, post: Post, repo_root: Path, payload_text: str) -> tuple[str, str]:
+def resolve_signature_path(repo_root: Path, post_id: str) -> Path:
+    return records_dir(repo_root) / f"{post_id}.txt.asc"
+
+
+def resolve_public_key_path(repo_root: Path, post_id: str) -> Path:
+    return records_dir(repo_root) / f"{post_id}.txt.pub.asc"
+
+
+def write_ascii_file(path: Path, text: str) -> Path:
+    path.write_text(text, encoding="ascii")
+    return path
+
+
+def store_post(
+    command_name: str,
+    post: Post,
+    repo_root: Path,
+    payload_text: str,
+    *,
+    signature_text: str | None = None,
+    public_key_text: str | None = None,
+) -> tuple[str, StoredArtifacts]:
     ensure_post_id_available(post, repo_root)
     post_path = write_post_file(post, repo_root, payload_text)
+    signature_path = None
+    public_key_path = None
+    paths = [post_path]
+    if signature_text is not None:
+        signature_path = write_ascii_file(
+            resolve_signature_path(repo_root, post.post_id),
+            ensure_ascii_text(signature_text, field_name="signature"),
+        )
+        paths.append(signature_path)
+    if public_key_text is not None:
+        public_key_path = write_ascii_file(
+            resolve_public_key_path(repo_root, post.post_id),
+            ensure_ascii_text(public_key_text, field_name="public_key"),
+        )
+        paths.append(public_key_path)
+
     commit_id = commit_post(
         repo_root,
-        post_path,
+        paths,
         message=build_commit_message(command_name, post.post_id),
     )
-    return commit_id, str(post_path.relative_to(repo_root))
+    return commit_id, StoredArtifacts(
+        post_path=str(post_path.relative_to(repo_root)),
+        signature_path=str(signature_path.relative_to(repo_root)) if signature_path else None,
+        public_key_path=str(public_key_path.relative_to(repo_root)) if public_key_path else None,
+    )
 
 
-def commit_post(repo_root: Path, post_path: Path, *, message: str) -> str:
+def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
     env = os.environ.copy()
     env.setdefault("GIT_AUTHOR_NAME", "Forum CGI")
     env.setdefault("GIT_AUTHOR_EMAIL", "forum-cgi@example.invalid")
     env.setdefault("GIT_COMMITTER_NAME", env["GIT_AUTHOR_NAME"])
     env.setdefault("GIT_COMMITTER_EMAIL", env["GIT_AUTHOR_EMAIL"])
 
-    relative_path = str(post_path.relative_to(repo_root))
+    relative_paths = [str(path.relative_to(repo_root)) for path in paths]
     subprocess.run(
-        ["git", "-C", str(repo_root), "add", relative_path],
+        ["git", "-C", str(repo_root), "add", *relative_paths],
         check=True,
         env=env,
     )
@@ -149,7 +207,7 @@ def commit_post(repo_root: Path, post_path: Path, *, message: str) -> str:
             "-m",
             message,
             "--",
-            relative_path,
+            *relative_paths,
         ],
         check=True,
         env=env,

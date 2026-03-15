@@ -3,38 +3,21 @@ from __future__ import annotations
 import subprocess
 import sys
 
-from forum_cgi.posting import (
-    PostingError,
-    get_repo_root,
-    parse_payload,
-    read_ascii_payload,
-    store_post,
-    validate_create_reply,
-    validate_create_thread,
-)
+from forum_cgi.posting import PostingError, get_repo_root, read_ascii_payload
+from forum_cgi.service import submit_create_reply, submit_create_thread
 from forum_cgi.text import (
     render_cgi_response,
     render_error_body,
-    render_success_body,
+    render_submission_result,
 )
 
 
 def run_create_thread() -> int:
     try:
         payload_text = read_ascii_payload()
-        post = parse_payload(payload_text)
         repo_root = get_repo_root()
-        validate_create_thread(post)
-        commit_id, stored_path = store_post("create_thread", post, repo_root, payload_text)
-        response = render_cgi_response(
-            "200 OK",
-            render_success_body(
-                record_id=post.post_id,
-                thread_id=post.post_id,
-                commit_id=commit_id,
-                stored_path=stored_path,
-            ),
-        )
+        result = submit_create_thread(payload_text, repo_root, dry_run=False)
+        response = render_cgi_response("200 OK", render_submission_result(result))
     except PostingError as exc:
         response = render_cgi_response(exc.status, render_error_body(exc.error_code, exc.message))
     except subprocess.CalledProcessError as exc:
@@ -49,20 +32,9 @@ def run_create_thread() -> int:
 def run_create_reply() -> int:
     try:
         payload_text = read_ascii_payload()
-        post = parse_payload(payload_text)
         repo_root = get_repo_root()
-        validate_create_reply(post, repo_root)
-        commit_id, stored_path = store_post("create_reply", post, repo_root, payload_text)
-        response = render_cgi_response(
-            "200 OK",
-            render_success_body(
-                record_id=post.post_id,
-                thread_id=post.thread_id or post.post_id,
-                parent_id=post.parent_id,
-                commit_id=commit_id,
-                stored_path=stored_path,
-            ),
-        )
+        result = submit_create_reply(payload_text, repo_root, dry_run=False)
+        response = render_cgi_response("200 OK", render_submission_result(result))
     except PostingError as exc:
         response = render_cgi_response(exc.status, render_error_body(exc.error_code, exc.message))
     except subprocess.CalledProcessError as exc:

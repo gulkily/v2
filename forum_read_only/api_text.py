@@ -6,14 +6,16 @@ from forum_read_only.repository import Post, Thread
 def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list[str]) -> str:
     lines = [
         "FORUM-API/1",
-        "Mode: read-only",
-        "Available-Commands: list_index get_thread get_post",
+        "Mode: mixed",
+        "Available-Commands: list_index get_thread get_post create_thread create_reply",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
         "",
         "Routes:",
         "/api/",
+        "/api/create_thread",
+        "/api/create_reply",
         "/api/list_index",
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",

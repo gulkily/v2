@@ -12,7 +12,15 @@ def load_template(name: str) -> Template:
     return Template(template_path.read_text(encoding="utf-8"))
 
 
-def render_page(*, title: str, hero_kicker: str, hero_title: str, hero_text: str, content_html: str) -> str:
+def render_page(
+    *,
+    title: str,
+    hero_kicker: str,
+    hero_title: str,
+    hero_text: str,
+    content_html: str,
+    page_script_html: str = "",
+) -> str:
     base = load_template("base.html")
     return base.substitute(
         title=title,
@@ -20,6 +28,7 @@ def render_page(*, title: str, hero_kicker: str, hero_title: str, hero_text: str
         hero_title=hero_title,
         hero_text=hero_text,
         content_html=content_html,
+        page_script_html=page_script_html,
     )
 
 
