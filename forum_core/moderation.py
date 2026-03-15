@@ -53,6 +53,10 @@ def moderation_sort_key(record: ModerationRecord) -> tuple[str, str]:
     return record.timestamp, record.record_id
 
 
+def moderation_records_dir(repo_root: Path) -> Path:
+    return repo_root / "records" / "moderation"
+
+
 def ensure_timestamp_text(timestamp_text: str) -> str:
     try:
         datetime.strptime(timestamp_text, "%Y-%m-%dT%H:%M:%SZ")
@@ -178,6 +182,31 @@ def derive_moderation_state(records: list[ModerationRecord]) -> ModerationState:
         locked_thread_ids=frozenset(locked_thread_ids),
         pinned_thread_ids=frozenset(pinned_thread_ids),
     )
+
+
+def thread_is_hidden(state: ModerationState, thread_id: str) -> bool:
+    return state.hides_thread(thread_id) or state.hides_post(thread_id)
+
+
+def post_is_hidden(state: ModerationState, post_id: str, root_thread_id: str) -> bool:
+    return state.hides_post(post_id) or thread_is_hidden(state, root_thread_id)
+
+
+def moderation_log_slice(
+    records: list[ModerationRecord],
+    *,
+    limit: int,
+    before: str | None = None,
+) -> tuple[ModerationRecord, ...]:
+    ordered = sorted(records, key=moderation_sort_key, reverse=True)
+    if before:
+        for index, record in enumerate(ordered):
+            if record.record_id == before:
+                ordered = ordered[index + 1 :]
+                break
+        else:
+            raise ValueError(f"unknown moderation cursor: {before}")
+    return tuple(ordered[:limit])
 
 
 def moderator_fingerprint_allowlist(env: dict[str, str] | None = None) -> frozenset[str]:

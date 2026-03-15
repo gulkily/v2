@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forum_core.identity import build_bootstrap_record_id
+from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
 from forum_read_only.repository import Post, index_posts, load_posts, parse_post_text
 
 
@@ -103,6 +104,14 @@ def validate_create_reply(post: Post, repo_root: Path) -> None:
         raise PostingError("not_found", f"unknown parent: {post.parent_id}", status="404 Not Found")
     if parent_post.root_thread_id != post.thread_id:
         raise PostingError("bad_request", "Parent-ID must point to a post in the same thread")
+
+    moderation_state = derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root)))
+    if thread_is_hidden(moderation_state, post.thread_id):
+        raise PostingError("not_found", f"unknown thread: {post.thread_id}", status="404 Not Found")
+    if moderation_state.locks_thread(post.thread_id):
+        raise PostingError("conflict", f"thread is locked by moderation: {post.thread_id}", status="409 Conflict")
+    if post_is_hidden(moderation_state, post.parent_id, post.thread_id):
+        raise PostingError("conflict", f"parent is hidden by moderation: {post.parent_id}", status="409 Conflict")
 
 
 def ensure_post_id_available(post: Post, repo_root: Path) -> None:

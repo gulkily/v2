@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from forum_core.moderation import ModerationRecord
 from forum_core.identity import ProfileSummary, render_profile_summary_text
 from forum_read_only.repository import Post, Thread
 
@@ -8,7 +9,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     lines = [
         "FORUM-API/1",
         "Mode: mixed",
-        "Available-Commands: list_index get_thread get_post get_profile create_thread create_reply moderate",
+        "Available-Commands: list_index get_thread get_post get_profile get_moderation_log create_thread create_reply moderate",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
@@ -22,11 +23,22 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",
         "/api/get_profile?identity_id=<identity-id>",
+        "/api/get_moderation_log?limit=<decimal>&before=<record-id-or-empty>",
     ]
     return "\n".join(lines) + "\n"
 
 
-def render_index_text(threads: list[Thread], *, board_tag: str | None = None) -> str:
+def render_index_text(
+    threads: list[Thread],
+    *,
+    board_tag: str | None = None,
+    visible_reply_counts: dict[str, int] | None = None,
+    pinned_thread_ids: frozenset[str] | None = None,
+    locked_thread_ids: frozenset[str] | None = None,
+) -> str:
+    reply_counts = visible_reply_counts or {}
+    pinned_ids = pinned_thread_ids or frozenset()
+    locked_ids = locked_thread_ids or frozenset()
     lines = [
         "Command: list_index",
         f"Board-Tag: {board_tag or 'all'}",
@@ -40,34 +52,43 @@ def render_index_text(threads: list[Thread], *, board_tag: str | None = None) ->
                     thread.root.post_id,
                     thread.root.subject or "",
                     " ".join(thread.root.board_tags),
-                    str(len(thread.replies)),
+                    str(reply_counts.get(thread.root.post_id, len(thread.replies))),
+                    "pinned" if thread.root.post_id in pinned_ids else "",
+                    "locked" if thread.root.post_id in locked_ids else "",
                 ]
             )
         )
     return "\n".join(lines) + "\n"
 
 
-def render_thread_text(thread: Thread) -> str:
+def render_thread_text(
+    thread: Thread,
+    *,
+    hidden_post_ids: frozenset[str] | None = None,
+    locked: bool = False,
+) -> str:
+    hidden_ids = hidden_post_ids or frozenset()
     lines = [
         f"Thread-ID: {thread.root.post_id}",
+        f"Thread-State: {'locked' if locked else 'open'}",
         f"Record-Count: {1 + len(thread.replies)}",
         "",
-        render_post_block(thread.root),
+        render_post_block(thread.root, hidden=thread.root.post_id in hidden_ids),
     ]
     for reply in thread.replies:
-        lines.extend(["", render_post_block(reply)])
+        lines.extend(["", render_post_block(reply, hidden=reply.post_id in hidden_ids)])
     return "\n".join(lines) + "\n"
 
 
-def render_post_text(post: Post) -> str:
-    return render_post_block(post) + "\n"
+def render_post_text(post: Post, *, hidden: bool = False) -> str:
+    return render_post_block(post, hidden=hidden) + "\n"
 
 
 def render_profile_text(summary: ProfileSummary) -> str:
     return render_profile_summary_text(summary)
 
 
-def render_post_block(post: Post) -> str:
+def render_post_block(post: Post, *, hidden: bool = False) -> str:
     headers = [
         f"Post-ID: {post.post_id}",
         f"Board-Tags: {' '.join(post.board_tags)}",
@@ -78,7 +99,39 @@ def render_post_block(post: Post) -> str:
         headers.append(f"Thread-ID: {post.thread_id}")
     if post.parent_id:
         headers.append(f"Parent-ID: {post.parent_id}")
+    if hidden:
+        headers.append("Moderation-State: hidden")
+        return "\n".join(headers + ["", "[hidden by moderation]"])
     return "\n".join(headers + ["", post.body])
+
+
+def render_moderation_log_text(
+    records: tuple[ModerationRecord, ...],
+    *,
+    limit: int,
+    before: str | None,
+) -> str:
+    lines = [
+        "Command: get_moderation_log",
+        f"Limit: {limit}",
+        f"Before: {before or ''}",
+        f"Entry-Count: {len(records)}",
+        "",
+    ]
+    for record in records:
+        lines.append(
+            "\t".join(
+                [
+                    record.record_id,
+                    record.timestamp,
+                    record.action,
+                    record.target_type,
+                    record.target_id,
+                    record.signer_fingerprint or "",
+                ]
+            )
+        )
+    return "\n".join(lines) + "\n"
 
 
 def render_not_found_text(resource_name: str, resource_id: str) -> str:

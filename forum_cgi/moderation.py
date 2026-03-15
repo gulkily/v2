@@ -7,6 +7,7 @@ from forum_core.identity import build_identity_id
 from forum_core.moderation import (
     ModerationRecord,
     is_authorized_moderator,
+    moderation_records_dir,
     parse_moderation_text,
 )
 from forum_cgi.posting import (
@@ -36,11 +37,6 @@ class ModerationSubmissionResult:
     public_key_path: str | None = None
     signer_fingerprint: str | None = None
     identity_id: str | None = None
-
-
-def moderation_records_dir(repo_root: Path) -> Path:
-    return repo_root / "records" / "moderation"
-
 
 def resolve_moderation_path(repo_root: Path, record_id: str) -> Path:
     return moderation_records_dir(repo_root) / f"{record_id}.txt"
