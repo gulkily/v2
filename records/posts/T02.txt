@@ -2,7 +2,7 @@ Post-ID: T02
 Board-Tags: planning
 Subject: Compose autosave and draft recovery
 Thread-Type: task
-Task-Status: proposed
+Task-Status: done
 Task-Presentability-Impact: 0.91
 Task-Implementation-Difficulty: 0.31
 Task-Sources: todo.txt
