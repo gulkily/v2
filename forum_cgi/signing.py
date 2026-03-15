@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -74,3 +75,43 @@ def verify_detached_signature(
                     return parts[2]
 
     raise PostingError("bad_request", "signature verification did not yield a signer fingerprint")
+
+
+def sign_detached_payload(
+    *,
+    payload_text: str,
+    private_key_text: str,
+) -> str:
+    payload_text = ensure_ascii_text(payload_text, field_name="payload")
+    private_key_text = ensure_ascii_text(private_key_text, field_name="private_key")
+    openpgp_module_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs").as_uri()
+    script = f"""
+import * as openpgp from {json.dumps(openpgp_module_url)};
+const privateKey = await openpgp.readPrivateKey({{
+  armoredKey: {json.dumps(private_key_text)},
+}});
+const message = await openpgp.createMessage({{
+  text: {json.dumps(payload_text)},
+}});
+const signature = await openpgp.sign({{
+  message,
+  signingKeys: privateKey,
+  detached: true,
+  format: "armored",
+}});
+process.stdout.write(signature);
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "--input-type=module",
+            "--eval",
+            script,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise PostingError("bad_request", "payload signing failed")
+    return ensure_ascii_text(result.stdout, field_name="signature")
