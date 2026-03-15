@@ -21,3 +21,15 @@
   - Ran `REQUEST_METHOD=GET REQUEST_URI=/assets/site.css QUERY_STRING= SERVER_NAME=localhost SERVER_PORT=80 SERVER_PROTOCOL=HTTP/1.1 php php_host/public/index.php` and confirmed the PHP shim returned CSS content for the asset route.
 - Notes:
   - The PHP shim currently shells out to the Python CGI bridge for each request, which keeps the adapter thin but makes host capability requirements explicit.
+
+## Stage 3 - Canonical write paths through the PHP shim
+- Changes:
+  - Updated [index.php](/home/wsl/v2/php_host/public/index.php) so the adapter uses `FORUM_PHP_APP_ROOT` for locating deployed application code and preserves the existing meaning of `FORUM_REPO_ROOT` as the forum data repository root.
+  - Updated [index.php](/home/wsl/v2/php_host/public/index.php) to read request bodies from `php://stdin` when verified through CLI-style execution, keeping hosted `POST` request forwarding intact for the adapter smoke harness.
+  - Extended [php_primary_host_installation.md](/home/wsl/v2/docs/php_primary_host_installation.md) to document the app-root override and to state explicitly that browser compose and API writes remain on `/api/create_thread` and `/api/create_reply`.
+- Verification:
+  - Ran a disposable hosted-path harness that generated an OpenPGP keypair, signed a thread payload, and submitted `POST /api/create_thread` through `php_host/public/index.php` with `FORUM_PHP_APP_ROOT=/home/wsl/v2` and `FORUM_REPO_ROOT=<temp repo>`; confirmed a stored thread record, signature/public-key sidecars, identity bootstrap record, and git commit `create_thread: php-host-thread-001`.
+  - Ran the same hosted-path harness for `POST /api/create_reply`; confirmed a stored reply record plus git commit `create_reply: php-host-reply-001`.
+  - Requested `GET /compose/thread` through the PHP shim and confirmed the rendered page still points at `/api/create_thread`.
+- Notes:
+  - The write smoke harness reports the current auto-reply failure path when no Dedalus connectivity is available, but the root thread write still succeeds and remains committed as expected.

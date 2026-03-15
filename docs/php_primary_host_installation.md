@@ -38,11 +38,13 @@ The supported installation shape assumes:
 - the sample adapter artifacts in `php_host/public/` copied into the host's public web root
 - the sample read bridge in `cgi-bin/forum_web.py` deployed with the rest of the repo
 
+If the public web root is separated from the application checkout, the sample `index.php` supports `FORUM_PHP_APP_ROOT` as an adapter-only override for locating the deployed Python application files. This is separate from the existing `FORUM_REPO_ROOT`, which keeps its canonical meaning as the forum data repository root.
+
 The exact file layout can vary by host, but the adapter contract stays fixed:
 
 1. Apache routes non-static read requests through the PHP front controller.
-2. The PHP front controller forwards the request into the canonical Python read surface.
-3. Write requests continue to reach the canonical Python write commands without changing endpoint names or payload formats.
+2. The PHP front controller forwards the request into the canonical Python surface.
+3. Browser compose and API write requests continue to use `/api/create_thread` and `/api/create_reply` without changing payload formats or response shapes.
 
 ## Minimal Adapter Contract
 The PHP adapter must do only the following:

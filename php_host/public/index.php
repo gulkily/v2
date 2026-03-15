@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-function forum_repo_root(): string
+function forum_app_root(): string
 {
-    $configured = getenv('FORUM_REPO_ROOT');
+    $configured = getenv('FORUM_PHP_APP_ROOT');
     if (is_string($configured) && $configured !== '') {
         return rtrim($configured, DIRECTORY_SEPARATOR);
     }
@@ -76,14 +76,26 @@ function forum_apply_cgi_response(string $response): void
     echo $body;
 }
 
-$repoRoot = forum_repo_root();
-$command = forum_python_command($repoRoot);
+function forum_input_stream()
+{
+    $input = fopen('php://input', 'rb');
+    if ($input !== false && PHP_SAPI !== 'cli') {
+        return $input;
+    }
+    if ($input !== false) {
+        fclose($input);
+    }
+    return fopen('php://stdin', 'rb');
+}
+
+$appRoot = forum_app_root();
+$command = forum_python_command($appRoot);
 $descriptorSpec = [
     0 => ['pipe', 'r'],
     1 => ['pipe', 'w'],
     2 => ['pipe', 'w'],
 ];
-$process = proc_open($command, $descriptorSpec, $pipes, $repoRoot, forum_cgi_environment());
+$process = proc_open($command, $descriptorSpec, $pipes, $appRoot, forum_cgi_environment());
 
 if (!is_resource($process)) {
     http_response_code(500);
@@ -92,7 +104,7 @@ if (!is_resource($process)) {
     exit;
 }
 
-$input = fopen('php://input', 'rb');
+$input = forum_input_stream();
 if ($input !== false) {
     stream_copy_to_stream($input, $pipes[0]);
     fclose($input);
