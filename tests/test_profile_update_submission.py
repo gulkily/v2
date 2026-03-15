@@ -180,6 +180,37 @@ process.stdout.write(signature);
         log_result = self.run_command(["git", "log", "--oneline", "--max-count", "1"], cwd=self.repo_root)
         self.assertIn("update_profile: profile-update-test-001", log_result.stdout)
 
+    def test_profile_page_escapes_script_shaped_display_name(self) -> None:
+        payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-002
+            Action: set_display_name
+            Source-Identity-ID: {self.identity_id}
+            Timestamp: 2026-03-14T12:01:00Z
+
+            <script>alert()</script>
+            """
+        ).lstrip()
+        signature_text = self.sign_payload(payload_text)
+        request_body = json.dumps(
+            {
+                "payload": payload_text,
+                "signature": signature_text,
+                "public_key": self.public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        status, _, body = self.request("/api/update_profile", method="POST", body=request_body)
+
+        self.assertEqual(status, "200 OK")
+
+        profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
+
+        self.assertEqual(profile_status, "200 OK")
+        self.assertNotIn("<script>alert()</script>", profile_body)
+        self.assertIn("&lt;script&gt;alert()&lt;/script&gt;", profile_body)
+
 
 if __name__ == "__main__":
     unittest.main()
