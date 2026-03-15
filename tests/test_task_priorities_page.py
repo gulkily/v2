@@ -47,6 +47,21 @@ class TaskPrioritiesPageTests(unittest.TestCase):
             """,
         )
         self.write_record(
+            "records/posts/T03.txt",
+            """
+            Post-ID: T03
+            Board-Tags: planning
+            Subject: Third task thread
+            Thread-Type: task
+            Task-Status: done
+            Task-Presentability-Impact: 0.20
+            Task-Implementation-Difficulty: 0.10
+            Task-Sources: notes.txt
+
+            One completed task thread.
+            """,
+        )
+        self.write_record(
             "records/posts/reply-001.txt",
             """
             Post-ID: reply-001
@@ -77,10 +92,10 @@ class TaskPrioritiesPageTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def get(self, path: str) -> tuple[str, dict[str, str], str]:
+    def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": "GET",
             "CONTENT_LENGTH": "0",
             "wsgi.input": BytesIO(b""),
@@ -109,16 +124,40 @@ class TaskPrioritiesPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
         self.assertIn("Development task priorities", body)
+        self.assertIn("Open task table", body)
         self.assertIn('data-sortable-table', body)
         self.assertIn("Presentability impact", body)
         self.assertIn("Implementation difficulty", body)
         self.assertIn("Comments", body)
         self.assertIn("/planning/tasks/T01", body)
+        self.assertIn("/planning/tasks/T02", body)
+        self.assertNotIn("/planning/tasks/T03", body)
         self.assertIn("/threads/T01", body)
         self.assertIn("visible reply", body)
         self.assertIn('class="col-task-main"', body)
         self.assertIn('class="page-shell page-shell-wide"', body)
+        self.assertIn('href="/planning/task-priorities/?view=done"', body)
+        self.assertIn('href="/planning/task-priorities/?view=all"', body)
         self.assertNotIn("Future typed root", body)
+
+    def test_done_task_view_shows_only_done_tasks(self) -> None:
+        status, _, body = self.get("/planning/task-priorities/", "view=done")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Done task table", body)
+        self.assertIn("/planning/tasks/T03", body)
+        self.assertNotIn("/planning/tasks/T01", body)
+        self.assertNotIn("/planning/tasks/T02", body)
+        self.assertIn('class="thread-chip thread-chip-active"', body)
+
+    def test_all_task_view_shows_open_and_done_tasks(self) -> None:
+        status, _, body = self.get("/planning/task-priorities/", "view=all")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("All task table", body)
+        self.assertIn("/planning/tasks/T01", body)
+        self.assertIn("/planning/tasks/T02", body)
+        self.assertIn("/planning/tasks/T03", body)
 
     def test_task_detail_page_shows_task_thread_actions(self) -> None:
         status, headers, body = self.get("/planning/tasks/T01")

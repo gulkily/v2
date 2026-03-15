@@ -650,10 +650,46 @@ def render_missing_resource(resource_name: str) -> str:
         content_html='<section class="panel"><p>Return to the <a href="/">board index</a> to browse available threads.</p></section>',
     )
 
+def is_task_open(thread) -> bool:
+    task = thread.root.task_metadata
+    assert task is not None
+    return task.status.strip().lower() != "done"
 
-def render_task_priorities_page() -> str:
+
+def filter_task_threads(task_threads, *, mode: str):
+    if mode == "done":
+        return [thread for thread in task_threads if not is_task_open(thread)]
+    if mode == "all":
+        return list(task_threads)
+    return [thread for thread in task_threads if is_task_open(thread)]
+
+
+def task_filter_mode_from_request(raw_mode: str | None) -> str:
+    mode = (raw_mode or "").strip().lower()
+    if mode in {"done", "all"}:
+        return mode
+    return "open"
+
+
+def render_task_filter_nav(*, current_mode: str) -> str:
+    links = [
+        ("open", "/planning/task-priorities/", "open tasks"),
+        ("done", "/planning/task-priorities/?view=done", "done tasks"),
+        ("all", "/planning/task-priorities/?view=all", "all tasks"),
+    ]
+    parts = []
+    for mode, href, label in links:
+        classes = "thread-chip"
+        if mode == current_mode:
+            classes += " thread-chip-active"
+        parts.append(f'<a class="{classes}" href="{href}">{html.escape(label)}</a>')
+    return "".join(parts)
+
+
+def render_task_priorities_page(*, view_mode: str) -> str:
     _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
     task_threads = load_task_threads(grouped_threads, moderation_state)
+    filtered_threads = filter_task_threads(task_threads, mode=view_mode)
     total_comments = sum(visible_reply_count(thread, moderation_state) for thread in task_threads)
     dependency_count = sum(len(thread.root.task_metadata.dependencies) for thread in task_threads if thread.root.task_metadata)
     stats_html = (
@@ -665,18 +701,44 @@ def render_task_priorities_page() -> str:
     )
     rows_html = "".join(
         render_task_priorities_row(thread, moderation_state=moderation_state)
-        for thread in task_threads
+        for thread in filtered_threads
     )
     if not rows_html:
         rows_html = (
             '<tr><td colspan="7"><p class="discussion-note">'
-            "No task threads are published yet."
+            "No tasks match this view yet."
             "</p></td></tr>"
+        )
+
+    table_heading = "Open task table"
+    intro_text = (
+        "The default view shows open tasks. Switch to done or all-task views as needed, "
+        "and use the table headers to sort without changing the canonical repository order."
+    )
+    table_text = (
+        "Dependencies link to task-detail routes in this page. The comments column points back to "
+        "the canonical task thread because replies are the discussion surface."
+    )
+    if view_mode == "done":
+        table_heading = "Done task table"
+        intro_text = (
+            "This view shows completed tasks only. Use the chips below to move between open, done, "
+            "and all-task planning views."
+        )
+    elif view_mode == "all":
+        table_heading = "All task table"
+        intro_text = (
+            "This view shows every task regardless of status. Use the chips below to move between "
+            "open, done, and all-task planning views."
         )
 
     content = load_template("task_priorities.html").substitute(
         stats_html=stats_html,
         rows_html=rows_html,
+        intro_text=html.escape(intro_text),
+        table_heading=html.escape(table_heading),
+        table_text=html.escape(table_text),
+        view_nav_html=render_task_filter_nav(current_mode=view_mode),
     )
     return render_page(
         title="Development Task Priorities",
@@ -1263,7 +1325,8 @@ def application(environ, start_response):
             return [body]
 
         if path in {"/planning/task-priorities", "/planning/task-priorities/"}:
-            body = render_task_priorities_page().encode("utf-8")
+            view_mode = task_filter_mode_from_request(query_params.get("view", [""])[0])
+            body = render_task_priorities_page(view_mode=view_mode).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

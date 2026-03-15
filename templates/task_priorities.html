@@ -1,20 +1,23 @@
 <section class="panel">
   <div class="section-head">
     <h2>How to read this</h2>
-    <p>The default row order follows task-thread root IDs. Use the table headers to sort by impact, difficulty, dependencies, sources, or comment activity without changing the canonical repository order.</p>
+    <p>${intro_text}</p>
   </div>
   <div class="action-row">
     <a class="thread-chip" href="/">back to board index</a>
     <a class="thread-chip" href="/compose/task">compose a task thread</a>
     <a class="thread-chip" href="#priority-table">jump to priorities</a>
   </div>
+  <div class="action-row">
+    ${view_nav_html}
+  </div>
   ${stats_html}
 </section>
 
 <section class="panel">
   <div class="section-head">
-    <h2>Sortable task table</h2>
-    <p>Dependencies link to other task-detail routes in this page. The comments column points back to the canonical task thread because replies are the discussion surface.</p>
+    <h2>${table_heading}</h2>
+    <p>${table_text}</p>
   </div>
   <p id="task-sort-status" class="sr-only" aria-live="polite"></p>
   <div class="table-shell">

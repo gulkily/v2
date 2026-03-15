@@ -171,6 +171,13 @@ body {
   color: var(--muted);
 }
 
+.thread-chip-active {
+  border-color: rgba(139, 94, 52, 0.34);
+  background: rgba(240, 220, 191, 0.92);
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .board-section {
   scroll-margin-top: 1rem;
 }
