@@ -408,6 +408,10 @@ function captureDraftFields(state, draftContext) {
   return fields;
 }
 
+function hasDraftContent(fields) {
+  return Object.values(fields).some((value) => typeof value === "string" && value.trim() !== "");
+}
+
 function updatePayloadPreview(form, commandName, defaults) {
   const payloadOutput = $("payload-output");
   if (!payloadOutput) {
@@ -517,7 +521,13 @@ async function main() {
     window.clearTimeout(pendingDraftTimer);
     pendingDraftTimer = window.setTimeout(() => {
       try {
-        const savedDraft = saveDraft(draftContext.storageKey, captureDraftFields(state, draftContext));
+        const fields = captureDraftFields(state, draftContext);
+        if (!hasDraftContent(fields)) {
+          clearDraft(draftContext.storageKey);
+          setDraftStatus("Drafts are saved locally in this browser.");
+          return;
+        }
+        const savedDraft = saveDraft(draftContext.storageKey, fields);
         const savedAt = formatSavedAt(savedDraft.savedAt);
         setDraftStatus(
           savedAt

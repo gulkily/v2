@@ -17,3 +17,14 @@
   - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`.
 - Notes:
   - Draft state remains browser-local by design; this stage does not change submission or clear-on-success behavior yet.
+
+## Stage 3 - successful-submit clearing and final hardening
+- Changes:
+  - Cleared the matching local compose draft only after a successful non-dry-run thread or reply submission, leaving failed-submit paths untouched so recovery still works.
+  - Refined autosave so fully emptied compose forms clear their stored local draft instead of preserving meaningless blank drafts.
+  - Kept the fallback path non-fatal by continuing to surface a draft-status message when local storage is unavailable rather than blocking signing or submission.
+- Verification:
+  - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`.
+  - Ran `node --input-type=module --eval "import('node:fs/promises').then(async (fs) => { let source = await fs.readFile('templates/assets/browser_signing.js', 'utf8'); source = source.replace(/^import .*$/m, 'const openpgp = {};').replace(/main\\(\\);\\s*$/, ''); await import('data:text/javascript,' + encodeURIComponent(source)); console.log('browser_signing.js parsed'); });"` and confirmed the final shared browser module parses.
+- Notes:
+  - There is still no dedicated browser test harness for `localStorage` side effects in this repo, so submit-path clearing was verified by code inspection and the final parse/page smoke pass rather than an automated browser integration test.
