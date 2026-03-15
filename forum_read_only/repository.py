@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from forum_core.identity import build_identity_id, fingerprint_from_public_key_path
+
 
 @dataclass(frozen=True)
 class Post:
@@ -13,6 +15,10 @@ class Post:
     parent_id: str | None
     body: str
     path: Path
+    signature_path: Path | None = None
+    public_key_path: Path | None = None
+    signer_fingerprint: str | None = None
+    identity_id: str | None = None
 
     @property
     def is_root(self) -> bool:
@@ -62,7 +68,39 @@ def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
 
 
 def parse_post(path: Path) -> Post:
-    return parse_post_text(path.read_text(encoding="ascii"), source_path=path)
+    post = parse_post_text(path.read_text(encoding="ascii"), source_path=path)
+    signature_path = resolve_signature_path(path)
+    public_key_path = resolve_public_key_path(path)
+
+    signer_fingerprint = None
+    identity_id = None
+    if public_key_path is not None:
+        signer_fingerprint = fingerprint_from_public_key_path(public_key_path)
+        identity_id = build_identity_id(signer_fingerprint)
+
+    return Post(
+        post_id=post.post_id,
+        board_tags=post.board_tags,
+        subject=post.subject,
+        thread_id=post.thread_id,
+        parent_id=post.parent_id,
+        body=post.body,
+        path=post.path,
+        signature_path=signature_path,
+        public_key_path=public_key_path,
+        signer_fingerprint=signer_fingerprint,
+        identity_id=identity_id,
+    )
+
+
+def resolve_signature_path(post_path: Path) -> Path | None:
+    candidate = post_path.with_name(f"{post_path.name}.asc")
+    return candidate if candidate.exists() else None
+
+
+def resolve_public_key_path(post_path: Path) -> Path | None:
+    candidate = post_path.with_name(f"{post_path.name}.pub.asc")
+    return candidate if candidate.exists() else None
 
 
 def load_posts(records_dir: Path) -> list[Post]:
