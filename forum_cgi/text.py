@@ -138,3 +138,106 @@ def render_submission_result(result) -> str:
         identity_bootstrap_path=result.identity_bootstrap_path,
         identity_bootstrap_created=result.identity_bootstrap_created,
     )
+
+
+def render_moderation_preview_body(
+    *,
+    command_name: str,
+    record_id: str,
+    action: str,
+    target_type: str,
+    target_id: str,
+    timestamp: str,
+    stored_path: str,
+    commit_message: str,
+    signature_path: str | None = None,
+    public_key_path: str | None = None,
+    signer_fingerprint: str | None = None,
+    identity_id: str | None = None,
+) -> str:
+    fields = [
+        ("Command", command_name),
+        ("Mode", "dry_run"),
+        ("Record-ID", record_id),
+        ("Action", action),
+        ("Target-Type", target_type),
+        ("Target-ID", target_id),
+        ("Timestamp", timestamp),
+        ("Stored-Path", stored_path),
+        ("Commit-Message", commit_message),
+    ]
+    if signature_path:
+        fields.append(("Signature-Path", signature_path))
+    if public_key_path:
+        fields.append(("Public-Key-Path", public_key_path))
+    if signer_fingerprint:
+        fields.append(("Signer-Fingerprint", signer_fingerprint))
+    if identity_id:
+        fields.append(("Identity-ID", identity_id))
+    return render_body(fields)
+
+
+def render_moderation_success_body(
+    *,
+    record_id: str,
+    action: str,
+    target_type: str,
+    target_id: str,
+    timestamp: str,
+    commit_id: str,
+    stored_path: str,
+    signature_path: str | None = None,
+    public_key_path: str | None = None,
+    signer_fingerprint: str | None = None,
+    identity_id: str | None = None,
+) -> str:
+    fields = [
+        ("Record-ID", record_id),
+        ("Action", action),
+        ("Target-Type", target_type),
+        ("Target-ID", target_id),
+        ("Timestamp", timestamp),
+        ("Commit-ID", commit_id),
+        ("Stored-Path", stored_path),
+    ]
+    if signature_path:
+        fields.append(("Signature-Path", signature_path))
+    if public_key_path:
+        fields.append(("Public-Key-Path", public_key_path))
+    if signer_fingerprint:
+        fields.append(("Signer-Fingerprint", signer_fingerprint))
+    if identity_id:
+        fields.append(("Identity-ID", identity_id))
+    return render_body(fields)
+
+
+def render_moderation_result(result) -> str:
+    if result.dry_run:
+        return render_moderation_preview_body(
+            command_name=result.command_name,
+            record_id=result.record_id,
+            action=result.action,
+            target_type=result.target_type,
+            target_id=result.target_id,
+            timestamp=result.timestamp,
+            stored_path=result.stored_path,
+            commit_message=f"{result.command_name}: {result.record_id}",
+            signature_path=result.signature_path,
+            public_key_path=result.public_key_path,
+            signer_fingerprint=result.signer_fingerprint,
+            identity_id=result.identity_id,
+        )
+
+    return render_moderation_success_body(
+        record_id=result.record_id,
+        action=result.action,
+        target_type=result.target_type,
+        target_id=result.target_id,
+        timestamp=result.timestamp,
+        commit_id=result.commit_id or "",
+        stored_path=result.stored_path,
+        signature_path=result.signature_path,
+        public_key_path=result.public_key_path,
+        signer_fingerprint=result.signer_fingerprint,
+        identity_id=result.identity_id,
+    )
