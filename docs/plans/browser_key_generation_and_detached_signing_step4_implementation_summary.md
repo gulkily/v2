@@ -24,3 +24,17 @@
   - Confirmed the new signed thread was immediately visible through `/api/get_thread?thread_id=stage2-browser-thread` and `/threads/stage2-browser-thread` when the reader was pointed at the temporary clone.
 - Notes:
   - Signed reply creation remains in dry-run preview mode until Stage 3.
+
+## Stage 3 - signed reply creation from the browser
+- Changes:
+  - Switched the browser-facing `/api/create_reply` route from dry-run preview to real write behavior.
+  - Switched the browser reply compose page from preview mode to real signed submission mode.
+  - Reused the shared signed-posting service so successful browser replies now write the payload file, detached signature file, and public-key sidecar in one git-backed commit.
+- Verification:
+  - Submitted a signed reply to `/api/create_reply` against a temporary local clone and confirmed a `200 OK` response with `Record-ID`, `Thread-ID`, `Parent-ID`, `Commit-ID`, `Signature-Path`, `Public-Key-Path`, and `Signer-Fingerprint`.
+  - Confirmed the temporary clone contained `records/posts/stage3-browser-reply.txt`, `records/posts/stage3-browser-reply.txt.asc`, and `records/posts/stage3-browser-reply.txt.pub.asc`.
+  - Confirmed the temporary clone created git commit subject `create_reply: stage3-browser-reply`.
+  - Confirmed the new signed reply was immediately visible through `/api/get_thread?thread_id=root-002` and `/posts/stage3-browser-reply` when the reader was pointed at the temporary clone.
+  - Confirmed `/api/create_reply` returns a stable `404 Not Found` error when the signed reply targets an unknown thread.
+- Notes:
+  - The browser thread and permalink views now link directly into a real signed reply flow instead of a dry-run preview.
