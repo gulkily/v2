@@ -6,3 +6,20 @@ things that need to be folded into the dev process:
 
 - comparison of architecture documents and checklist, to identify anything planned in one place but missing or only implied in the other
 
+- on current page, there should be a textarea which goes to an llm, including the current page's content/context with the query
+	- uses dedalus as backend
+	- displays results in-page with js if possible
+	- content is retained on the page for the present user
+		- how?
+		- can be published  to the public as a comment on the page
+
+- a script to scan the threads status and add comments
+	- criteria for adding comments:
+		- thread has been without any comments for a certain amount of time (e.g. 24 hours)
+		- thread contains content that is inaccurate or should be corrected
+		- moderation-actionable events (e.g. spam, harassment, etc.)
+
+- moderation tools:
+	- flagging system for users to report inappropriate content
+	- automated detection of spam or harmful content using machine learning models
+	- a dashboard for moderators to review flagged content and take action (e.g. remove, warn user, etc.)
