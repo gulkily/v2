@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from forum_core.identity import ProfileSummary, render_profile_summary_text
 from forum_read_only.repository import Post, Thread
 
 
@@ -7,7 +8,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     lines = [
         "FORUM-API/1",
         "Mode: mixed",
-        "Available-Commands: list_index get_thread get_post create_thread create_reply",
+        "Available-Commands: list_index get_thread get_post get_profile create_thread create_reply",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
@@ -19,6 +20,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
         "/api/list_index",
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",
+        "/api/get_profile?identity_id=<identity-id>",
     ]
     return "\n".join(lines) + "\n"
 
@@ -58,6 +60,10 @@ def render_thread_text(thread: Thread) -> str:
 
 def render_post_text(post: Post) -> str:
     return render_post_block(post) + "\n"
+
+
+def render_profile_text(summary: ProfileSummary) -> str:
+    return render_profile_summary_text(summary)
 
 
 def render_post_block(post: Post) -> str:

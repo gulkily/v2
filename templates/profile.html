@@ -1,0 +1,33 @@
+<section class="panel">
+  ${breadcrumb_html}
+  <div class="section-head">
+    <h2>${profile_heading}</h2>
+    <p>${profile_subhead}</p>
+  </div>
+  ${stat_html}
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>Bootstrap Material</h2>
+    <p>This identity is currently anchored by visible public-key material in the repository.</p>
+  </div>
+  <div class="profile-grid">
+    <p><strong>Identity-ID:</strong> <code>${bootstrap_identity_id}</code></p>
+    <p><strong>Fingerprint:</strong> <code>${bootstrap_fingerprint}</code></p>
+    <p><strong>Bootstrap source post:</strong> <a href="/posts/${bootstrap_post_id}">${bootstrap_post_id}</a></p>
+    <p><strong>Bootstrap source thread:</strong> <a href="/threads/${bootstrap_thread_id}">${bootstrap_thread_id}</a></p>
+    <p><strong>Bootstrap path:</strong> <code>${bootstrap_path}</code></p>
+  </div>
+  <pre class="key-block">${public_key_text}</pre>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>Visible Signed Posts</h2>
+    <p>These posts currently map to the same identity in repository state.</p>
+  </div>
+  <div class="profile-links">
+    ${post_links_html}
+  </div>
+</section>

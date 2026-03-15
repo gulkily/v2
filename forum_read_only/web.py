@@ -4,9 +4,10 @@ import html
 import json
 import os
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
+from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_cgi.posting import PostingError
 from forum_cgi.service import submit_create_reply, submit_create_thread
 from forum_cgi.text import render_error_body, render_submission_result
@@ -16,8 +17,10 @@ from forum_read_only.api_text import (
     render_index_text,
     render_not_found_text,
     render_post_text,
+    render_profile_text,
     render_thread_text,
 )
+from forum_read_only.profiles import find_profile_summary
 from forum_read_only.repository import (
     group_threads,
     index_posts,
@@ -149,6 +152,52 @@ def render_post(post_id: str) -> str:
     )
 
 
+def render_profile(identity_id: str) -> str:
+    posts, _, _ = load_repository_state()
+    summary = find_profile_summary(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_id=identity_id,
+    )
+    if summary is None:
+        raise LookupError(f"unknown identity: {identity_id}")
+
+    post_links_html = "".join(
+        f'<a class="thread-chip" href="/posts/{html.escape(post_id)}">{html.escape(post_id)}</a>'
+        for post_id in summary.post_ids
+    ) or '<p>No visible signed posts are currently associated with this identity.</p>'
+    content = load_template("profile.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ("/", "board index"),
+                (f"/profiles/{identity_slug(summary.identity_id)}", summary.identity_id),
+            ]
+        ),
+        profile_heading=html.escape(short_identity_label(summary.signer_fingerprint)),
+        profile_subhead=html.escape(summary.identity_id),
+        stat_html=(
+            '<div class="stat-grid">'
+            f'<article class="stat-card"><span class="stat-number">{len(summary.post_ids)}</span><span class="stat-label">visible posts</span></article>'
+            f'<article class="stat-card"><span class="stat-number">{len(summary.thread_ids)}</span><span class="stat-label">threads touched</span></article>'
+            "</div>"
+        ),
+        bootstrap_identity_id=html.escape(summary.identity_id),
+        bootstrap_fingerprint=html.escape(summary.signer_fingerprint),
+        bootstrap_post_id=html.escape(summary.bootstrap_post_id),
+        bootstrap_thread_id=html.escape(summary.bootstrap_thread_id),
+        bootstrap_path=html.escape(summary.bootstrap_path),
+        public_key_text=html.escape(summary.public_key_text),
+        post_links_html=post_links_html,
+    )
+    return render_page(
+        title=summary.identity_id,
+        hero_kicker="Profile View",
+        hero_title=short_identity_label(summary.signer_fingerprint),
+        hero_text="This profile view is derived from visible repository records. It shows the current identity anchor and the signed posts that map to the same key-backed identity.",
+        content_html=content,
+    )
+
+
 def render_post_card(post, *, root_thread_id: str) -> str:
     board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
     subject_html = ""
@@ -162,6 +211,13 @@ def render_post_card(post, *, root_thread_id: str) -> str:
             f' · parent <a href="/posts/{html.escape(post.parent_id or "")}">{html.escape(post.parent_id or "")}</a></p>'
         )
 
+    identity_html = ""
+    if post.identity_id and post.signer_fingerprint:
+        identity_html = (
+            f'<p class="post-identity">signed by <a href="/profiles/{html.escape(identity_slug(post.identity_id))}">'
+            f'{html.escape(short_identity_label(post.signer_fingerprint))}</a></p>'
+        )
+
     return (
         '<article class="post-card">'
         '<div class="post-meta-row">'
@@ -169,6 +225,7 @@ def render_post_card(post, *, root_thread_id: str) -> str:
         f'<p class="post-tags">{board_tags}</p>'
         "</div>"
         f"{subject_html}"
+        f"{identity_html}"
         f"{relation_html}"
         f'<div class="post-body">{render_body_html(post.body)}</div>'
         f'<p class="post-link"><a href="/posts/{html.escape(post.post_id)}">permalink</a></p>'
@@ -266,6 +323,22 @@ def render_api_get_post(post_id: str | None) -> tuple[str, str]:
         return "404 Not Found", render_not_found_text("post", post_id)
 
     return "200 OK", render_post_text(post)
+
+
+def render_api_get_profile(identity_id: str | None) -> tuple[str, str]:
+    if not identity_id:
+        return "400 Bad Request", render_bad_request_text("missing required query parameter: identity_id")
+
+    posts, _, _ = load_repository_state()
+    summary = find_profile_summary(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_id=identity_id,
+    )
+    if summary is None:
+        return "404 Not Found", render_not_found_text("identity", identity_id)
+
+    return "200 OK", render_profile_text(summary)
 
 
 def normalize_board_tags_text(raw_text: str) -> str:
@@ -453,6 +526,14 @@ def application(environ, start_response):
             start_response(status, headers)
             return [body]
 
+        if path == "/api/get_profile":
+            identity_id = query_params.get("identity_id", [""])[0].strip() or None
+            status, body_text = render_api_get_profile(identity_id)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
         if path == "/":
             body = render_board_index().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
@@ -558,6 +639,20 @@ def application(environ, start_response):
                 return [body]
             except LookupError:
                 body = render_missing_resource("post").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+        if path.startswith("/profiles/"):
+            slug = unquote(path.removeprefix("/profiles/"))
+            try:
+                identity_id = identity_id_from_slug(slug)
+                body = render_profile(identity_id).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except (LookupError, ValueError):
+                body = render_missing_resource("profile").encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
                 start_response("404 Not Found", headers)
                 return [body]

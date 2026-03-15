@@ -257,7 +257,8 @@ body {
 .post-id,
 .post-tags,
 .post-relation,
-.post-link {
+.post-link,
+.post-identity {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
@@ -292,6 +293,33 @@ body {
 .post-card a:hover,
 .breadcrumb a:hover {
   color: var(--ink);
+}
+
+.profile-grid {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.profile-grid p {
+  margin: 0;
+}
+
+.profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.key-block {
+  overflow-x: auto;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(139, 94, 52, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 249, 240, 0.84);
+  color: var(--ink);
+  font: 0.82rem/1.45 "Courier New", Courier, monospace;
 }
 
 input,
