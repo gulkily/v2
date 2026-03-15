@@ -26,7 +26,7 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
   - Includes: `create_thread`, `create_reply`, canonical payload validation, direct git commits.
   - Demonstrable result: a user can create a thread locally and immediately see it in the UI and API.
 
-- [ ] Loop 5: Browser key generation and detached signing
+- [x] Loop 5: Browser key generation and detached signing
   - Goal: add minimal OpenPGP-backed posting from the browser.
   - Includes: key generation/import, detached signatures, server-side verification when required.
   - Demonstrable result: signed posting works end-to-end from a browser and from CLI tooling.
