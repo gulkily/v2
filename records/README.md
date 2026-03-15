@@ -9,5 +9,6 @@ For the current implementation slices, canonical forum state is still text-nativ
 - `identity-links/` contains signed merge and key-rotation records that resolve multiple keys or identities into one logical profile.
 - `profile-updates/` contains signed profile-metadata updates such as display-name changes for resolved identities.
 - `moderation/` contains signed moderation records.
+- `tasks/` contains one canonical planning record per task, including ratings, dependencies, and optional links to discussion threads.
 
 Later feature slices may add other record categories, but this loop establishes only the minimal layout needed for post storage.

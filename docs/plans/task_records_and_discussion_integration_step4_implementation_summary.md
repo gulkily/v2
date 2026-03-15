@@ -32,3 +32,14 @@
   - Ran a temp-repo smoke check with one task record linked to `root-001` and confirmed `/planning/tasks/T99` renders the linked thread URL and compose-reply URL, while `/planning/tasks/T404` returns `404 Not Found` with the existing missing-resource copy.
 - Notes:
   - The task detail page intentionally summarizes linked discussion state instead of embedding full thread rendering, so comments still live on the normal thread surface.
+
+## Stage 4 - Focused tests and record-family docs
+- Changes:
+  - Added task-model tests covering structured parsing plus dependency validation failures.
+  - Replaced the planning-page stub test with record-backed route coverage for the planning index, task detail view, linked discussion actions, unlinked tasks, and missing-task behavior.
+  - Updated `records/README.md` so the new `tasks/` record family is discoverable beside the existing canonical record categories.
+- Verification:
+  - Ran `python -m unittest tests.test_task_records tests.test_task_priorities_page` and confirmed `Ran 8 tests ... OK`.
+  - Manually requested `/planning/task-priorities/` and `/planning/tasks/T01` through the WSGI app against the current repo and confirmed both returned `200 OK` with `text/html; charset=utf-8`.
+- Notes:
+  - The current repo seed data still leaves discussion links optional; linked-discussion behavior is covered in temp-repo tests until canonical task-discussion threads are added to the repo.
