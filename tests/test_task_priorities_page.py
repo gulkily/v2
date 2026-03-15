@@ -116,6 +116,8 @@ class TaskPrioritiesPageTests(unittest.TestCase):
         self.assertIn("/planning/tasks/T01", body)
         self.assertIn("/threads/T01", body)
         self.assertIn("visible reply", body)
+        self.assertIn('class="col-task-main"', body)
+        self.assertIn('class="page-shell page-shell-wide"', body)
         self.assertNotIn("Future typed root", body)
 
     def test_task_detail_page_shows_task_thread_actions(self) -> None:

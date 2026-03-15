@@ -31,6 +31,11 @@ body {
   padding: 2rem 0 3rem;
 }
 
+.page-shell.page-shell-wide {
+  width: calc(100vw - 2rem);
+  max-width: 1600px;
+}
+
 .hero {
   position: relative;
   overflow: hidden;
@@ -447,6 +452,34 @@ button:disabled {
   border-collapse: collapse;
 }
 
+.priority-table .col-task-id {
+  width: 7%;
+}
+
+.priority-table .col-task-main {
+  width: 37%;
+}
+
+.priority-table .col-impact {
+  width: 11%;
+}
+
+.priority-table .col-difficulty {
+  width: 13%;
+}
+
+.priority-table .col-dependencies {
+  width: 11%;
+}
+
+.priority-table .col-sources {
+  width: 13%;
+}
+
+.priority-table .col-comments {
+  width: 8%;
+}
+
 .priority-table caption {
   padding: 0 0 1rem;
   text-align: left;
@@ -517,6 +550,7 @@ button:disabled {
 .task-title {
   margin: 0 0 0.3rem;
   font-size: 1rem;
+  line-height: 1.35;
 }
 
 .task-link {
@@ -526,6 +560,16 @@ button:disabled {
 
 .task-link:hover {
   color: var(--accent);
+}
+
+.task-note {
+  margin: 0 0 0.45rem;
+  line-height: 1.45;
+}
+
+.task-status,
+.discussion-note {
+  margin: 0;
 }
 
 .task-note,

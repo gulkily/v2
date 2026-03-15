@@ -685,6 +685,7 @@ def render_task_priorities_page() -> str:
         hero_text="This planning index is derived from typed task thread roots in `records/posts/`. The root post carries the current task metadata, and ordinary replies are the task comments.",
         content_html=content,
         page_script_html='<script src="/assets/task_priorities.js"></script>',
+        page_shell_class="page-shell-wide",
     )
 
 

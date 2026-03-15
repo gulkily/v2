@@ -21,6 +21,7 @@ def render_page(
     hero_text: str,
     content_html: str,
     page_script_html: str = "",
+    page_shell_class: str = "",
 ) -> str:
     base = load_template("base.html")
     return base.substitute(
@@ -30,6 +31,7 @@ def render_page(
         hero_text=html.escape(hero_text),
         content_html=content_html,
         page_script_html=page_script_html,
+        page_shell_class=html.escape(page_shell_class),
     )
 
 
