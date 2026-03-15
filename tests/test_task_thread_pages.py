@@ -129,6 +129,7 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn("Task updated", body)
         self.assertIn("Status changed from proposed to done.", body)
         self.assertIn("<strong>Status:</strong> done", body)
+        self.assertIn('/planning/task-priorities/?view=done', body)
         record_text = (self.repo_root / "records/posts/T01.txt").read_text(encoding="ascii")
         self.assertIn("Task-Status: done", record_text)
 
@@ -140,6 +141,20 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertEqual(status, "409 Conflict")
         self.assertIn("Task update failed", body)
         self.assertIn("task is already done: T01", body)
+
+    def test_done_task_moves_between_filtered_priority_views(self) -> None:
+        self.post("/planning/tasks/T01/mark-done")
+
+        _, _, open_body = self.get("/planning/task-priorities/")
+        _, _, done_body = self.get("/planning/task-priorities/", "view=done")
+        _, _, all_body = self.get("/planning/task-priorities/", "view=all")
+        _, _, detail_body = self.get("/planning/tasks/T01")
+
+        self.assertNotIn("/planning/tasks/T01", open_body)
+        self.assertIn("/planning/tasks/T01", done_body)
+        self.assertIn("/planning/tasks/T01", all_body)
+        self.assertIn("This task is already marked done.", detail_body)
+        self.assertNotIn("/planning/tasks/T01/mark-done", detail_body)
 
 
 if __name__ == "__main__":

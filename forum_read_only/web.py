@@ -807,6 +807,11 @@ def render_task_completion_feedback(
             '<div class="section-head"><h2>Task updated</h2>'
             f"<p>Status changed from {html.escape(result.previous_status)} to done.</p></div>"
             f'<p><strong>Commit:</strong> <code>{html.escape(result.commit_id)}</code></p>'
+            '<div class="action-row">'
+            '<a class="thread-chip" href="/planning/task-priorities/">open tasks</a>'
+            '<a class="thread-chip" href="/planning/task-priorities/?view=done">done tasks</a>'
+            '<a class="thread-chip" href="/planning/task-priorities/?view=all">all tasks</a>'
+            "</div>"
             "</section>"
         )
     if error_message:
@@ -823,7 +828,12 @@ def render_task_status_action(thread) -> str:
     task = thread.root.task_metadata
     assert task is not None
     if task.status.strip().lower() == "done":
-        return '<p class="discussion-note">This task is already marked done.</p>'
+        return (
+            '<p class="discussion-note">This task is already marked done.</p>'
+            '<div class="action-row">'
+            '<a class="thread-chip" href="/planning/task-priorities/?view=done">view done tasks</a>'
+            "</div>"
+        )
     return (
         f'<form method="post" action="/planning/tasks/{html.escape(thread.root.post_id)}/mark-done" class="field-stack">'
         '<button type="submit">mark task done</button>'

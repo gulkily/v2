@@ -20,3 +20,15 @@
   - Confirmed the task detail action updates the canonical task root to `Task-Status: done` and the open/done planning filters still render correctly.
 - Notes:
   - The task completion flow currently renders the updated task page directly after POST; broader navigation polish remains for the next stage.
+
+## Stage 3 - done-state readback and regression hardening
+- Changes:
+  - Added readback navigation from the task completion success panel into the open, done, and all-task planning views.
+  - Updated the task detail action area so already-done tasks show stable done-state messaging instead of the completion form.
+  - Added focused regression coverage confirming that a completed task disappears from the default open list, remains visible in done/all views, and renders as done on the task detail page.
+- Verification:
+  - Ran `./forum test test_task_thread_pages.py`.
+  - Ran `./forum test test_task_priorities_page.py`.
+  - Confirmed the task-detail completion flow and all three filtered planning views stay coherent after a task moves to `done`.
+- Notes:
+  - The flow remains intentionally narrow: one completion action with readback through the existing planning surfaces, not a broader task editor.
