@@ -10,6 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from forum_core.runtime_env import get_missing_env_defaults, repo_env_paths, sync_env_defaults
 
 
 @dataclass(frozen=True)
@@ -26,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("help", help="Show help output.")
+    subparsers.add_parser("env-sync", help="Append missing .env settings from .env.example.")
     subparsers.add_parser("start", help="Start the local read-only forum server.")
 
     test_parser = subparsers.add_parser("test", help="Run the unittest suite.")
@@ -44,6 +49,8 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 
     if args.command in (None, "help"):
         return parser, None
+    if args.command == "env-sync":
+        return parser, TaskRequest(command="env-sync")
     if args.command == "start":
         return parser, TaskRequest(command="start")
     if args.command == "test":
@@ -52,12 +59,39 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 
 
 def run_task(request: TaskRequest) -> int:
+    if request.command == "env-sync":
+        return run_env_sync()
     if request.command == "start":
         return run_start()
     if request.command == "test":
         return run_tests(request.test_pattern)
     print(f"Unknown command: {request.command}", file=sys.stderr)
     return 1
+
+
+def run_env_sync() -> int:
+    env_path, env_example_path = repo_env_paths(REPO_ROOT)
+    status = get_missing_env_defaults(env_path=env_path, env_example_path=env_example_path)
+    if not status.get("example_found"):
+        print(f"Missing defaults file: {env_example_path}", file=sys.stderr)
+        return 1
+
+    if int(status.get("missing_count", 0)) <= 0:
+        print("No missing .env settings found. Nothing to sync.")
+        return 0
+
+    result = sync_env_defaults(env_path=env_path, env_example_path=env_example_path)
+    if not result.get("updated"):
+        print("No missing .env settings found. Nothing to sync.")
+        return 0
+
+    added_count = int(result.get("added_count", 0))
+    if result.get("env_created"):
+        print(f"Created .env and added {added_count} default setting(s) from .env.example.")
+        return 0
+
+    print(f"Added {added_count} missing setting(s) to .env from .env.example.")
+    return 0
 
 
 def run_start() -> int:
