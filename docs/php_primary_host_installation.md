@@ -35,6 +35,8 @@ The supported installation shape assumes:
 - a public web root containing `index.php`, `.htaccess`, and any public static assets
 - a Python-accessible repository root outside or alongside the public web root
 - a `cgi-bin` location for the canonical Python write commands
+- the sample adapter artifacts in `php_host/public/` copied into the host's public web root
+- the sample read bridge in `cgi-bin/forum_web.py` deployed with the rest of the repo
 
 The exact file layout can vary by host, but the adapter contract stays fixed:
 
