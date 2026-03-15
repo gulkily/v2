@@ -86,3 +86,14 @@ things that need to be folded into the dev process:
 	- removing mod privileges from a user should also remove any mod privileges that they granted to other users, and this should also be reflected in the mod tree.
 
 - what's the easiest way to host this?
+
+- on the compose thread page, where the keys etc are displayed, make the data monospace font
+
+- change command name from forum to v2
+
+- add dedalus api support and .env
+
+- zip file export of a profile, tag, thread, or any other listable collection of content, including all relevant metadata and content in a structured format (e.g. JSON, markdown, etc.)
+	- should be able to select which content to include in the export (e.g. only threads with a certain tag, only threads created by a certain user, etc.)
+	- should be able to import the zip file back into the system, restoring all content and metadata as it was at the time of export.
+	- the zip file format should be text files with a clear and consistent structure, so that it can be easily parsed and understood by both humans and machines.

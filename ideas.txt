@@ -41,4 +41,9 @@ Multi-repo content idea for later:
 	- allow editing of payload.
 	- and view server response.
 
+- build a profile based on an existing e.g. github account
+	- scrape the profile and ai-generate a personality description that can be used for prompting later.
 
+- the frontpage should be designed for new users new to the site
+	- this means the most insightful and beneficial posts
+	- not necessarily the most recent ones.
