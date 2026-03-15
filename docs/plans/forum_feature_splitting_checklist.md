@@ -38,7 +38,7 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
   - Includes: public-key bootstrap post shape, profile summary derivation, user/profile view.
   - Demonstrable result: a user identity can be created and viewed from repository data.
 
-- [ ] Loop 7: Moderation record model
+- [x] Loop 7: Moderation record model
   - Goal: introduce signed moderation actions as first-class records.
   - Includes: moderation log, hide, lock, pin, unpin record types, visible-state rules.
   - Demonstrable result: a moderator action changes what the public instance shows and appears in the moderation log.
