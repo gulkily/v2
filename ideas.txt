@@ -32,3 +32,13 @@ Multi-repo content idea for later:
   - rules for whether threads can span repos
   - rules for which repo receives new posts
 - Keep this shelved for now; do not fold it into the current loop yet.
+
+- vim mode in editor?
+
+- q&a page about the site and code that can be ai-answered
+
+- sign and submit button should pause on current page if technical details is expanded?
+	- allow editing of payload.
+	- and view server response.
+
+

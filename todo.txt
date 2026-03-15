@@ -23,3 +23,39 @@ things that need to be folded into the dev process:
 	- flagging system for users to report inappropriate content
 	- automated detection of spam or harmful content using machine learning models
 	- a dashboard for moderators to review flagged content and take action (e.g. remove, warn user, etc.)
+
+
+- script to import all of a subreddit into the system, including threads, comments, and metadata (e.g. author, timestamp, etc.)
+	- should be able to handle large volumes of data efficiently
+	- should be able to update the database with new threads and comments as they are posted on the subreddit
+	- should be able to limit the import to a specific time range or set of threads (e.g. only threads with a certain number of upvotes, etc.)
+
+- update grammar of system when possible
+	- directories, database entries, urls, etc, should be singular, not plural.
+	- e.g. "thread" instead of "threads", "comment" instead of "comments", etc.
+
+- compose page should have auto-save, so that the user doesn't lose what they typed.
+	- auto-save should save the content to local storage or a temporary database entry, so that it can be retrieved if the user accidentally navigates away from the page or closes the browser.
+	- auto-save should also have a timestamp, so that the user can see when their content was last saved.
+
+- a page that communicates the node configuration settings
+	- e.g. retention policy, moderation settings, etc.
+	- admin id, contact information, etc.
+	- should be easily accessible from the main page, and should be updated in real-time as changes are made to the configuration settings.
+	- commit id, date, installation date, etc.
+
+- more robust local dev server
+	- start on a "v2" command
+	- detect changes in running code, and reload
+	- ^c handler
+
+- frontend checklist
+	- dark mode toggle
+
+- git log on website somewhere
+	- page with newest content feed together with git log
+
+- generate some test moderation data
+
+- how do i view user's public key from profile page?
+
