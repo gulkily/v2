@@ -411,6 +411,18 @@ def render_post_card(post, *, root_thread_id: str, identity_context, hidden: boo
     )
 
 
+def render_compose_reference(post, *, root_thread_id: str, identity_context) -> str:
+    return (
+        '<section class="panel compose-reference">'
+        '<div class="section-head">'
+        "<h2>Replying to</h2>"
+        "<p>This is the visible post your signed reply will target.</p>"
+        "</div>"
+        f"{render_post_card(post, root_thread_id=root_thread_id, identity_context=identity_context)}"
+        "</section>"
+    )
+
+
 def render_moderation_card(record, *, identity_context) -> str:
     target_href = f"/threads/{html.escape(record.target_id)}" if record.target_type == "thread" else f"/posts/{html.escape(record.target_id)}"
     moderator_html = ""
@@ -600,6 +612,7 @@ def render_compose_page(
     context_text: str,
     thread_id: str = "",
     parent_id: str = "",
+    reply_target_html: str = "",
 ) -> str:
     breadcrumb_items = [
         ("/", "board index"),
@@ -610,6 +623,7 @@ def render_compose_page(
         compose_heading=html.escape(compose_heading),
         compose_text=html.escape(compose_text),
         context_text=html.escape(context_text),
+        reply_target_html=reply_target_html,
         command_name=html.escape(command_name),
         endpoint_path=html.escape(endpoint_path),
         dry_run_value="true" if dry_run else "false",
@@ -891,7 +905,7 @@ def application(environ, start_response):
                 start_response("404 Not Found", headers)
                 return [body]
 
-            posts, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+            posts, grouped_threads, _, _, moderation_state, identity_context = load_repository_state()
             thread = index_threads(grouped_threads).get(thread_id)
             if thread is None or thread_is_hidden(moderation_state, thread_id):
                 body = render_missing_resource("thread").encode("utf-8")
@@ -935,6 +949,11 @@ def application(environ, start_response):
                 context_text=f"This signed reply will go into thread {thread.root.post_id} in {describe_board_tags(board_tags)} under parent {parent_id}. Reply linkage is filled in automatically.",
                 thread_id=thread_id,
                 parent_id=parent_id,
+                reply_target_html=render_compose_reference(
+                    parent_post,
+                    root_thread_id=thread.root.post_id,
+                    identity_context=identity_context,
+                ),
             ).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)

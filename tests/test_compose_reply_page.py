@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import os
+import tempfile
+import unittest
+from io import BytesIO
+from pathlib import Path
+from textwrap import dedent
+from unittest import mock
+
+from forum_read_only.web import application
+
+
+class ComposeReplyPageTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.repo_root = Path(self.tempdir.name)
+
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Root thread
+
+            Root post body.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: general
+            Subject: Reply target
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Target reply body.
+            Second line for context.
+            """,
+        )
+
+    def tearDown(self) -> None:
+        self.tempdir.cleanup()
+
+    def write_record(self, relative_path: str, raw_text: str) -> None:
+        path = self.repo_root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
+
+    def get(self, path: str, query_string: str) -> tuple[str, dict[str, str], str]:
+        environ = {
+            "PATH_INFO": path,
+            "QUERY_STRING": query_string,
+            "REQUEST_METHOD": "GET",
+            "CONTENT_LENGTH": "0",
+            "wsgi.input": BytesIO(b""),
+        }
+        response: dict[str, object] = {}
+
+        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+            response["status"] = status
+            response["headers"] = headers
+
+        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
+            body = b"".join(application(environ, start_response)).decode("utf-8")
+
+        return (
+            response["status"],
+            dict(response["headers"]),
+            body,
+        )
+
+    def test_compose_reply_page_shows_parent_post_body(self) -> None:
+        status, _, body = self.get(
+            "/compose/reply",
+            "thread_id=root-001&parent_id=reply-001",
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Replying to", body)
+        self.assertIn("Target reply body.", body)
+        self.assertIn("Second line for context.", body)
+        self.assertIn("/posts/reply-001", body)
+        self.assertIn('id="signed-post-form"', body)
+
+    def test_compose_reply_page_does_not_leak_hidden_parent_post(self) -> None:
+        self.write_record(
+            "records/moderation/hide-reply-001.txt",
+            """
+            Record-ID: hide-reply-001
+            Action: hide
+            Target-Type: post
+            Target-ID: reply-001
+            Timestamp: 2026-03-14T12:00:00Z
+
+            Hidden for moderation.
+            """,
+        )
+
+        status, _, body = self.get(
+            "/compose/reply",
+            "thread_id=root-001&parent_id=reply-001",
+        )
+
+        self.assertEqual(status, "404 Not Found")
+        self.assertNotIn("Target reply body.", body)
+
+
+if __name__ == "__main__":
+    unittest.main()
