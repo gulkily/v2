@@ -84,6 +84,11 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn(IDENTITY_ID, body)
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
+        self.assertIn('data-dry-run="true"', body)
+        self.assertIn('/assets/browser_signing.js', body)
+        self.assertIn('id="private-key-input"', body)
+        self.assertIn('id="payload-output"', body)
+        self.assertIn("Sign and preview", body)
 
 
 if __name__ == "__main__":

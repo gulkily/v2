@@ -397,9 +397,11 @@ def render_profile_update_page(identity_id: str) -> str:
             "This dedicated page prepares a signed display-name update for the current resolved identity. "
             "The same canonical profile page remains the readback surface after submission."
         ),
+        dry_run_value="true",
         source_identity_id=html.escape(summary.identity_id),
         profile_slug=html.escape(profile_slug),
         display_name_value=html.escape(summary.display_name),
+        submit_label="Sign and preview",
     )
     return render_page(
         title=f"Update username · {summary.display_name}",
@@ -407,6 +409,7 @@ def render_profile_update_page(identity_id: str) -> str:
         hero_title="Update your username",
         hero_text="Use the existing browser signing flow to prepare one signed username/display-name update for the resolved profile you are viewing.",
         content_html=content,
+        page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
     )
 
 

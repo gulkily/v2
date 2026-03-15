@@ -9,3 +9,16 @@
   - Ran `python3 -m py_compile forum_read_only/web.py`.
 - Notes:
   - The page shell is intentionally static at this stage; the browser signing asset is wired in Stage 2.
+
+## Stage 2 - browser signing support for canonical profile-update previews
+- Changes:
+  - Extended the dedicated profile-update page to reuse the existing browser signing shell, including key import/generation controls, canonical payload preview, detached-signature preview, and response output panes.
+  - Generalized `browser_signing.js` so it can build canonical `update_profile` payloads for `set_display_name` without regressing signed thread and reply composition.
+  - Added profile-update-specific key handling so the page reuses an existing stored key when present and asks for an import when no matching local key is available instead of silently auto-generating one on load.
+- Verification:
+  - Ran `python3 -m unittest discover -s tests -p 'test_profile_update_page.py'`.
+  - Ran `python3 -m unittest discover -s tests -p 'test_compose_reply_page.py'`.
+  - Ran `python3 -m py_compile forum_read_only/web.py`.
+  - Ran `node --input-type=module --eval "import('node:fs/promises').then(async (fs) => { let source = await fs.readFile('templates/assets/browser_signing.js', 'utf8'); source = source.replace(/^import .*$/m, 'const openpgp = {};').replace(/main\\(\\);\\s*$/, ''); await import('data:text/javascript,' + encodeURIComponent(source)); console.log('browser_signing.js parsed'); });"` and confirmed the browser module parses after stubbing the top-level import and `main()` call for a non-browser syntax smoke check.
+- Notes:
+  - The update page currently submits deterministic dry-run previews only; Stage 3 will switch it to real `update_profile` submissions and redirect back to the profile read surface.

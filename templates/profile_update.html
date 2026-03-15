@@ -17,13 +17,13 @@
   class="panel compose-panel"
   data-command="update_profile"
   data-endpoint="/api/update_profile"
-  data-dry-run="false"
+  data-dry-run="${dry_run_value}"
   data-source-identity-id="${source_identity_id}"
   data-profile-slug="${profile_slug}"
 >
   <div class="section-head">
     <h2>Signed Username Update</h2>
-    <p>The browser signing flow attaches here. It will submit one canonical profile-update record for this resolved identity.</p>
+    <p>The browser will build one canonical profile-update payload for this resolved identity, sign it locally, and submit a deterministic preview.</p>
   </div>
   <form id="profile-update-form" class="field-stack">
     <label class="field-stack" for="display-name-input">
@@ -31,10 +31,53 @@
       <input id="display-name-input" name="display_name" type="text" maxlength="80" value="${display_name_value}" required>
     </label>
     <div class="action-row">
-      <button id="sign-submit-button" type="button" disabled>Sign and submit</button>
+      <button id="sign-submit-button" type="submit">${submit_label}</button>
       <a class="thread-chip" href="/profiles/${profile_slug}">back to profile</a>
     </div>
   </form>
-  <p id="key-status" class="status-note">Browser signing attaches in the next stage.</p>
-  <p id="submit-status" class="status-note">Waiting for browser signing support.</p>
+  <p id="key-status" class="status-note">Preparing local signing key...</p>
+  <p id="submit-status" class="status-note">Waiting for signed preview.</p>
 </section>
+
+<details class="panel compose-details">
+  <summary>Technical details</summary>
+  <div class="compose-grid">
+    <section class="compose-card">
+      <div class="section-head">
+        <h2>Key material</h2>
+        <p>Reuse the local key for this profile when available, or import the matching private key before signing.</p>
+      </div>
+      <div class="action-row">
+        <button id="generate-key-button" type="button">Generate New Key</button>
+        <button id="import-key-button" type="button">Import Key</button>
+      </div>
+      <label class="field-stack" for="private-key-input">
+        <span>ASCII-armored private key</span>
+        <textarea id="private-key-input" rows="10" spellcheck="false"></textarea>
+      </label>
+      <label class="field-stack" for="public-key-output">
+        <span>ASCII-armored public key</span>
+        <textarea id="public-key-output" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+    </section>
+
+    <section class="compose-card">
+      <div class="section-head">
+        <h2>Derived payload</h2>
+        <p>The browser derives the canonical payload, detached signature, and shows the exact preview response.</p>
+      </div>
+      <label class="field-stack" for="payload-output">
+        <span>Canonical payload preview</span>
+        <textarea id="payload-output" rows="10" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field-stack" for="signature-output">
+        <span>Detached signature</span>
+        <textarea id="signature-output" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field-stack" for="response-output">
+        <span>Server response</span>
+        <textarea id="response-output" rows="10" spellcheck="false" readonly></textarea>
+      </label>
+    </section>
+  </div>
+</details>
