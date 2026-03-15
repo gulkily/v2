@@ -4,3 +4,5 @@ things that need to be folded into the dev process:
 
 - clear instructions for participation for agents
 
+- comparison of architecture documents and checklist, to identify anything planned in one place but missing or only implied in the other
+
