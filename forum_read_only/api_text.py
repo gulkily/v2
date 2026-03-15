@@ -9,7 +9,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     lines = [
         "FORUM-API/1",
         "Mode: mixed",
-        "Available-Commands: list_index get_thread get_post get_profile get_moderation_log create_thread create_reply moderate link_identity update_profile",
+        "Available-Commands: list_index get_thread get_post get_profile get_moderation_log call_llm create_thread create_reply moderate link_identity update_profile",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
@@ -21,6 +21,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
         "/api/moderate",
         "/api/link_identity",
         "/api/update_profile",
+        "/api/call_llm",
         "/api/list_index",
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",
@@ -149,6 +150,16 @@ def render_moderation_log_text(
             )
         )
     return "\n".join(lines) + "\n"
+
+
+def render_llm_result_text(*, model: str, output_text: str) -> str:
+    normalized_output = output_text.rstrip()
+    return (
+        f"Command: call_llm\n"
+        f"Model: {model}\n"
+        "\n"
+        f"{normalized_output}\n"
+    )
 
 
 def render_not_found_text(resource_name: str, resource_id: str) -> str:

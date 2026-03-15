@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
+from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
 from forum_core.moderation import (
     derive_moderation_state,
@@ -33,6 +34,7 @@ from forum_read_only.api_text import (
     render_api_home_text,
     render_bad_request_text,
     render_index_text,
+    render_llm_result_text,
     render_moderation_log_text,
     render_not_found_text,
     render_post_text,
@@ -976,6 +978,48 @@ def read_optional_text(payload: dict[str, object], field_name: str) -> str | Non
     return value if value != "" else None
 
 
+def read_required_text(payload: dict[str, object], field_name: str) -> str:
+    value = read_optional_text(payload, field_name)
+    if value is None or not value.strip():
+        raise PostingError("bad_request", f"missing required field: {field_name}")
+    return value.strip()
+
+
+def build_llm_messages(*, prompt: str, system_prompt: str | None = None) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+    return messages
+
+
+def render_api_call_llm(environ) -> tuple[str, str]:
+    try:
+        payload = read_json_request(environ)
+        prompt = read_required_text(payload, "prompt")
+        system_prompt = read_optional_text(payload, "system_prompt")
+    except PostingError as exc:
+        return "400 Bad Request", render_error_body(exc.error_code, exc.message)
+
+    try:
+        output_text = run_llm(
+            build_llm_messages(
+                prompt=prompt,
+                system_prompt=system_prompt.strip() if system_prompt else None,
+            )
+        )
+    except LLMProviderError as exc:
+        message = str(exc)
+        if message in {
+            "DEDALUS_API_KEY is not configured.",
+            "Dedalus SDK not installed. Add 'dedalus-labs' to requirements.",
+        }:
+            return "500 Internal Server Error", render_error_body("internal_error", message)
+        return "502 Bad Gateway", render_error_body("upstream_error", message)
+
+    return "200 OK", render_llm_result_text(model=get_llm_model(), output_text=output_text)
+
+
 def render_api_create_thread(environ, *, default_dry_run: bool) -> tuple[str, str]:
     payload = read_json_request(environ)
     repo_root = get_repo_root()
@@ -1108,6 +1152,18 @@ def application(environ, start_response):
                 start_response("405 Method Not Allowed", headers)
                 return [body]
             status, body_text = render_api_update_profile(environ, default_dry_run=False)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/call_llm":
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body_text = render_api_call_llm(environ)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
