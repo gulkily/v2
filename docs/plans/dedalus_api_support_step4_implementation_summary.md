@@ -25,3 +25,14 @@
   - Ran a WSGI smoke harness against `application(...)`; confirmed `/api/call_llm` returned `200 OK` with synthetic output when `run_llm` was mocked, `500 Internal Server Error` when the provider raised missing-key config, and `400 Bad Request` when `prompt` was omitted.
 - Notes:
   - Chose the narrower v1 request shape (`prompt` plus optional `system_prompt`) to keep the baseline endpoint easy to call while still routing through the generic provider contract.
+
+## Stage 4 - Tests and operator docs
+- Changes:
+  - Added [tests/test_llm_api.py](/home/wsl/v2/tests/test_llm_api.py) covering API discovery, success, invalid request, and missing-config behavior for `/api/call_llm`.
+  - Extended [tests/test_runtime_env.py](/home/wsl/v2/tests/test_runtime_env.py) so the committed `.env.example` is verified to expose `DEDALUS_API_KEY` through the existing env-sync parser.
+  - Updated [docs/developer_commands.md](/home/wsl/v2/docs/developer_commands.md) with the `DEDALUS_API_KEY` note and a concrete local-server request example for `/api/call_llm`.
+- Verification:
+  - Ran `python3 -m unittest tests.test_runtime_env tests.test_llm_api` and the targeted suite passed (`Ran 9 tests ... OK`).
+  - Ran a final WSGI smoke harness using the documented `prompt` plus `system_prompt` payload; confirmed `200 OK` with response body `Command: call_llm`, `Model: openai/gpt-4o-mini`, and `ready`.
+- Notes:
+  - The live Dedalus network path was not exercised here because no configured API key was available in this workspace during implementation.

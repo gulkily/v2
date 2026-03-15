@@ -99,6 +99,14 @@ class RuntimeEnvTests(unittest.TestCase):
         self.assertEqual(len(logs.output), 1)
         self.assertIn("./forum env-sync", logs.output[0])
 
+    def test_committed_env_example_includes_dedalus_api_key(self) -> None:
+        committed_example_path = runtime_env.REPO_ROOT / ".env.example"
+
+        status = runtime_env.get_missing_env_defaults(self.env_path, committed_example_path)
+
+        self.assertTrue(status["example_found"])
+        self.assertIn("DEDALUS_API_KEY", status["missing_keys"])
+
 
 if __name__ == "__main__":
     unittest.main()

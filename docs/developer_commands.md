@@ -23,4 +23,20 @@ The command contract is intentionally small: future backends such as Perl should
 - Restart the relevant process after changing `.env`.
 - Explicit process environment variables still override `.env`.
 - `FORUM_HOST` and `FORUM_PORT` control the local server bind address for `./forum start`.
+- `DEDALUS_API_KEY` enables the server-side `/api/call_llm` baseline LLM endpoint.
 - The wrapper prefers `.venv/bin/python3` when present and otherwise falls back to `python3`.
+
+## Dedalus baseline
+1. Install dependencies with `python3 -m pip install -r requirements.txt`.
+2. Run `./forum env-sync` and set `DEDALUS_API_KEY=...` in the repo-root `.env`.
+3. Start the local server with `./forum start`.
+4. Call the baseline LLM endpoint:
+
+```bash
+curl -s http://127.0.0.1:8000/api/call_llm \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Reply with the single word ready.","system_prompt":"Be concise."}'
+```
+
+The response is `text/plain` and includes the command name, model, and generated output.
