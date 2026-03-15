@@ -34,3 +34,16 @@
   - Confirmed `render_api_get_profile(...)` returns `200 OK` for both merged aliases and that both responses include the same updated display name, fallback field, and display-name record metadata.
 - Notes:
   - The HTML profile page and attribution labels still use the old fingerprint shorthand at this stage; those surfaces are updated in Stage 4.
+
+## Stage 4 - profile page and attribution display-name updates
+- Changes:
+  - Updated the web profile page so its heading uses the resolved display name while retaining canonical identity details and fallback metadata in the profile details panel.
+  - Updated signed post and moderation attribution labels to prefer the resolved display name while keeping canonical profile links stable.
+  - Extended the shared identity context helpers so web rendering can reuse the same display-name resolution logic as `get_profile`.
+  - Added `update_profile` to the `/api/` discovery text and route list.
+- Verification:
+  - Compiled the updated modules with `python3 -m py_compile forum_cgi/*.py forum_core/*.py forum_read_only/*.py`.
+  - In a disposable repository clone, generated two signed identities, merged them, applied a signed profile update, allowlisted one signer as a moderator, and submitted a signed moderation record.
+  - Confirmed the rendered profile page shows the updated display name, the rendered post permalink shows `signed by` with the updated display name, the moderation log page shows `moderated by` with the same name, and `/api/` includes `update_profile` plus `/api/update_profile`.
+- Notes:
+  - Browser profile-editing UX still remains out of scope; the first write surface for this loop is the signed API/CLI contract.

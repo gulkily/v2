@@ -19,6 +19,7 @@ from forum_core.identity_links import (
 )
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
+    ResolvedDisplayName,
     profile_update_records_dir,
     load_profile_update_records,
     resolve_current_display_name,
@@ -37,6 +38,18 @@ class IdentityContext:
 
     def member_identity_ids(self, identity_id: str | None) -> tuple[str, ...]:
         return self.resolution.member_identity_ids(identity_id)
+
+    def resolved_display_name(self, identity_id: str | None) -> ResolvedDisplayName | None:
+        member_identity_ids = self.member_identity_ids(identity_id)
+        if not member_identity_ids:
+            canonical_identity_id = self.canonical_identity_id(identity_id)
+            if canonical_identity_id is None:
+                return None
+            member_identity_ids = (canonical_identity_id,)
+        return resolve_current_display_name(
+            member_identity_ids=member_identity_ids,
+            profile_updates=list(self.profile_update_records),
+        )
 
 
 def identity_records_dir(repo_root: Path) -> Path:
@@ -171,3 +184,15 @@ def synthetic_bootstrap(posts: list[Post], identity_id: str) -> IdentityBootstra
         public_key_text=post.public_key_path.read_text(encoding="ascii"),
         path=post.public_key_path or post.path,
     )
+
+
+def resolve_identity_display_name(
+    *,
+    identity_context: IdentityContext,
+    identity_id: str | None,
+    fallback_display_name: str,
+) -> str:
+    resolved_display_name = identity_context.resolved_display_name(identity_id)
+    if resolved_display_name is None:
+        return fallback_display_name
+    return resolved_display_name.display_name

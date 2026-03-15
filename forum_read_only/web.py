@@ -38,7 +38,7 @@ from forum_read_only.api_text import (
     render_profile_text,
     render_thread_text,
 )
-from forum_read_only.profiles import find_profile_summary, load_identity_context
+from forum_read_only.profiles import find_profile_summary, load_identity_context, resolve_identity_display_name
 from forum_read_only.repository import (
     group_threads,
     index_posts,
@@ -326,10 +326,10 @@ def render_profile(identity_id: str) -> str:
         breadcrumb_html=render_breadcrumb(
             [
                 ("/", "board index"),
-                (f"/profiles/{identity_slug(summary.identity_id)}", summary.identity_id),
+                (f"/profiles/{identity_slug(summary.identity_id)}", summary.display_name),
             ]
         ),
-        profile_heading=html.escape(short_identity_label(summary.signer_fingerprint)),
+        profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
         stat_html=(
             '<div class="stat-grid">'
@@ -341,6 +341,9 @@ def render_profile(identity_id: str) -> str:
         bootstrap_identity_id=html.escape(summary.identity_id),
         bootstrap_source_identity_id=html.escape(summary.bootstrap_identity_id),
         bootstrap_fingerprint=html.escape(summary.signer_fingerprint),
+        display_name=html.escape(summary.display_name),
+        display_name_source=html.escape(summary.display_name_source),
+        fallback_display_name=html.escape(summary.fallback_display_name),
         bootstrap_post_id=html.escape(summary.bootstrap_post_id),
         bootstrap_thread_id=html.escape(summary.bootstrap_thread_id),
         bootstrap_path=html.escape(summary.bootstrap_path),
@@ -352,9 +355,9 @@ def render_profile(identity_id: str) -> str:
         post_links_html=post_links_html,
     )
     return render_page(
-        title=summary.identity_id,
+        title=summary.display_name,
         hero_kicker="Profile View",
-        hero_title=short_identity_label(summary.signer_fingerprint),
+        hero_title=summary.display_name,
         hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
         content_html=content,
     )
@@ -376,9 +379,14 @@ def render_post_card(post, *, root_thread_id: str, identity_context, hidden: boo
     identity_html = ""
     if post.identity_id and post.signer_fingerprint:
         canonical_identity_id = resolved_profile_identity_id(identity_context, post.identity_id)
+        display_name = resolve_identity_display_name(
+            identity_context=identity_context,
+            identity_id=post.identity_id,
+            fallback_display_name=short_identity_label(post.signer_fingerprint),
+        )
         identity_html = (
             f'<p class="post-identity">signed by <a href="/profiles/{html.escape(identity_slug(canonical_identity_id or post.identity_id))}">'
-            f'{html.escape(short_identity_label(post.signer_fingerprint))}</a></p>'
+            f'{html.escape(display_name)}</a></p>'
         )
 
     body_html = (
@@ -408,9 +416,14 @@ def render_moderation_card(record, *, identity_context) -> str:
     moderator_html = ""
     if record.identity_id and record.signer_fingerprint:
         canonical_identity_id = resolved_profile_identity_id(identity_context, record.identity_id)
+        display_name = resolve_identity_display_name(
+            identity_context=identity_context,
+            identity_id=record.identity_id,
+            fallback_display_name=short_identity_label(record.signer_fingerprint),
+        )
         moderator_html = (
             f'<p class="post-identity">moderated by <a href="/profiles/{html.escape(identity_slug(canonical_identity_id or record.identity_id))}">'
-            f'{html.escape(short_identity_label(record.signer_fingerprint))}</a></p>'
+            f'{html.escape(display_name)}</a></p>'
         )
     reason_html = (
         f'<div class="post-body">{render_body_html(record.reason)}</div>'
