@@ -16,6 +16,7 @@ The command contract is intentionally small: future backends such as Perl should
 - `python3 scripts/run_read_only.py`: direct local server entrypoint.
 - `python3 -m unittest discover -s tests [-p PATTERN]`: direct test invocation.
 - `cgi-bin/create_thread.py` and `cgi-bin/create_reply.py`: direct write-command entrypoints for lower-level testing and parity work.
+- `scripts/forum_gpg.sh ...`: signed API helper for CLI-first GPG posting, profile updates, and identity link records.
 
 ## Runtime environment
 - Repo-root `.env` is loaded automatically for the main local server path, direct WSGI import path, CGI write entrypoints, and `./forum test`.
@@ -46,3 +47,12 @@ curl -s http://127.0.0.1:8000/api/call_llm \
 ```
 
 The response is `text/plain` and includes the command name, model, and generated output.
+
+## GPG CLI signing workflow
+1. Start the local server with `./forum start`.
+2. Use `scripts/forum_gpg.sh create-thread --key YOURKEYID --payload thread.txt` for a first signed post. That first signed post automatically bootstraps the profile.
+3. Use `scripts/forum_gpg.sh update-profile ...` to publish a signed display-name change after bootstrap.
+4. Use `scripts/forum_gpg.sh rotate-key ...` to add a not-yet-visible replacement key to an existing profile.
+5. Use `scripts/forum_gpg.sh merge-identity ...` from both identities when two already-visible profiles should resolve to one profile.
+
+See [`gpg_cli_workflow.md`](gpg_cli_workflow.md) for the canonical payload expectations and complete examples.

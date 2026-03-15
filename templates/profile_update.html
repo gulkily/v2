@@ -40,6 +40,29 @@
 </section>
 
 <details class="panel compose-details">
+  <summary>Use an external signer instead</summary>
+  <div class="section-head">
+    <h2>Manual signed profile update</h2>
+    <p>You can complete this without the local browser key flow. Use any signer that can sign the exact payload as ASCII text, produce an ASCII-armored detached signature, and export the matching ASCII-armored public key.</p>
+  </div>
+  <ol class="plain-list">
+    <li>Enter the desired display name so the page can derive the canonical payload preview below.</li>
+    <li>Copy the exact text from <strong>Canonical payload preview</strong>.</li>
+    <li>Sign that exact payload as a detached ASCII-armored signature using the key for <code>${source_identity_id}</code>.</li>
+    <li>Export the matching ASCII-armored public key.</li>
+    <li>Submit one JSON request to <code>/api/update_profile</code> with <code>payload</code>, <code>signature</code>, <code>public_key</code>, and <code>dry_run</code>.</li>
+  </ol>
+  <p>Example request body:</p>
+  <pre><code>{
+  "payload": "...exact canonical payload text...",
+  "signature": "-----BEGIN PGP SIGNATURE-----\n...\n-----END PGP SIGNATURE-----\n",
+  "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----\n",
+  "dry_run": false
+}</code></pre>
+  <p>The signing key must resolve to <code>${source_identity_id}</code> or the server will reject the update.</p>
+</details>
+
+<details class="panel compose-details">
   <summary>Technical details</summary>
   <div class="compose-grid">
     <section class="compose-card">

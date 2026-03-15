@@ -29,6 +29,29 @@ ${reply_target_html}
 </section>
 
 <details class="panel compose-details">
+  <summary>Use an external signer instead</summary>
+  <div class="section-head">
+    <h2>Manual signed submission</h2>
+    <p>You do not need this application installed locally. Any tool is fine if it can sign the exact payload as ASCII text, produce an ASCII-armored detached signature, and export the matching ASCII-armored public key.</p>
+  </div>
+  <ol class="plain-list">
+    <li>Write your post body here so the page can derive the canonical payload preview below.</li>
+    <li>Copy the exact text from <strong>Canonical payload preview</strong>.</li>
+    <li>Sign that exact payload with your own signing tool as a detached ASCII-armored signature.</li>
+    <li>Export the matching ASCII-armored public key.</li>
+    <li>Submit one JSON request to <code>${endpoint_path}</code> with four fields: <code>payload</code>, <code>signature</code>, <code>public_key</code>, and <code>dry_run</code>.</li>
+  </ol>
+  <p>Example request body:</p>
+  <pre><code>{
+  "payload": "...exact canonical payload text...",
+  "signature": "-----BEGIN PGP SIGNATURE-----\n...\n-----END PGP SIGNATURE-----\n",
+  "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----\n",
+  "dry_run": false
+}</code></pre>
+  <p>If this is your first signed post with that key, the response will also include the derived <code>Identity-ID</code> and whether an identity bootstrap record was created.</p>
+</details>
+
+<details class="panel compose-details">
   <summary>Technical details</summary>
   <div class="compose-grid">
     <section class="compose-card">
