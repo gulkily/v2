@@ -47,6 +47,7 @@ from forum_read_only.repository import (
     list_board_tags,
     load_posts,
 )
+from forum_read_only.tasks import load_tasks, task_records_dir
 from forum_read_only.templates import load_asset_text, load_template, render_page
 
 load_repo_env()
@@ -57,10 +58,6 @@ def get_repo_root() -> Path:
     env_root = os.environ.get("FORUM_REPO_ROOT")
     if env_root:
         return Path(env_root).resolve()
-    return Path(__file__).resolve().parent.parent
-
-
-def get_app_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
@@ -558,9 +555,112 @@ def render_missing_resource(resource_name: str) -> str:
     )
 
 
-def render_task_priorities_document() -> str:
-    document_path = get_app_root() / "docs" / "plans" / "task_priorities.html"
-    return document_path.read_text(encoding="utf-8")
+def render_task_priorities_page() -> str:
+    _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+    threads = index_threads(grouped_threads)
+    tasks = load_tasks(task_records_dir(get_repo_root()))
+
+    linked_discussion_count = sum(1 for task in tasks if task.discussion_thread_id)
+    dependency_count = sum(len(task.dependencies) for task in tasks)
+    stats_html = (
+        '<div class="stat-grid">'
+        f'<article class="stat-card"><span class="stat-number">{len(tasks)}</span><span class="stat-label">task records</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{linked_discussion_count}</span><span class="stat-label">linked discussions</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{dependency_count}</span><span class="stat-label">dependency edges</span></article>'
+        "</div>"
+    )
+    rows_html = "".join(
+        render_task_priorities_row(task, threads=threads, moderation_state=moderation_state)
+        for task in tasks
+    )
+    if not rows_html:
+        rows_html = (
+            '<tr><td colspan="7"><p class="discussion-note">'
+            "No task records are published yet."
+            "</p></td></tr>"
+        )
+
+    content = load_template("task_priorities.html").substitute(
+        stats_html=stats_html,
+        rows_html=rows_html,
+    )
+    return render_page(
+        title="Development Task Priorities",
+        hero_kicker="Planning View",
+        hero_title="Development task priorities",
+        hero_text="This planning index is rendered from canonical task records in the repository. Presentability measures user-visible payoff, implementation difficulty measures delivery effort, and linked discussion state reuses the normal forum thread model.",
+        content_html=content,
+        page_script_html='<script src="/assets/task_priorities.js"></script>',
+    )
+
+
+def render_task_priorities_row(task, *, threads, moderation_state) -> str:
+    discussion_html, discussion_sort_value = render_task_discussion_summary(
+        task.discussion_thread_id,
+        threads=threads,
+        moderation_state=moderation_state,
+    )
+    dependency_html = render_task_dependency_links(task.dependencies)
+    sources_html = "".join(
+        f"<code>{html.escape(source)}</code>"
+        for source in task.sources
+    )
+    return (
+        f'<tr id="task-{html.escape(task.task_id)}"'
+        f' data-id="{html.escape(task.task_id)}"'
+        f' data-task="{html.escape(task.title)}"'
+        f' data-impact="{task.presentability_impact:.2f}"'
+        f' data-difficulty="{task.implementation_difficulty:.2f}"'
+        f' data-dependencies="{html.escape(" ".join(task.dependencies))}"'
+        f' data-source="{html.escape(" ".join(task.sources))}"'
+        f' data-discussion="{html.escape(discussion_sort_value)}">'
+        f'<td><a class="task-id" href="#task-{html.escape(task.task_id)}">{html.escape(task.task_id)}</a></td>'
+        "<td>"
+        f'<h3 class="task-title">{html.escape(task.title)}</h3>'
+        f'<p class="task-note">{html.escape(task.summary)}</p>'
+        f'<p class="task-status">status {html.escape(task.status)}</p>'
+        "</td>"
+        f'<td><span class="rating-value">{task.presentability_impact:.2f}</span></td>'
+        f'<td><span class="rating-value">{task.implementation_difficulty:.2f}</span></td>'
+        f"<td>{dependency_html}</td>"
+        f'<td><p class="source-list">{sources_html}</p></td>'
+        f"<td>{discussion_html}</td>"
+        "</tr>"
+    )
+
+
+def render_task_dependency_links(dependencies: tuple[str, ...]) -> str:
+    if not dependencies:
+        return '<p class="dep-list">None</p>'
+    return '<p class="dep-list">' + ", ".join(
+        f'<a href="#task-{html.escape(dependency)}">{html.escape(dependency)}</a>'
+        for dependency in dependencies
+    ) + "</p>"
+
+
+def render_task_discussion_summary(discussion_thread_id: str | None, *, threads, moderation_state) -> tuple[str, str]:
+    if not discussion_thread_id:
+        return '<p class="discussion-note">Not linked yet</p>', ""
+
+    thread = threads.get(discussion_thread_id)
+    if thread is None or thread_is_hidden(moderation_state, discussion_thread_id):
+        return (
+            '<p class="discussion-note">Linked thread unavailable</p>',
+            "missing",
+        )
+
+    reply_count = visible_reply_count(thread, moderation_state)
+    labels = thread_status_labels(discussion_thread_id, moderation_state)
+    suffix = ""
+    if labels:
+        suffix = " · " + " ".join(labels)
+    return (
+        '<p class="discussion-note">'
+        f'<a href="/threads/{html.escape(discussion_thread_id)}">{html.escape(discussion_thread_id)}</a>'
+        f' · {reply_count} visible repl{"y" if reply_count == 1 else "ies"}{suffix}'
+        "</p>",
+        discussion_thread_id,
+    )
 
 
 def render_api_home() -> str:
@@ -944,7 +1044,7 @@ def application(environ, start_response):
             return [body]
 
         if path in {"/planning/task-priorities", "/planning/task-priorities/"}:
-            body = render_task_priorities_document().encode("utf-8")
+            body = render_task_priorities_page().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
@@ -1036,6 +1136,12 @@ def application(environ, start_response):
 
         if path == "/assets/browser_signing.js":
             body = load_asset_text("browser_signing.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/task_priorities.js":
+            body = load_asset_text("task_priorities.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

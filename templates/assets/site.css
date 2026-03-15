@@ -423,6 +423,141 @@ button:disabled {
   min-height: 1.4rem;
 }
 
+.table-shell {
+  overflow-x: auto;
+}
+
+.priority-table {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+}
+
+.priority-table caption {
+  padding: 0 0 1rem;
+  text-align: left;
+  color: var(--muted);
+}
+
+.priority-table th,
+.priority-table td {
+  padding: 0.9rem 0.85rem;
+  border-bottom: 1px solid rgba(139, 94, 52, 0.16);
+  text-align: left;
+  vertical-align: top;
+}
+
+.priority-table tbody tr:nth-child(even) {
+  background: rgba(255, 249, 240, 0.54);
+}
+
+.priority-table tbody tr:target {
+  outline: 2px solid rgba(139, 94, 52, 0.4);
+  outline-offset: -2px;
+  background: rgba(255, 245, 230, 0.92);
+}
+
+.priority-table th[aria-sort="ascending"],
+.priority-table th[aria-sort="descending"] {
+  color: var(--accent);
+}
+
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sort-button::after {
+  content: " ";
+  width: 0.8rem;
+  text-align: center;
+  color: var(--accent);
+}
+
+.priority-table th[aria-sort="ascending"] .sort-button::after {
+  content: "^";
+}
+
+.priority-table th[aria-sort="descending"] .sort-button::after {
+  content: "v";
+}
+
+.task-id {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(139, 94, 52, 0.1);
+  color: var(--accent);
+  font: 0.82rem/1.2 "Courier New", Courier, monospace;
+  text-decoration: none;
+}
+
+.task-title {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+}
+
+.task-note,
+.task-status,
+.dep-list,
+.source-list,
+.discussion-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.task-note {
+  max-width: 32rem;
+}
+
+.task-status {
+  margin-top: 0.45rem;
+}
+
+.rating-value {
+  font: 0.95rem/1.4 "Courier New", Courier, monospace;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.source-list code {
+  white-space: nowrap;
+}
+
+.dep-list a,
+.discussion-note a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 700px) {
   .page-shell {
     width: min(100vw - 1rem, 1080px);
