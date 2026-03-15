@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from pathlib import Path
 from string import Template
 
@@ -23,10 +24,10 @@ def render_page(
 ) -> str:
     base = load_template("base.html")
     return base.substitute(
-        title=title,
-        hero_kicker=hero_kicker,
-        hero_title=hero_title,
-        hero_text=hero_text,
+        title=html.escape(title),
+        hero_kicker=html.escape(hero_kicker),
+        hero_title=html.escape(hero_title),
+        hero_text=html.escape(hero_text),
         content_html=content_html,
         page_script_html=page_script_html,
     )

@@ -50,8 +50,8 @@ function deriveSubjectFromBody(bodyText) {
   return firstNonEmptyLine(bodyText).slice(0, 72);
 }
 
-function slugFromBody(bodyText) {
-  const firstLine = firstNonEmptyLine(bodyText).toLowerCase();
+function slugFromText(text) {
+  const firstLine = firstNonEmptyLine(text).toLowerCase();
   const slug = firstLine.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug.slice(0, 24) || "note";
 }
@@ -68,7 +68,15 @@ function randomToken() {
 
 function generatePostId(commandName, bodyText) {
   const prefix = commandName === "create_thread" ? "thread" : "reply";
-  return `${prefix}-${timestampToken()}-${slugFromBody(bodyText)}-${randomToken()}`;
+  return `${prefix}-${timestampToken()}-${slugFromText(bodyText)}-${randomToken()}`;
+}
+
+function generateProfileUpdateId(displayName) {
+  return `profile-update-${timestampToken()}-${slugFromText(displayName)}-${randomToken()}`;
+}
+
+function isoTimestamp() {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 function loadKeys() {
@@ -117,7 +125,13 @@ function responseRecordId(responseText) {
   return match ? match[1].trim() : "";
 }
 
-function redirectTarget(commandName, recordId) {
+function redirectTarget(commandName, recordId, defaults) {
+  if (commandName === "update_profile") {
+    if (!defaults.profileSlug) {
+      return "";
+    }
+    return `/profiles/${encodeURIComponent(defaults.profileSlug)}`;
+  }
   if (!recordId) {
     return "";
   }
@@ -127,7 +141,12 @@ function redirectTarget(commandName, recordId) {
   return `/posts/${encodeURIComponent(recordId)}`;
 }
 
-function formState() {
+function formState(commandName) {
+  if (commandName === "update_profile") {
+    return {
+      displayName: $("display-name-input"),
+    };
+  }
   return {
     body: $("body-input"),
   };
@@ -138,10 +157,24 @@ function defaultContext(root) {
     boardTags: normalizeBoardTags(root.dataset.boardTags || "general"),
     threadId: (root.dataset.threadId || "").trim(),
     parentId: (root.dataset.parentId || "").trim(),
+    sourceIdentityId: (root.dataset.sourceIdentityId || "").trim(),
+    profileSlug: (root.dataset.profileSlug || "").trim(),
   };
 }
 
-function buildCanonicalPayload(form, commandName, defaults) {
+function normalizeDisplayName(displayName) {
+  const value = requiredTrimmed(displayName, "Display-Name");
+  if (value.includes("\n") || value.includes("\r")) {
+    throw new Error("Display-Name must be a single line");
+  }
+  ensureAscii(value, "Display-Name");
+  if (value.length > 80) {
+    throw new Error("Display-Name must be at most 80 characters");
+  }
+  return value;
+}
+
+function buildCanonicalPostPayload(form, commandName, defaults) {
   const body = normalizeNewlines(requiredTrimmed(form.body.value, "Body")).replace(/\n*$/, "\n");
   const postId = generatePostId(commandName, body);
   const boardTags = requiredTrimmed(defaults.boardTags, "Board-Tags");
@@ -176,13 +209,52 @@ function buildCanonicalPayload(form, commandName, defaults) {
   };
 }
 
+function buildCanonicalProfileUpdatePayload(form, defaults) {
+  const displayName = normalizeDisplayName(form.displayName.value);
+  const recordId = generateProfileUpdateId(displayName);
+  const timestamp = isoTimestamp();
+  const sourceIdentityId = requiredTrimmed(defaults.sourceIdentityId, "Source-Identity-ID");
+
+  ensureAscii(recordId, "Record-ID");
+  ensureAscii(timestamp, "Timestamp");
+  ensureAscii(sourceIdentityId, "Source-Identity-ID");
+
+  return {
+    payload: [
+      `Record-ID: ${recordId}`,
+      "Action: set_display_name",
+      `Source-Identity-ID: ${sourceIdentityId}`,
+      `Timestamp: ${timestamp}`,
+      "",
+      displayName,
+      "",
+    ].join("\n"),
+    recordId,
+    displayName,
+  };
+}
+
+function buildCanonicalPayload(form, commandName, defaults) {
+  if (commandName === "update_profile") {
+    return buildCanonicalProfileUpdatePayload(form, defaults);
+  }
+  return buildCanonicalPostPayload(form, commandName, defaults);
+}
+
+function hasPreviewInput(form, commandName) {
+  if (commandName === "update_profile") {
+    return Boolean(form.displayName.value.trim());
+  }
+  return Boolean(form.body.value.trim());
+}
+
 function updatePayloadPreview(form, commandName, defaults) {
   const payloadOutput = $("payload-output");
   if (!payloadOutput) {
     return;
   }
   try {
-    if (!form.body.value.trim()) {
+    if (!hasPreviewInput(form, commandName)) {
       payloadOutput.value = "";
       return;
     }
@@ -233,7 +305,7 @@ async function ensureLocalKeys({ forceGenerate = false, importedPrivateKey = "" 
 }
 
 async function main() {
-  const root = $("compose-app");
+  const root = $("compose-app") || $("profile-update-app");
   if (!root) {
     return;
   }
@@ -242,7 +314,8 @@ async function main() {
   const endpoint = root.dataset.endpoint || "/api/create_thread";
   const dryRun = root.dataset.dryRun === "true";
   const defaults = defaultContext(root);
-  const state = formState();
+  const state = formState(commandName);
+  const form = commandName === "update_profile" ? $("profile-update-form") : $("signed-post-form");
   const privateKeyInput = $("private-key-input");
   const publicKeyOutput = $("public-key-output");
   const payloadOutput = $("payload-output");
@@ -250,6 +323,10 @@ async function main() {
   const responseOutput = $("response-output");
   const signSubmitButton = $("sign-submit-button");
   let currentKeys = null;
+
+  if (!form || !privateKeyInput || !publicKeyOutput || !payloadOutput || !signatureOutput || !responseOutput || !signSubmitButton) {
+    return;
+  }
 
   function applyKeys(keys) {
     currentKeys = keys;
@@ -269,7 +346,66 @@ async function main() {
     }
   }
 
-  state.body.addEventListener("input", () => {
+  async function prepareInitialKeys() {
+    if (commandName === "update_profile") {
+      const stored = await deriveStoredKeys();
+      if (!stored) {
+        setStatus(
+          "key-status",
+          "Import the private key for this profile, or generate a new one only if it matches this identity.",
+        );
+        return null;
+      }
+      applyKeys(stored);
+      setStatus("key-status", "Loaded the stored local signing key.");
+      return stored;
+    }
+    return prepareKeys({}, "Local signing key is ready.");
+  }
+
+  async function resolveSubmitKeys() {
+    if (currentKeys) {
+      return currentKeys;
+    }
+    if (commandName === "update_profile") {
+      const stored = await deriveStoredKeys();
+      if (stored) {
+        applyKeys(stored);
+        return stored;
+      }
+      throw new Error("Load or import the private key for this profile before signing.");
+    }
+    const keys = await ensureLocalKeys();
+    applyKeys(keys);
+    return keys;
+  }
+
+  function submittingMessage() {
+    if (dryRun) {
+      return "Submitting signed preview...";
+    }
+    if (commandName === "update_profile") {
+      return "Submitting signed profile update...";
+    }
+    return "Submitting signed post...";
+  }
+
+  function failurePrefix() {
+    return commandName === "update_profile" ? "Signed profile update failed" : "Signed posting failed";
+  }
+
+  function successMessage() {
+    if (dryRun) {
+      return "Signed preview accepted.";
+    }
+    if (commandName === "update_profile") {
+      return "Signed profile update accepted. Redirecting...";
+    }
+    return "Signed post accepted. Redirecting...";
+  }
+
+  const previewInput = commandName === "update_profile" ? state.displayName : state.body;
+  previewInput.addEventListener("input", () => {
     updatePayloadPreview(state, commandName, defaults);
     signatureOutput.value = "";
     responseOutput.value = "";
@@ -301,13 +437,12 @@ async function main() {
   updatePayloadPreview(state, commandName, defaults);
   setStatus("key-status", "Preparing local signing key...");
   try {
-    const keys = await prepareKeys({}, "Local signing key is ready.");
-    applyKeys(keys);
+    await prepareInitialKeys();
   } catch (error) {
     setStatus("key-status", `Key setup failed: ${error.message}`);
   }
 
-  $("signed-post-form").addEventListener("submit", async (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     signSubmitButton.disabled = true;
     setStatus("submit-status", "Building canonical payload...");
@@ -315,15 +450,14 @@ async function main() {
     signatureOutput.value = "";
 
     try {
-      const keys = currentKeys || await ensureLocalKeys();
-      applyKeys(keys);
+      const keys = await resolveSubmitKeys();
       const built = buildCanonicalPayload(state, commandName, defaults);
       payloadOutput.value = built.payload;
       setStatus("submit-status", "Signing payload...");
       const signature = await signPayload(built.payload, keys.privateKey);
 
       signatureOutput.value = signature;
-      setStatus("submit-status", dryRun ? "Submitting signed preview..." : "Submitting signed post...");
+      setStatus("submit-status", submittingMessage());
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -346,10 +480,10 @@ async function main() {
 
       const recordId = responseRecordId(responseText);
       if (dryRun) {
-        setStatus("submit-status", "Signed preview accepted.");
+        setStatus("submit-status", successMessage());
       } else {
-        setStatus("submit-status", "Signed post accepted. Redirecting...");
-        const target = redirectTarget(commandName, recordId);
+        setStatus("submit-status", successMessage());
+        const target = redirectTarget(commandName, recordId, defaults);
         if (target) {
           window.setTimeout(() => {
             window.location.assign(target);
@@ -357,7 +491,7 @@ async function main() {
         }
       }
     } catch (error) {
-      setStatus("submit-status", `Signed posting failed: ${error.message}`);
+      setStatus("submit-status", `${failurePrefix()}: ${error.message}`);
     } finally {
       signSubmitButton.disabled = false;
     }

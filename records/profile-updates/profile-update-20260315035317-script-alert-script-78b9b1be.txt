@@ -1,0 +1,6 @@
+Record-ID: profile-update-20260315035317-script-alert-script-78b9b1be
+Action: set_display_name
+Source-Identity-ID: openpgp:4a7c28879d6dc4e92cee81468ed80d5c3298463b
+Timestamp: 2026-03-15T03:53:17Z
+
+<script>alert()</script>

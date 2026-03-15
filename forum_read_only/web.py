@@ -331,6 +331,11 @@ def render_profile(identity_id: str) -> str:
         ),
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
+        profile_action_html=(
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
+            "update username"
+            "</a>"
+        ),
         stat_html=(
             '<div class="stat-grid">'
             f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
@@ -360,6 +365,51 @@ def render_profile(identity_id: str) -> str:
         hero_title=summary.display_name,
         hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
         content_html=content,
+    )
+
+
+def render_profile_update_page(identity_id: str) -> str:
+    posts, _, _, _, _, identity_context = load_repository_state()
+    summary = find_profile_summary(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    if summary is None:
+        raise LookupError(f"unknown identity: {identity_id}")
+
+    profile_slug = identity_slug(summary.identity_id)
+    content = load_template("profile_update.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ("/", "board index"),
+                (f"/profiles/{profile_slug}", summary.display_name),
+                (f"/profiles/{profile_slug}/update", "update username"),
+            ]
+        ),
+        update_heading="Update username",
+        update_subhead=summary.identity_id,
+        current_display_name=html.escape(summary.display_name),
+        identity_id=html.escape(summary.identity_id),
+        display_name_source=html.escape(summary.display_name_source),
+        context_text=html.escape(
+            "This dedicated page prepares a signed display-name update for the current resolved identity. "
+            "The same canonical profile page remains the readback surface after submission."
+        ),
+        dry_run_value="false",
+        source_identity_id=html.escape(summary.identity_id),
+        profile_slug=html.escape(profile_slug),
+        display_name_value=html.escape(summary.display_name),
+        submit_label="Sign and submit",
+    )
+    return render_page(
+        title=f"Update username · {summary.display_name}",
+        hero_kicker="Profile Update",
+        hero_title="Update your username",
+        hero_text="Use the existing browser signing flow to prepare one signed username/display-name update for the resolved profile you are viewing.",
+        content_html=content,
+        page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
     )
 
 
@@ -1007,6 +1057,21 @@ def application(environ, start_response):
                 return [body]
             except LookupError:
                 body = render_missing_resource("post").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+        if path.startswith("/profiles/") and path.endswith("/update"):
+            slug = unquote(path.removeprefix("/profiles/").removesuffix("/update"))
+            slug = slug.rstrip("/")
+            try:
+                identity_id = identity_id_from_slug(slug)
+                body = render_profile_update_page(identity_id).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except (LookupError, ValueError):
+                body = render_missing_resource("profile").encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
                 start_response("404 Not Found", headers)
                 return [body]
