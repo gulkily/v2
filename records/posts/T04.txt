@@ -1,0 +1,11 @@
+Post-ID: T04
+Board-Tags: planning
+Subject: Event log and git-backed activity feed
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.89
+Task-Implementation-Difficulty: 0.48
+Task-Depends-On: T01
+Task-Sources: todo.txt
+
+Show newest content, moderation records, and git activity together with filtering so the instance feels alive and auditable.

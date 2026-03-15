@@ -1,0 +1,11 @@
+Post-ID: T21
+Board-Tags: planning
+Subject: External import pipeline for subreddit and archive content
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.58
+Task-Implementation-Difficulty: 0.79
+Task-Depends-On: T09 T19
+Task-Sources: todo.txt
+
+Import large third-party discussion archives with author metadata, range limits, and incremental updates without overwhelming the repository layout.

@@ -1,10 +1,11 @@
 <section class="panel">
   <div class="section-head">
     <h2>How to read this</h2>
-    <p>The default row order follows the curated repository task IDs. Use the table headers to sort by impact, difficulty, dependencies, sources, or linked discussion state without changing the canonical record order.</p>
+    <p>The default row order follows task-thread root IDs. Use the table headers to sort by impact, difficulty, dependencies, sources, or comment activity without changing the canonical repository order.</p>
   </div>
   <div class="action-row">
     <a class="thread-chip" href="/">back to board index</a>
+    <a class="thread-chip" href="/compose/task">compose a task thread</a>
     <a class="thread-chip" href="#priority-table">jump to priorities</a>
   </div>
   ${stats_html}
@@ -13,12 +14,12 @@
 <section class="panel">
   <div class="section-head">
     <h2>Sortable task table</h2>
-    <p>Dependencies link to other rows in this page. Linked discussion points to the existing thread view when a task record declares a discussion thread.</p>
+    <p>Dependencies link to other task-detail routes in this page. The comments column points back to the canonical task thread because replies are the discussion surface.</p>
   </div>
   <p id="task-sort-status" class="sr-only" aria-live="polite"></p>
   <div class="table-shell">
     <table class="priority-table" id="priority-table" data-sortable-table>
-      <caption>Task records with impact, implementation difficulty, dependencies, sources, and linked discussion state.</caption>
+      <caption>Task threads with impact, implementation difficulty, dependencies, sources, and comment activity.</caption>
       <thead>
         <tr>
           <th scope="col" aria-sort="none">
@@ -40,7 +41,7 @@
             <button class="sort-button" type="button" data-sort-key="source" data-sort-type="text">Sources</button>
           </th>
           <th scope="col" aria-sort="none">
-            <button class="sort-button" type="button" data-sort-key="discussion" data-sort-type="text">Linked discussion</button>
+            <button class="sort-button" type="button" data-sort-key="comments" data-sort-type="number">Comments</button>
           </th>
         </tr>
       </thead>

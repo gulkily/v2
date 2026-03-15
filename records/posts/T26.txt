@@ -1,0 +1,11 @@
+Post-ID: T26
+Board-Tags: planning
+Subject: Thread scanning and unanswered question nudging
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.49
+Task-Implementation-Difficulty: 0.54
+Task-Depends-On: T04 T12
+Task-Sources: todo.txt
+
+Scan for stale threads, questions without replies, or obviously inaccurate content and create comments or follow-up prompts with clearer policy guardrails.

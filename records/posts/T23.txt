@@ -1,0 +1,11 @@
+Post-ID: T23
+Board-Tags: planning
+Subject: Alternative clients beyond the main web UI
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.55
+Task-Implementation-Difficulty: 0.70
+Task-Depends-On: T01 T19
+Task-Sources: docs/plans/forum_feature_splitting_checklist.md
+
+Use a stable read and write contract to support agent, CLI, mobile, or other focused clients instead of forcing every workflow through the same browser interface.

@@ -25,11 +25,15 @@
 
 ## Stage 3 - Derive planning/task browse surfaces from typed task threads
 - Changes:
-  - Pending.
+  - Added a task-thread read model that filters typed task roots out of the ordinary thread set without treating other typed roots as tasks.
+  - Switched `/planning/task-priorities/` and `/planning/tasks/<task-id>` to derive from task-typed root threads instead of `records/tasks/`.
+  - Seeded the existing curated task list into `records/posts/T01.txt` through `records/posts/T26.txt` as canonical task threads so the live planning pages stay populated after the source-of-truth shift.
+  - Updated the planning templates to describe comment activity rather than linked external discussion threads.
 - Verification:
-  - Pending.
+  - `python -m unittest tests.test_task_priorities_page tests.test_task_thread_pages`
+  - `python -m py_compile forum_read_only/web.py forum_read_only/task_threads.py`
 - Notes:
-  - Pending.
+  - Route stability stayed intact because the migrated task thread roots reuse the existing `T01`-style identifiers as their `Post-ID` values.
 
 ## Stage 4 - Harden typed root-thread model with tests and docs
 - Changes:

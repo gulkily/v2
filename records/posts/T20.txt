@@ -1,0 +1,11 @@
+Post-ID: T20
+Board-Tags: planning
+Subject: Multi-repo aggregation and federation tooling
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.62
+Task-Implementation-Difficulty: 0.87
+Task-Depends-On: T09 T19
+Task-Sources: ideas.txt; docs/plans/forum_feature_splitting_checklist.md
+
+Aggregate several content repositories into one logical forum view and settle rules for global IDs, write targets, and cross-repo thread behavior.

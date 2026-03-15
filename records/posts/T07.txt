@@ -1,0 +1,11 @@
+Post-ID: T07
+Board-Tags: planning
+Subject: Compose advanced signing UX
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.81
+Task-Implementation-Difficulty: 0.44
+Task-Depends-On: T02 T06
+Task-Sources: ideas.txt; todo.txt
+
+Preserve technical-details state, allow payload edits before submission, and show the server response inline so signing is more understandable and less brittle.

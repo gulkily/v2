@@ -1,0 +1,10 @@
+Post-ID: T24
+Board-Tags: planning
+Subject: Local dev server polish and v2 command cleanup
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.59
+Task-Implementation-Difficulty: 0.34
+Task-Sources: todo.txt
+
+Add watch and reload behavior, cleaner shutdown handling, and a less confusing top-level command so local iteration feels intentional instead of improvised.

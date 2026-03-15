@@ -1,0 +1,11 @@
+Post-ID: T09
+Board-Tags: planning
+Subject: Derived index persistence and SQLite read model
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.65
+Task-Implementation-Difficulty: 0.69
+Task-Depends-On: T08
+Task-Sources: todo.txt; docs/plans/forum_feature_splitting_checklist.md
+
+Define where derived indexes live, when they rebuild, and whether SQLite becomes the fast read path once direct repository reads stop scaling well enough.

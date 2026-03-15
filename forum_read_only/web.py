@@ -49,7 +49,7 @@ from forum_read_only.repository import (
     load_posts,
     root_thread_type,
 )
-from forum_read_only.tasks import index_tasks as index_task_records, load_tasks, task_records_dir
+from forum_read_only.task_threads import index_task_threads, load_task_threads
 from forum_read_only.templates import load_asset_text, load_template, render_page
 
 load_repo_env()
@@ -621,26 +621,24 @@ def render_missing_resource(resource_name: str) -> str:
 
 def render_task_priorities_page() -> str:
     _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
-    threads = index_threads(grouped_threads)
-    tasks = load_tasks(task_records_dir(get_repo_root()))
-
-    linked_discussion_count = sum(1 for task in tasks if task.discussion_thread_id)
-    dependency_count = sum(len(task.dependencies) for task in tasks)
+    task_threads = load_task_threads(grouped_threads, moderation_state)
+    total_comments = sum(visible_reply_count(thread, moderation_state) for thread in task_threads)
+    dependency_count = sum(len(thread.root.task_metadata.dependencies) for thread in task_threads if thread.root.task_metadata)
     stats_html = (
         '<div class="stat-grid">'
-        f'<article class="stat-card"><span class="stat-number">{len(tasks)}</span><span class="stat-label">task records</span></article>'
-        f'<article class="stat-card"><span class="stat-number">{linked_discussion_count}</span><span class="stat-label">linked discussions</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{len(task_threads)}</span><span class="stat-label">task threads</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{total_comments}</span><span class="stat-label">visible task comments</span></article>'
         f'<article class="stat-card"><span class="stat-number">{dependency_count}</span><span class="stat-label">dependency edges</span></article>'
         "</div>"
     )
     rows_html = "".join(
-        render_task_priorities_row(task, threads=threads, moderation_state=moderation_state)
-        for task in tasks
+        render_task_priorities_row(thread, moderation_state=moderation_state)
+        for thread in task_threads
     )
     if not rows_html:
         rows_html = (
             '<tr><td colspan="7"><p class="discussion-note">'
-            "No task records are published yet."
+            "No task threads are published yet."
             "</p></td></tr>"
         )
 
@@ -652,32 +650,30 @@ def render_task_priorities_page() -> str:
         title="Development Task Priorities",
         hero_kicker="Planning View",
         hero_title="Development task priorities",
-        hero_text="This planning index is rendered from canonical task records in the repository. Presentability measures user-visible payoff, implementation difficulty measures delivery effort, and linked discussion state reuses the normal forum thread model.",
+        hero_text="This planning index is derived from typed task thread roots in `records/posts/`. The root post carries the current task metadata, and ordinary replies are the task comments.",
         content_html=content,
         page_script_html='<script src="/assets/task_priorities.js"></script>',
     )
 
 
-def render_task_priorities_row(task, *, threads, moderation_state) -> str:
-    discussion_html, discussion_sort_value = render_task_discussion_summary(
-        task.discussion_thread_id,
-        threads=threads,
-        moderation_state=moderation_state,
-    )
+def render_task_priorities_row(thread, *, moderation_state) -> str:
+    task = thread.root.task_metadata
+    assert task is not None
+    discussion_html, discussion_sort_value = render_task_thread_summary(thread, moderation_state=moderation_state)
     dependency_html = render_task_dependency_links(task.dependencies)
     return (
-        f'<tr id="task-{html.escape(task.task_id)}"'
-        f' data-id="{html.escape(task.task_id)}"'
-        f' data-task="{html.escape(task.title)}"'
+        f'<tr id="task-{html.escape(thread.root.post_id)}"'
+        f' data-id="{html.escape(thread.root.post_id)}"'
+        f' data-task="{html.escape(thread.root.subject or thread.root.post_id)}"'
         f' data-impact="{task.presentability_impact:.2f}"'
         f' data-difficulty="{task.implementation_difficulty:.2f}"'
         f' data-dependencies="{html.escape(" ".join(task.dependencies))}"'
         f' data-source="{html.escape(" ".join(task.sources))}"'
-        f' data-discussion="{html.escape(discussion_sort_value)}">'
-        f'<td><a class="task-id" href="/planning/tasks/{html.escape(task.task_id)}">{html.escape(task.task_id)}</a></td>'
+        f' data-comments="{html.escape(discussion_sort_value)}">'
+        f'<td><a class="task-id" href="/planning/tasks/{html.escape(thread.root.post_id)}">{html.escape(thread.root.post_id)}</a></td>'
         "<td>"
-        f'<h3 class="task-title"><a class="task-link" href="/planning/tasks/{html.escape(task.task_id)}">{html.escape(task.title)}</a></h3>'
-        f'<p class="task-note">{html.escape(task.summary)}</p>'
+        f'<h3 class="task-title"><a class="task-link" href="/planning/tasks/{html.escape(thread.root.post_id)}">{html.escape(thread.root.subject or thread.root.post_id)}</a></h3>'
+        f'<p class="task-note">{html.escape(thread.root.body)}</p>'
         f'<p class="task-status">status {html.escape(task.status)}</p>'
         "</td>"
         f'<td><span class="rating-value">{task.presentability_impact:.2f}</span></td>'
@@ -689,56 +685,43 @@ def render_task_priorities_row(task, *, threads, moderation_state) -> str:
     )
 
 
-def render_task_discussion_summary(discussion_thread_id: str | None, *, threads, moderation_state) -> tuple[str, str]:
-    if not discussion_thread_id:
-        return '<p class="discussion-note">Not linked yet</p>', ""
-
-    thread = threads.get(discussion_thread_id)
-    if thread is None or thread_is_hidden(moderation_state, discussion_thread_id):
-        return (
-            '<p class="discussion-note">Linked thread unavailable</p>',
-            "missing",
-        )
-
+def render_task_thread_summary(thread, *, moderation_state) -> tuple[str, str]:
     reply_count = visible_reply_count(thread, moderation_state)
-    labels = thread_status_labels(discussion_thread_id, moderation_state)
+    labels = thread_status_labels(thread.root.post_id, moderation_state)
     suffix = ""
     if labels:
         suffix = " · " + " ".join(labels)
     return (
         '<p class="discussion-note">'
-        f'<a href="/threads/{html.escape(discussion_thread_id)}">{html.escape(discussion_thread_id)}</a>'
+        f'<a href="/threads/{html.escape(thread.root.post_id)}">{html.escape(thread.root.post_id)}</a>'
         f' · {reply_count} visible repl{"y" if reply_count == 1 else "ies"}{suffix}'
         "</p>",
-        discussion_thread_id,
+        f"{reply_count:04d}",
     )
 
 
 def render_task_detail_page(task_id: str) -> str:
-    tasks = load_tasks(task_records_dir(get_repo_root()))
-    task = index_task_records(tasks).get(task_id)
-    if task is None:
+    _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+    task_threads = load_task_threads(grouped_threads, moderation_state)
+    thread = index_task_threads(task_threads).get(task_id)
+    if thread is None:
         raise LookupError(f"unknown task: {task_id}")
 
-    _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
-    threads = index_threads(grouped_threads)
-    discussion_html = render_task_detail_discussion(
-        task.discussion_thread_id,
-        threads=threads,
-        moderation_state=moderation_state,
-    )
+    task = thread.root.task_metadata
+    assert task is not None
+    discussion_html = render_task_detail_discussion(thread, moderation_state=moderation_state)
     content = load_template("task_detail.html").substitute(
         breadcrumb_html=render_breadcrumb(
             [
                 ("/", "board index"),
                 ("/planning/task-priorities/", "task priorities"),
-                (f"/planning/tasks/{task.task_id}", task.task_id),
+                (f"/planning/tasks/{thread.root.post_id}", thread.root.post_id),
             ]
         ),
-        task_heading=html.escape(task.title),
-        task_id=html.escape(task.task_id),
+        task_heading=html.escape(thread.root.subject or thread.root.post_id),
+        task_id=html.escape(thread.root.post_id),
         task_status=html.escape(task.status),
-        task_summary=html.escape(task.summary),
+        task_summary=html.escape(thread.root.body),
         task_impact=f"{task.presentability_impact:.2f}",
         task_difficulty=f"{task.implementation_difficulty:.2f}",
         dependency_html=render_task_dependency_links(task.dependencies),
@@ -746,54 +729,35 @@ def render_task_detail_page(task_id: str) -> str:
         discussion_html=discussion_html,
     )
     return render_page(
-        title=task.title,
+        title=thread.root.subject or thread.root.post_id,
         hero_kicker="Task Detail",
-        hero_title=task.title,
-        hero_text="This task view joins one canonical task record with the current linked discussion-thread state while keeping comments on the normal forum thread surface.",
+        hero_title=thread.root.subject or thread.root.post_id,
+        hero_text="This task view is derived from one task-typed root thread. The root carries structured task metadata, and the same thread remains the discussion surface.",
         content_html=content,
     )
 
 
-def render_task_detail_discussion(discussion_thread_id: str | None, *, threads, moderation_state) -> str:
-    if not discussion_thread_id:
-        return (
-            '<section class="panel">'
-            '<div class="section-head"><h2>Discussion</h2>'
-            '<p>This task does not link to a discussion thread yet.</p></div>'
-            '<p class="discussion-note">Add a <code>Discussion-Thread-ID</code> to the task record when a canonical discussion thread exists.</p>'
-            "</section>"
-        )
-
-    thread = threads.get(discussion_thread_id)
-    if thread is None or thread_is_hidden(moderation_state, discussion_thread_id):
-        return (
-            '<section class="panel">'
-            '<div class="section-head"><h2>Discussion</h2>'
-            '<p>The linked discussion thread is not currently visible.</p></div>'
-            f'<p class="discussion-note">Configured thread ID: <code>{html.escape(discussion_thread_id)}</code></p>'
-            "</section>"
-        )
-
+def render_task_detail_discussion(thread, *, moderation_state) -> str:
     reply_count = visible_reply_count(thread, moderation_state)
-    thread_labels = thread_status_labels(discussion_thread_id, moderation_state)
+    thread_labels = thread_status_labels(thread.root.post_id, moderation_state)
     status_text = " ".join(thread_labels) if thread_labels else "open"
     reply_link_html = (
-        f'<a class="thread-chip" href="/compose/reply?thread_id={html.escape(discussion_thread_id)}&parent_id={html.escape(discussion_thread_id)}">reply in linked discussion</a>'
-        if not moderation_state.locks_thread(discussion_thread_id)
-        else '<p class="discussion-note">This linked discussion thread is locked by moderation.</p>'
+        f'<a class="thread-chip" href="/compose/reply?thread_id={html.escape(thread.root.post_id)}&parent_id={html.escape(thread.root.post_id)}">reply on this task</a>'
+        if not moderation_state.locks_thread(thread.root.post_id)
+        else '<p class="discussion-note">This task thread is locked by moderation.</p>'
     )
     return (
         '<section class="panel">'
         '<div class="section-head"><h2>Discussion</h2>'
-        '<p>This task reuses the normal forum thread view for freeform comments.</p></div>'
+        '<p>This task thread is also the discussion thread. Replies stay in the normal forum reply flow.</p></div>'
         '<div class="stat-grid">'
         f'<article class="stat-card"><span class="stat-number">{reply_count}</span><span class="stat-label">visible replies</span></article>'
         f'<article class="stat-card"><span class="stat-number">{html.escape(status_text)}</span><span class="stat-label">thread state</span></article>'
-        f'<article class="stat-card"><span class="stat-number">{html.escape(discussion_thread_id)}</span><span class="stat-label">thread id</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{html.escape(thread.root.post_id)}</span><span class="stat-label">thread id</span></article>'
         "</div>"
         f'<p class="task-note task-note--detail">{html.escape(first_line(thread.root.body))}</p>'
         '<div class="action-row">'
-        f'<a class="thread-chip" href="/threads/{html.escape(discussion_thread_id)}">open linked discussion</a>'
+        f'<a class="thread-chip" href="/threads/{html.escape(thread.root.post_id)}">open task thread</a>'
         f"{reply_link_html}"
         "</div>"
         "</section>"

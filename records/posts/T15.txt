@@ -1,0 +1,11 @@
+Post-ID: T15
+Board-Tags: planning
+Subject: Moderator delegation tree and permission management
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.74
+Task-Implementation-Difficulty: 0.74
+Task-Depends-On: T13
+Task-Sources: todo.txt
+
+Model grant and revoke flows for moderators and make the full grant ancestry visible so the trust graph around moderation power is inspectable.

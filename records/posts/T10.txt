@@ -1,0 +1,11 @@
+Post-ID: T10
+Board-Tags: planning
+Subject: Hashtag recognition and richer tag browse affordances
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.60
+Task-Implementation-Difficulty: 0.28
+Task-Depends-On: T08
+Task-Sources: todo.txt
+
+Recognize hashtags in post bodies and connect them to browse and filter surfaces so content is easier to traverse without manual tagging discipline.

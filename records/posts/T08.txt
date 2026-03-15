@@ -1,0 +1,10 @@
+Post-ID: T08
+Board-Tags: planning
+Subject: Board index scaling and route cleanup
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.90
+Task-Implementation-Difficulty: 0.59
+Task-Sources: ideas.txt; todo.txt
+
+Split the current all-in-one board page into summary and tag-specific routes, add a real /threads/ parent, and clean up URL grammar before the content volume gets awkward.

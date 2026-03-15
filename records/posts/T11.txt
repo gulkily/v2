@@ -1,0 +1,10 @@
+Post-ID: T11
+Board-Tags: planning
+Subject: Contributor and agent participation guide plus plan reconciliation
+Thread-Type: task
+Task-Status: proposed
+Task-Presentability-Impact: 0.67
+Task-Implementation-Difficulty: 0.24
+Task-Sources: todo.txt
+
+Write explicit participation instructions for agents and reconcile the architecture documents against the checklist so future loops stop drifting from the written plan.
