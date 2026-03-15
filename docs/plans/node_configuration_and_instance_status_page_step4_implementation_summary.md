@@ -29,3 +29,13 @@
   - Confirmed the board index returned `200 OK`, rendered the `instance info` label, and linked directly to `/instance/`.
 - Notes:
   - The board-index action row now carries four primary public destinations; the wording stays intentionally technical to match the feature’s audience.
+
+## Stage 4 - Tests And Operator Docs
+- Changes:
+  - Added `tests/test_instance_info_page.py` to cover the board-index link, the `/instance/` route, rendered public fact fields, and missing-metadata placeholders.
+  - Updated `docs/developer_commands.md` to document the canonical source of public instance metadata and which facts are derived at render time.
+- Verification:
+  - Ran `python3 -m unittest tests.test_instance_info tests.test_instance_info_page`.
+  - Confirmed 7 focused tests passed for helper parsing, git-derived facts, page rendering, board-index discoverability, and explicit missing-value behavior.
+- Notes:
+  - The test run emits the existing missing-`.env` reminder from startup; that warning is expected and does not affect the instance-info feature behavior.

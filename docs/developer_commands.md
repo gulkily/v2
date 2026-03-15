@@ -26,6 +26,12 @@ The command contract is intentionally small: future backends such as Perl should
 - `DEDALUS_API_KEY` enables the server-side `/api/call_llm` baseline LLM endpoint.
 - The wrapper prefers `.venv/bin/python3` when present and otherwise falls back to `python3`.
 
+## Public instance info
+- The public `/instance/` page publishes operator, policy, and deployment facts for the current instance.
+- Tracked public metadata lives in `records/instance/public.txt`.
+- Commit ID and commit date are derived from the current git checkout at render time.
+- Moderation settings are derived from the current moderator allowlist configuration.
+
 ## Dedalus baseline
 1. Install dependencies with `python3 -m pip install -r requirements.txt`.
 2. Run `./forum env-sync` and set `DEDALUS_API_KEY=...` in the repo-root `.env`.
