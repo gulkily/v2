@@ -12,3 +12,8 @@
 - Changes: Added the repo-root `forum` wrapper as the canonical short command and made it executable. The wrapper forwards argv to `scripts/forum_tasks.py` while preferring `.venv/bin/python3` when present and falling back to `python3` otherwise.
 - Verification: Ran `./forum help`; ran `./forum test test_profile_update_page.py` and confirmed the targeted unittest file passes; ran `env PYTHONUNBUFFERED=1 FORUM_PORT=8031 timeout 2s ./forum start` and confirmed the wrapper reaches the local server path and prints `Serving read-only forum on http://127.0.0.1:8031` before timeout.
 - Notes: The wrapper keeps the backend handoff intentionally small so a later Perl runner can be introduced behind the same public subcommands without changing the user-facing contract.
+
+## Stage 4 - Document the command surface
+- Changes: Added `docs/developer_commands.md` as the project-level command reference for `./forum`, including `help`, `start`, and `test` usage, the supported direct entrypoints, and the explicit rule that future backends such as Perl must preserve the same public contract.
+- Verification: Reviewed `docs/developer_commands.md`; ran `./forum help` and confirmed the documented subcommands match the real help output; ran `./forum test test_profile_update_page.py` and confirmed the documented focused-test example works.
+- Notes: This repo still has no broad root README, so the command reference lives in `docs/developer_commands.md` for now rather than expanding this feature into a general documentation overhaul.
