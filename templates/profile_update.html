@@ -23,7 +23,7 @@
 >
   <div class="section-head">
     <h2>Signed Username Update</h2>
-    <p>The browser will build one canonical profile-update payload for this resolved identity, sign it locally, and submit a deterministic preview.</p>
+    <p>The browser will build one canonical profile-update payload for this resolved identity, sign it locally, and submit it directly to repository-backed storage.</p>
   </div>
   <form id="profile-update-form" class="field-stack">
     <label class="field-stack" for="display-name-input">
@@ -36,7 +36,7 @@
     </div>
   </form>
   <p id="key-status" class="status-note">Preparing local signing key...</p>
-  <p id="submit-status" class="status-note">Waiting for signed preview.</p>
+  <p id="submit-status" class="status-note">Waiting for signed submission.</p>
 </section>
 
 <details class="panel compose-details">
@@ -64,7 +64,7 @@
     <section class="compose-card">
       <div class="section-head">
         <h2>Derived payload</h2>
-        <p>The browser derives the canonical payload, detached signature, and shows the exact preview response.</p>
+        <p>The browser derives the canonical payload, detached signature, and shows the exact server response.</p>
       </div>
       <label class="field-stack" for="payload-output">
         <span>Canonical payload preview</span>

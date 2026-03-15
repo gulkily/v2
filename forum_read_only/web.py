@@ -397,11 +397,11 @@ def render_profile_update_page(identity_id: str) -> str:
             "This dedicated page prepares a signed display-name update for the current resolved identity. "
             "The same canonical profile page remains the readback surface after submission."
         ),
-        dry_run_value="true",
+        dry_run_value="false",
         source_identity_id=html.escape(summary.identity_id),
         profile_slug=html.escape(profile_slug),
         display_name_value=html.escape(summary.display_name),
-        submit_label="Sign and preview",
+        submit_label="Sign and submit",
     )
     return render_page(
         title=f"Update username · {summary.display_name}",

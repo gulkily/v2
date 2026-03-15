@@ -22,3 +22,16 @@
   - Ran `node --input-type=module --eval "import('node:fs/promises').then(async (fs) => { let source = await fs.readFile('templates/assets/browser_signing.js', 'utf8'); source = source.replace(/^import .*$/m, 'const openpgp = {};').replace(/main\\(\\);\\s*$/, ''); await import('data:text/javascript,' + encodeURIComponent(source)); console.log('browser_signing.js parsed'); });"` and confirmed the browser module parses after stubbing the top-level import and `main()` call for a non-browser syntax smoke check.
 - Notes:
   - The update page currently submits deterministic dry-run previews only; Stage 3 will switch it to real `update_profile` submissions and redirect back to the profile read surface.
+
+## Stage 3 - real browser profile-update submission and readback
+- Changes:
+  - Switched the dedicated profile-update page from dry-run preview mode to real signed submission mode and updated the page copy to reflect repository-backed writes.
+  - Reused the shared browser signing asset so successful `update_profile` submissions now post to `/api/update_profile` and redirect back to the canonical profile page.
+  - Added an end-to-end test that generates a browser-style OpenPGP key, signs a canonical profile-update payload, submits it through the WSGI app, and confirms the updated display name appears on the profile read surface.
+- Verification:
+  - Ran `python3 -m unittest discover -s tests -p 'test_profile_update_submission.py'`.
+  - Ran `python3 -m unittest discover -s tests -p 'test_profile_update_page.py'`.
+  - Ran `python3 -m unittest discover -s tests -p 'test_compose_reply_page.py'`.
+  - Ran `python3 -m py_compile forum_read_only/web.py`.
+- Notes:
+  - The update flow still depends on a matching local or imported private key for the profile being edited; there is still no broader account-session model in this slice.
