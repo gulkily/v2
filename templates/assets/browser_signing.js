@@ -2,6 +2,8 @@ import * as openpgp from "./vendor/openpgp.min.mjs";
 
 const STORAGE_PRIVATE = "forum_private_key_armored";
 const STORAGE_PUBLIC = "forum_public_key_armored";
+const STORAGE_DRAFT_PREFIX = "forum_compose_draft_v1:";
+const DRAFT_SAVE_DELAY_MS = 400;
 
 function $(id) {
   return document.getElementById(id);
@@ -121,6 +123,17 @@ function saveKeys(privateKey, publicKey) {
   localStorage.setItem(STORAGE_PUBLIC, publicKey);
 }
 
+function draftStorageAvailable() {
+  try {
+    const probeKey = `${STORAGE_DRAFT_PREFIX}probe`;
+    localStorage.setItem(probeKey, "1");
+    localStorage.removeItem(probeKey);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 async function privateToPublic(armoredPrivateKey) {
   const privateKey = await openpgp.readPrivateKey({ armoredKey: armoredPrivateKey });
   return privateKey.toPublic().armor();
@@ -184,6 +197,32 @@ function formState(commandName) {
     taskDifficulty: $("task-difficulty-input"),
     taskDependencies: $("task-dependencies-input"),
     taskSources: $("task-sources-input"),
+  };
+}
+
+function composeDraftContext(commandName, defaults) {
+  if (commandName === "update_profile") {
+    return null;
+  }
+  const scopeParts = [
+    commandName,
+    defaults.threadType || "plain",
+    defaults.boardTags || "general",
+  ];
+  if (commandName === "create_reply") {
+    scopeParts.push(defaults.threadId || "");
+    scopeParts.push(defaults.parentId || "");
+  }
+  return {
+    storageKey: `${STORAGE_DRAFT_PREFIX}${scopeParts.join("|")}`,
+    fields: [
+      ["body", "body"],
+      ["taskStatus", "taskStatus"],
+      ["taskImpact", "taskImpact"],
+      ["taskDifficulty", "taskDifficulty"],
+      ["taskDependencies", "taskDependencies"],
+      ["taskSources", "taskSources"],
+    ],
   };
 }
 
@@ -307,6 +346,68 @@ function hasPreviewInput(form, commandName) {
   return Boolean(form.body.value.trim());
 }
 
+function formatSavedAt(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleString();
+}
+
+function setDraftStatus(message) {
+  setStatus("draft-status", message);
+}
+
+function loadDraft(storageKey) {
+  try {
+    const rawValue = localStorage.getItem(storageKey);
+    if (!rawValue) {
+      return null;
+    }
+    const parsed = JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.savedAt !== "string" || !parsed.fields || typeof parsed.fields !== "object") {
+      return null;
+    }
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function saveDraft(storageKey, fields) {
+  const draft = {
+    savedAt: new Date().toISOString(),
+    fields,
+  };
+  localStorage.setItem(storageKey, JSON.stringify(draft));
+  return draft;
+}
+
+function clearDraft(storageKey) {
+  localStorage.removeItem(storageKey);
+}
+
+function applyDraft(state, draftContext, draft) {
+  for (const [fieldName, storageName] of draftContext.fields) {
+    const input = state[fieldName];
+    const value = draft.fields[storageName];
+    if (input && typeof value === "string") {
+      input.value = value;
+    }
+  }
+}
+
+function captureDraftFields(state, draftContext) {
+  const fields = {};
+  for (const [fieldName, storageName] of draftContext.fields) {
+    const input = state[fieldName];
+    if (input) {
+      fields[storageName] = input.value;
+    }
+  }
+  return fields;
+}
+
 function updatePayloadPreview(form, commandName, defaults) {
   const payloadOutput = $("payload-output");
   if (!payloadOutput) {
@@ -381,10 +482,52 @@ async function main() {
   const signatureOutput = $("signature-output");
   const responseOutput = $("response-output");
   const signSubmitButton = $("sign-submit-button");
+  const draftContext = composeDraftContext(commandName, defaults);
+  const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
   let currentKeys = null;
+  let pendingDraftTimer = 0;
 
   if (!form || !privateKeyInput || !publicKeyOutput || !payloadOutput || !signatureOutput || !responseOutput || !signSubmitButton) {
     return;
+  }
+
+  if (draftContext) {
+    if (!canStoreDraft) {
+      setDraftStatus("Local draft saving is unavailable in this browser. Compose will still work.");
+    } else {
+      const savedDraft = loadDraft(draftContext.storageKey);
+      if (savedDraft) {
+        applyDraft(state, draftContext, savedDraft);
+        const restoredAt = formatSavedAt(savedDraft.savedAt);
+        setDraftStatus(
+          restoredAt
+            ? `Restored local draft saved at ${restoredAt}.`
+            : "Restored a local draft from this browser.",
+        );
+      } else {
+        setDraftStatus("Drafts are saved locally in this browser.");
+      }
+    }
+  }
+
+  function scheduleDraftSave() {
+    if (!draftContext || !canStoreDraft) {
+      return;
+    }
+    window.clearTimeout(pendingDraftTimer);
+    pendingDraftTimer = window.setTimeout(() => {
+      try {
+        const savedDraft = saveDraft(draftContext.storageKey, captureDraftFields(state, draftContext));
+        const savedAt = formatSavedAt(savedDraft.savedAt);
+        setDraftStatus(
+          savedAt
+            ? `Draft saved locally at ${savedAt}.`
+            : "Draft saved locally in this browser.",
+        );
+      } catch (_error) {
+        setDraftStatus("Local draft saving is unavailable in this browser. Compose will still work.");
+      }
+    }, DRAFT_SAVE_DELAY_MS);
   }
 
   function applyKeys(keys) {
@@ -478,6 +621,7 @@ async function main() {
       updatePayloadPreview(state, commandName, defaults);
       signatureOutput.value = "";
       responseOutput.value = "";
+      scheduleDraftSave();
     });
   }
 
@@ -552,6 +696,11 @@ async function main() {
       if (dryRun) {
         setStatus("submit-status", successMessage());
       } else {
+        if (draftContext && canStoreDraft) {
+          window.clearTimeout(pendingDraftTimer);
+          clearDraft(draftContext.storageKey);
+          setDraftStatus("Local draft cleared after successful submission.");
+        }
         setStatus("submit-status", successMessage());
         const target = redirectTarget(commandName, recordId, defaults);
         if (target) {
