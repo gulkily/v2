@@ -7,6 +7,15 @@ from forum_core.identity import build_identity_id, fingerprint_from_public_key_p
 
 
 @dataclass(frozen=True)
+class TaskRootMetadata:
+    status: str
+    presentability_impact: float
+    implementation_difficulty: float
+    dependencies: tuple[str, ...]
+    sources: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Post:
     post_id: str
     board_tags: tuple[str, ...]
@@ -15,6 +24,8 @@ class Post:
     parent_id: str | None
     body: str
     path: Path
+    thread_type: str | None = None
+    task_metadata: TaskRootMetadata | None = None
     signature_path: Path | None = None
     public_key_path: Path | None = None
     signer_fingerprint: str | None = None
@@ -33,6 +44,70 @@ class Post:
 class Thread:
     root: Post
     replies: tuple[Post, ...]
+
+
+def parse_rating_value(raw_value: str, *, header_name: str) -> float:
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{header_name} must be a decimal rating") from exc
+    if value < 0 or value > 1:
+        raise ValueError(f"{header_name} must be between 0 and 1")
+    return value
+
+
+def parse_task_dependencies(raw_value: str) -> tuple[str, ...]:
+    return tuple(part for part in raw_value.split() if part)
+
+
+def split_semicolon_header(raw_value: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in raw_value.split(";") if part.strip())
+
+
+def require_header(headers: dict[str, str], header_name: str) -> str:
+    value = headers.get(header_name, "").strip()
+    if not value:
+        raise ValueError(f"post text is missing required header: {header_name}")
+    return value
+
+
+def normalize_thread_type(raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    value = raw_value.strip()
+    if not value:
+        return None
+    if not value.replace("-", "").isalnum() or not value[0].isalpha() or value.lower() != value:
+        raise ValueError("Thread-Type must be lowercase letters, digits, or hyphens")
+    return value
+
+
+def has_task_headers(headers: dict[str, str]) -> bool:
+    return any(key.startswith("Task-") for key in headers)
+
+
+def parse_task_root_metadata(headers: dict[str, str]) -> TaskRootMetadata:
+    return TaskRootMetadata(
+        status=require_header(headers, "Task-Status"),
+        presentability_impact=parse_rating_value(
+            require_header(headers, "Task-Presentability-Impact"),
+            header_name="Task-Presentability-Impact",
+        ),
+        implementation_difficulty=parse_rating_value(
+            require_header(headers, "Task-Implementation-Difficulty"),
+            header_name="Task-Implementation-Difficulty",
+        ),
+        dependencies=parse_task_dependencies(headers.get("Task-Depends-On", "")),
+        sources=split_semicolon_header(headers.get("Task-Sources", "")),
+    )
+
+
+def root_thread_type(post: Post) -> str | None:
+    return post.thread_type if post.is_root else None
+
+
+def is_task_root(post: Post) -> bool:
+    return root_thread_type(post) == "task" and post.task_metadata is not None
 
 
 def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
@@ -55,6 +130,20 @@ def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
     subject = headers.get("Subject", "")
     thread_id = headers.get("Thread-ID")
     parent_id = headers.get("Parent-ID")
+    thread_type = normalize_thread_type(headers.get("Thread-Type"))
+    task_metadata = None
+
+    if thread_id or parent_id:
+        if thread_type is not None:
+            raise ValueError("Thread-Type is only valid on thread roots")
+        if has_task_headers(headers):
+            raise ValueError("Task-* headers are only valid on task root threads")
+    elif thread_type == "task":
+        task_metadata = parse_task_root_metadata(headers)
+        if not body_text.strip():
+            raise ValueError("task root body must not be blank")
+    elif has_task_headers(headers):
+        raise ValueError("Task-* headers require Thread-Type: task")
 
     return Post(
         post_id=post_id,
@@ -64,6 +153,8 @@ def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
         parent_id=parent_id,
         body=body_text.rstrip("\n"),
         path=source_path or Path("<request>"),
+        thread_type=thread_type,
+        task_metadata=task_metadata,
     )
 
 
@@ -86,6 +177,8 @@ def parse_post(path: Path) -> Post:
         parent_id=post.parent_id,
         body=post.body,
         path=post.path,
+        thread_type=post.thread_type,
+        task_metadata=post.task_metadata,
         signature_path=signature_path,
         public_key_path=public_key_path,
         signer_fingerprint=signer_fingerprint,
