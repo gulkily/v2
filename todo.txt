@@ -54,8 +54,10 @@ things that need to be folded into the dev process:
 
 - git log on website somewhere
 	- page with newest content feed together with git log
+	- general event log, which includes moderation log, posts, replies, other filters
 
 - generate some test moderation data
 
 - how do i view user's public key from profile page?
 
+- on compose reply page, I want to see the content I'm replying to for reference.
