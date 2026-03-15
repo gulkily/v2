@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
+from forum_core.instance_info import load_instance_info, render_public_value
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
@@ -320,6 +321,35 @@ def render_moderation_log_page(*, limit: int, before: str | None) -> str:
         hero_kicker="Moderation View",
         hero_title="Signed moderation records",
         hero_text="This log reflects the visible moderation records in the current repository state and provides the audit trail behind public-instance moderation effects.",
+        content_html=content,
+    )
+
+
+def render_instance_info_page() -> str:
+    repo_root = get_repo_root()
+    info = load_instance_info(repo_root)
+    content = load_template("instance_info.html").substitute(
+        breadcrumb_html=render_breadcrumb([("/", "board index"), ("/instance/", "instance info")]),
+        instance_heading=html.escape(render_public_value(info.instance_name)),
+        instance_summary=html.escape(
+            info.summary
+            or "This page publishes the current public operator, policy, and deployment facts for this instance."
+        ),
+        instance_name=html.escape(render_public_value(info.instance_name)),
+        admin_name=html.escape(render_public_value(info.admin_name)),
+        admin_contact=html.escape(render_public_value(info.admin_contact)),
+        retention_policy=html.escape(render_public_value(info.retention_policy)),
+        moderation_settings=html.escape(render_public_value(info.moderation_settings)),
+        install_date=html.escape(render_public_value(info.install_date)),
+        commit_id=html.escape(render_public_value(info.commit_id)),
+        commit_date=html.escape(render_public_value(info.commit_date)),
+        source_path=html.escape(str(info.source_path.relative_to(repo_root))),
+    )
+    return render_page(
+        title="Instance Info",
+        hero_kicker="Instance View",
+        hero_title=render_public_value(info.instance_name),
+        hero_text="One public page for current instance-level facts, combining tracked public metadata with derived runtime and repository identity.",
         content_html=content,
     )
 
@@ -1221,6 +1251,12 @@ def application(environ, start_response):
 
         if path == "/":
             body = render_board_index().encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/instance/":
+            body = render_instance_info_page().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
