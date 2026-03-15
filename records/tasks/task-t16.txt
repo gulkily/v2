@@ -1,9 +1,0 @@
-Task-ID: T16
-Title: Soft-delete behavior
-Status: proposed
-Presentability-Impact: 0.75
-Implementation-Difficulty: 0.57
-Depends-On: T13
-Sources: docs/plans/forum_feature_splitting_checklist.md
-
-Support immediate public-instance removal with auditable tombstones or delete records so sensitive content can disappear fast without losing the moderation trail.

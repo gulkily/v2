@@ -1,9 +1,0 @@
-Task-ID: T25
-Title: Hosting and deployment guide
-Status: proposed
-Presentability-Impact: 0.73
-Implementation-Difficulty: 0.27
-Depends-On: T19 T24
-Sources: todo.txt
-
-Document the easiest credible path to run this system in public, including environment requirements, basic operational checks, and what kind of host is a sensible first target.

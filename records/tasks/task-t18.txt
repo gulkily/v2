@@ -1,8 +1,0 @@
-Task-ID: T18
-Title: Anonymous posting policy modes and proof of work captcha
-Status: proposed
-Presentability-Impact: 0.77
-Implementation-Difficulty: 0.63
-Sources: docs/plans/forum_feature_splitting_checklist.md; todo.txt
-
-Make unsigned, disposable-key, and temporary-identity behavior explicit and back the riskier modes with proof-of-work so operators can tune openness without losing all abuse resistance.

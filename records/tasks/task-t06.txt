@@ -1,8 +1,0 @@
-Task-ID: T06
-Title: Key manager retention and signing error recovery
-Status: proposed
-Presentability-Impact: 0.83
-Implementation-Difficulty: 0.43
-Sources: todo.txt
-
-Keep previous keys when rotating and turn the current decrypted-key failure mode into an actionable browser flow instead of a dead-end error.

@@ -1,9 +1,0 @@
-Task-ID: T26
-Title: Thread scanning and unanswered question nudging
-Status: proposed
-Presentability-Impact: 0.49
-Implementation-Difficulty: 0.54
-Depends-On: T04 T12
-Sources: todo.txt
-
-Scan for stale threads, questions without replies, or obviously inaccurate content and create comments or follow-up prompts with clearer policy guardrails.

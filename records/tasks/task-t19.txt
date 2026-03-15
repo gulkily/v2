@@ -1,8 +1,0 @@
-Task-ID: T19
-Title: Git and HTTP sync model
-Status: proposed
-Presentability-Impact: 0.70
-Implementation-Difficulty: 0.66
-Sources: docs/plans/forum_feature_splitting_checklist.md
-
-Clarify how clones, mirrors, and HTTP clients exchange content, including what canonical partial-sync boundaries or submission flows the system wants to support.

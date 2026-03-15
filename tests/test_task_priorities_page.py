@@ -57,6 +57,17 @@ class TaskPrioritiesPageTests(unittest.TestCase):
             First task comment.
             """,
         )
+        self.write_record(
+            "records/posts/proposal-001.txt",
+            """
+            Post-ID: proposal-001
+            Board-Tags: planning
+            Subject: Future typed root
+            Thread-Type: proposal
+
+            This should not appear in task planning surfaces.
+            """,
+        )
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -105,6 +116,7 @@ class TaskPrioritiesPageTests(unittest.TestCase):
         self.assertIn("/planning/tasks/T01", body)
         self.assertIn("/threads/T01", body)
         self.assertIn("visible reply", body)
+        self.assertNotIn("Future typed root", body)
 
     def test_task_detail_page_shows_task_thread_actions(self) -> None:
         status, headers, body = self.get("/planning/tasks/T01")

@@ -1,9 +1,0 @@
-Task-ID: T12
-Title: Page-aware AI Q and A and contextual assistant surface
-Status: proposed
-Presentability-Impact: 0.84
-Implementation-Difficulty: 0.58
-Depends-On: T01
-Sources: todo.txt; ideas.txt
-
-Add a page-level assistant that can answer questions about the current page or code context, optionally retaining results privately or publishing them back into the discussion flow.

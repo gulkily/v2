@@ -37,8 +37,12 @@
 
 ## Stage 4 - Harden typed root-thread model with tests and docs
 - Changes:
-  - Pending.
+  - Removed the superseded separate task-record runtime path (`forum_read_only/tasks.py`, `records/tasks/`, and the old task-record test fixture) so task-typed roots are the only canonical planning source in the live code path.
+  - Updated repository/docs references to describe task metadata as root-thread state inside `records/posts/`, while keeping the old task-record spec only as a historical note.
+  - Tightened the planning-page test fixture so a placeholder non-task typed root (`Thread-Type: proposal`) proves task-only surfaces do not accidentally include other future typed roots.
 - Verification:
-  - Pending.
+  - `python -m unittest tests.test_thread_typed_roots tests.test_task_thread_pages tests.test_task_priorities_page tests.test_compose_reply_page`
+  - `python -m py_compile forum_read_only/web.py forum_read_only/repository.py forum_read_only/task_threads.py forum_read_only/api_text.py`
+  - Manual WSGI smoke check for `/`, `/planning/task-priorities/`, `/planning/tasks/T01`, `/compose/task`, and `/threads/T01` on the live repo
 - Notes:
-  - Pending.
+  - The current architecture leaves room for future append-only task-update records without reintroducing a second canonical planning record family.

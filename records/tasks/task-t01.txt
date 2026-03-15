@@ -1,8 +1,0 @@
-Task-ID: T01
-Title: Publish raw planning files and debug views in the web UI
-Status: proposed
-Presentability-Impact: 0.94
-Implementation-Difficulty: 0.34
-Sources: todo.txt; docs/plans/forum_feature_splitting_checklist.md
-
-Extend the current planning page into a real transparency surface: expose todo.txt, ideas.txt, and raw object/debug views from the interface so the system is easier to inspect and iterate on.

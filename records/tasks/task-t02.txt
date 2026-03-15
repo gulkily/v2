@@ -1,8 +1,0 @@
-Task-ID: T02
-Title: Compose autosave and draft recovery
-Status: proposed
-Presentability-Impact: 0.91
-Implementation-Difficulty: 0.31
-Sources: todo.txt
-
-Save thread and reply drafts locally with a visible last-saved timestamp so accidental navigation or reloads do not wipe work.
