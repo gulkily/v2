@@ -10,7 +10,7 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
-from forum_cgi.auto_reply import AutoReplyError, thread_auto_reply_enabled
+from forum_cgi.auto_reply import AutoReplyError, AutoReplySigningError, thread_auto_reply_enabled
 from forum_read_only.web import application
 
 
@@ -28,12 +28,6 @@ class ThreadAutoReplyTests(unittest.TestCase):
         self.run_command(["git", "config", "user.email", "codex@example.com"], cwd=self.repo_root)
 
         self.user_keys = self.generate_signing_keypair("Thread Author Test")
-        self.assistant_keys = self.generate_signing_keypair("Thread Auto Reply Test")
-        self.assistant_private_key_path = self.repo_root / "assistant-private.asc"
-        self.assistant_public_key_path = self.repo_root / "assistant-public.asc"
-        self.assistant_private_key_path.write_text(self.assistant_keys["privateKey"], encoding="ascii")
-        self.assistant_public_key_path.write_text(self.assistant_keys["publicKey"], encoding="ascii")
-
     def tearDown(self) -> None:
         self.repo_tempdir.cleanup()
 
@@ -190,8 +184,8 @@ process.stdout.write(signature);
                 body=self.create_thread_request_body(payload_text),
                 extra_env={
                     "FORUM_ENABLE_THREAD_AUTO_REPLY": "1",
-                    "FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH": str(self.assistant_private_key_path),
-                    "FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH": str(self.assistant_public_key_path),
+                    "FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH": "",
+                    "FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH": "",
                 },
             )
 
@@ -200,6 +194,8 @@ process.stdout.write(signature);
         self.assertIn("Auto-Reply-Status: created", body)
         auto_reply_record_id = body.split("Auto-Reply-Record-ID: ", 1)[1].splitlines()[0].strip()
         self.assertTrue((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt").exists())
+        self.assertTrue((self.repo_root / "records" / "system" / "thread-auto-reply-private.asc").exists())
+        self.assertTrue((self.repo_root / "records" / "system" / "thread-auto-reply-public.asc").exists())
 
         thread_status, _, thread_body = self.request("/threads/thread-enabled-001")
         self.assertEqual(thread_status, "200 OK")
@@ -220,7 +216,11 @@ process.stdout.write(signature);
                 "/api/create_thread",
                 method="POST",
                 body=self.create_thread_request_body(payload_text),
-                extra_env={"FORUM_ENABLE_THREAD_AUTO_REPLY": "1"},
+                extra_env={
+                    "FORUM_ENABLE_THREAD_AUTO_REPLY": "1",
+                    "FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH": "",
+                    "FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH": "",
+                },
             )
 
         self.assertEqual(status, "200 OK")
@@ -230,6 +230,37 @@ process.stdout.write(signature);
         self.assertTrue((self.repo_root / "records" / "posts" / "thread-failed-001.txt").exists())
         post_files = sorted(path.name for path in (self.repo_root / "records" / "posts").glob("*.txt"))
         self.assertEqual(post_files, ["thread-failed-001.txt"])
+
+    def test_api_create_thread_falls_back_to_unsigned_reply_when_signing_setup_fails(self) -> None:
+        payload_text = self.build_thread_payload(
+            post_id="thread-unsigned-001",
+            subject="Unsigned fallback",
+            body_text="Hello from the unsigned fallback path.",
+        )
+
+        with mock.patch("forum_cgi.auto_reply.run_llm", return_value="Unsigned assistant reply.\n"), mock.patch(
+            "forum_cgi.auto_reply.generate_signing_keypair",
+            side_effect=AutoReplySigningError("simulated key generation failure"),
+        ):
+            status, _, body = self.request(
+                "/api/create_thread",
+                method="POST",
+                body=self.create_thread_request_body(payload_text),
+                extra_env={"FORUM_ENABLE_THREAD_AUTO_REPLY": "1"},
+            )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Record-ID: thread-unsigned-001", body)
+        self.assertIn("Auto-Reply-Status: created_unsigned", body)
+        self.assertIn("Auto-Reply-Message: assistant signing keys could not be prepared:", body)
+        auto_reply_record_id = body.split("Auto-Reply-Record-ID: ", 1)[1].splitlines()[0].strip()
+        self.assertTrue((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt").exists())
+        self.assertFalse((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt.asc").exists())
+        self.assertFalse((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt.pub.asc").exists())
+
+        thread_status, _, thread_body = self.request("/threads/thread-unsigned-001")
+        self.assertEqual(thread_status, "200 OK")
+        self.assertIn("Unsigned assistant reply.", thread_body)
 
 
 if __name__ == "__main__":

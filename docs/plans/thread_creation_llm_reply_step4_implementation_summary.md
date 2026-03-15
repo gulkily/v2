@@ -37,3 +37,14 @@
   - Ran `python3 -m unittest tests.test_llm_api`; the existing Dedalus API suite still passed (`Ran 4 tests ... OK`).
 - Notes:
   - The test runs emit the existing missing-`.env` warning from runtime env loading, but the suites still pass and the warning is expected in disposable test repos without synced `.env` files.
+
+## Follow-on - Auto-generate assistant keys and unsigned fallback
+- Changes:
+  - Extended [auto_reply.py](/home/wsl/v2/forum_cgi/auto_reply.py) so thread auto reply now defaults assistant key storage to `records/system/`, auto-generates an assistant keypair when the configured files are missing, and returns an unsigned fallback payload only when signing setup cannot be prepared.
+  - Extended [service.py](/home/wsl/v2/forum_cgi/service.py) so successful unsigned fallback replies are recorded as `Auto-Reply-Status: created_unsigned` instead of being dropped.
+  - Updated [test_thread_auto_reply.py](/home/wsl/v2/tests/test_thread_auto_reply.py) and [developer_commands.md](/home/wsl/v2/docs/developer_commands.md) to cover/generated-key behavior and the unsigned fallback contract.
+- Verification:
+  - Ran `python3 -m unittest tests.test_thread_auto_reply tests.test_runtime_env tests.test_llm_api`; the targeted suite passed (`Ran 14 tests ... OK`).
+  - Ran a disposable-repo smoke harness for both follow-on cases: confirmed missing assistant keys were generated under `records/system/` for the signed path, and confirmed forced key-generation failure produced `Auto-Reply-Status: created_unsigned`.
+- Notes:
+  - This changes the operator story materially: assistant key paths are now optional rather than mandatory for the feature to work.

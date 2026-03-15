@@ -25,7 +25,7 @@ The command contract is intentionally small: future backends such as Perl should
 - `FORUM_HOST` and `FORUM_PORT` control the local server bind address for `./forum start`.
 - `DEDALUS_API_KEY` enables the server-side `/api/call_llm` baseline LLM endpoint.
 - `FORUM_ENABLE_THREAD_AUTO_REPLY=1` enables one best-effort Dedalus-generated assistant reply after successful thread creation.
-- `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH` and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH` must point to the assistant's ASCII-armored signing key files when thread auto reply is enabled.
+- `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH` and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH` are optional overrides for the assistant's ASCII-armored signing key files. If they are unset or missing, the server will try to generate key files automatically.
 - The wrapper prefers `.venv/bin/python3` when present and otherwise falls back to `python3`.
 
 ## Public instance info
@@ -52,8 +52,9 @@ The response is `text/plain` and includes the command name, model, and generated
 ## Thread auto reply
 1. Install dependencies with `python3 -m pip install -r requirements.txt`.
 2. Run `./forum env-sync`.
-3. Set `DEDALUS_API_KEY=...`, `FORUM_ENABLE_THREAD_AUTO_REPLY=1`, `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH=...`, and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH=...` in the repo-root `.env`.
-4. Restart the relevant process after changing `.env`.
-5. Create a thread through the usual browser or `/api/create_thread` flow.
+3. Set `DEDALUS_API_KEY=...` and `FORUM_ENABLE_THREAD_AUTO_REPLY=1` in the repo-root `.env`.
+4. Optionally set `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH=...` and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH=...` if you want the assistant signing keys somewhere specific. If you leave them unset, the server will try to create them under `records/system/`.
+5. Restart the relevant process after changing `.env`.
+6. Create a thread through the usual browser or `/api/create_thread` flow.
 
-When enabled, the server stores the root thread first and then makes one best-effort attempt to add a canonical signed assistant reply beneath it. `/api/create_thread` reports `Auto-Reply-Status` in its plain-text response. If the auto-reply path fails, the original thread still succeeds and remains stored.
+When enabled, the server stores the root thread first and then makes one best-effort attempt to add a canonical assistant reply beneath it. `/api/create_thread` reports `Auto-Reply-Status` in its plain-text response. The preferred path is a signed assistant reply. If assistant key files are missing, the server will try to generate them automatically; if signing setup still fails, it falls back once to an unsigned reply instead of dropping the generated comment. If the LLM call itself fails, the original thread still succeeds and remains stored.

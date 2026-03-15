@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import secrets
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +19,10 @@ class AutoReplyError(RuntimeError):
     pass
 
 
+class AutoReplySigningError(AutoReplyError):
+    pass
+
+
 @dataclass(frozen=True)
 class AssistantSigningConfig:
     private_key_path: Path
@@ -24,39 +30,36 @@ class AssistantSigningConfig:
 
 
 @dataclass(frozen=True)
-class SignedPayload:
+class AutoReplyPayload:
     payload_text: str
-    signature_text: str
-    public_key_text: str
-    signer_fingerprint: str
-    identity_id: str
+    signature_text: str | None
+    public_key_text: str | None
+    signer_fingerprint: str | None
+    identity_id: str | None
+    signing_mode: str
+    status_message: str | None = None
 
 
 def thread_auto_reply_enabled() -> bool:
     return _env_flag("FORUM_ENABLE_THREAD_AUTO_REPLY")
 
 
-def get_thread_auto_reply_signing_config() -> AssistantSigningConfig:
-    private_key_path = _required_path_env("FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH")
-    public_key_path = _required_path_env("FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH")
+def get_thread_auto_reply_signing_config(repo_root: Path) -> AssistantSigningConfig:
+    private_key_path = _optional_path_env("FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH")
+    public_key_path = _optional_path_env("FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH")
+    if private_key_path is None:
+        private_key_path = repo_root / "records" / "system" / "thread-auto-reply-private.asc"
+    if public_key_path is None:
+        public_key_path = repo_root / "records" / "system" / "thread-auto-reply-public.asc"
     return AssistantSigningConfig(
         private_key_path=private_key_path,
         public_key_path=public_key_path,
     )
 
 
-def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> SignedPayload:
+def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> AutoReplyPayload:
     if not thread_post.is_root:
         raise AutoReplyError("thread auto reply requires a thread root post")
-
-    signing_config = get_thread_auto_reply_signing_config()
-    public_key_text = _read_ascii_file(signing_config.public_key_path, env_name="FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH")
-    private_key_text = _read_ascii_file(
-        signing_config.private_key_path,
-        env_name="FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH",
-    )
-    signer_fingerprint = fingerprint_from_public_key_text(public_key_text)
-    identity_id = build_identity_id(signer_fingerprint)
 
     output_text = run_llm(
         [
@@ -76,16 +79,32 @@ def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> SignedP
     )
     body = normalize_auto_reply_body(output_text)
     payload_text = build_auto_reply_payload(thread_post=thread_post, body_text=body)
-    signature_text = sign_detached_payload(
-        payload_text=payload_text,
-        private_key_text=private_key_text,
-    )
-    return SignedPayload(
+    try:
+        private_key_text, public_key_text = load_or_generate_thread_auto_reply_keys(repo_root=repo_root)
+        signer_fingerprint = fingerprint_from_public_key_text(public_key_text)
+        identity_id = build_identity_id(signer_fingerprint)
+        signature_text = sign_detached_payload(
+            payload_text=payload_text,
+            private_key_text=private_key_text,
+        )
+    except AutoReplySigningError as exc:
+        return AutoReplyPayload(
+            payload_text=payload_text,
+            signature_text=None,
+            public_key_text=None,
+            signer_fingerprint=None,
+            identity_id=None,
+            signing_mode="unsigned",
+            status_message=str(exc),
+        )
+
+    return AutoReplyPayload(
         payload_text=payload_text,
         signature_text=signature_text,
         public_key_text=public_key_text,
         signer_fingerprint=signer_fingerprint,
         identity_id=identity_id,
+        signing_mode="signed",
     )
 
 
@@ -157,10 +176,10 @@ def _env_flag(name: str) -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
-def _required_path_env(name: str) -> Path:
+def _optional_path_env(name: str) -> Path | None:
     raw_value = os.getenv(name, "").strip()
     if not raw_value:
-        raise AutoReplyError(f"{name} is not configured.")
+        return None
     return Path(raw_value).expanduser().resolve()
 
 
@@ -168,13 +187,77 @@ def _read_ascii_file(path: Path, *, env_name: str) -> str:
     try:
         raw_text = path.read_text(encoding="ascii")
     except FileNotFoundError as exc:
-        raise AutoReplyError(f"{env_name} file does not exist: {path}") from exc
+        raise AutoReplySigningError(f"{env_name} file does not exist: {path}") from exc
     except UnicodeDecodeError as exc:
-        raise AutoReplyError(f"{env_name} must point to an ASCII-armored key file") from exc
+        raise AutoReplySigningError(f"{env_name} must point to an ASCII-armored key file") from exc
     try:
         return ensure_ascii_text(raw_text, field_name=env_name)
     except PostingError as exc:
-        raise AutoReplyError(exc.message) from exc
+        raise AutoReplySigningError(exc.message) from exc
+
+
+def load_or_generate_thread_auto_reply_keys(*, repo_root: Path) -> tuple[str, str]:
+    signing_config = get_thread_auto_reply_signing_config(repo_root)
+    if signing_config.private_key_path.exists() and signing_config.public_key_path.exists():
+        return (
+            _read_ascii_file(
+                signing_config.private_key_path,
+                env_name="FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH",
+            ),
+            _read_ascii_file(
+                signing_config.public_key_path,
+                env_name="FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH",
+            ),
+        )
+
+    try:
+        private_key_text, public_key_text = generate_signing_keypair()
+        signing_config.private_key_path.parent.mkdir(parents=True, exist_ok=True)
+        signing_config.public_key_path.parent.mkdir(parents=True, exist_ok=True)
+        signing_config.private_key_path.write_text(private_key_text, encoding="ascii")
+        signing_config.public_key_path.write_text(public_key_text, encoding="ascii")
+        return private_key_text, public_key_text
+    except (OSError, AutoReplySigningError) as exc:
+        raise AutoReplySigningError(f"assistant signing keys could not be prepared: {exc}") from exc
+
+
+def generate_signing_keypair() -> tuple[str, str]:
+    openpgp_module_url = (
+        Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+    ).as_uri()
+    script = f"""
+import * as openpgp from {json.dumps(openpgp_module_url)};
+const generated = await openpgp.generateKey({{
+  type: "ecc",
+  curve: "ed25519",
+  userIDs: [{{ name: "forum-thread-auto-reply" }}],
+  format: "armored",
+}});
+process.stdout.write(JSON.stringify({{
+  privateKey: generated.privateKey,
+  publicKey: generated.publicKey,
+}}));
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "--input-type=module",
+            "--eval",
+            script,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise AutoReplySigningError("assistant signing key generation failed")
+    try:
+        generated = json.loads(result.stdout)
+        private_key_text = ensure_ascii_text(generated["privateKey"], field_name="private_key")
+        public_key_text = ensure_ascii_text(generated["publicKey"], field_name="public_key")
+    except (KeyError, json.JSONDecodeError, PostingError) as exc:
+        raise AutoReplySigningError("assistant signing key generation returned invalid output") from exc
+    return private_key_text, public_key_text
 
 
 def get_thread_auto_reply_model() -> str:

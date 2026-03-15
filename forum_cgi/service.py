@@ -201,14 +201,14 @@ def maybe_create_thread_auto_reply(
         return _with_auto_reply(result, status="disabled")
 
     try:
-        signed_reply = generate_thread_auto_reply(thread_post=post, repo_root=repo_root)
+        auto_reply = generate_thread_auto_reply(thread_post=post, repo_root=repo_root)
         reply_result = submit_create_reply(
-            signed_reply.payload_text,
+            auto_reply.payload_text,
             repo_root,
             dry_run=False,
-            signature_text=signed_reply.signature_text,
-            public_key_text=signed_reply.public_key_text,
-            require_signature=True,
+            signature_text=auto_reply.signature_text,
+            public_key_text=auto_reply.public_key_text,
+            require_signature=auto_reply.signature_text is not None,
         )
     except (AutoReplyError, LLMProviderError, PostingError) as exc:
         logger.warning("Thread auto reply failed for %s: %s", post.post_id, exc)
@@ -216,6 +216,15 @@ def maybe_create_thread_auto_reply(
     except Exception:
         logger.exception("Thread auto reply crashed for %s", post.post_id)
         return _with_auto_reply(result, status="failed", message="unexpected auto reply failure")
+
+    if auto_reply.signing_mode == "unsigned":
+        logger.warning("Thread auto reply for %s proceeded without signing: %s", post.post_id, auto_reply.status_message)
+        return _with_auto_reply(
+            result,
+            status="created_unsigned",
+            record_id=reply_result.record_id,
+            message=auto_reply.status_message,
+        )
 
     return _with_auto_reply(
         result,
