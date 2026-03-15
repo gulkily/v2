@@ -1,0 +1,6 @@
+Post-ID: reply-20260315035548-script-alert-script-a63e725b
+Board-Tags: wisdom general
+Thread-ID: root-002
+Parent-ID: root-002
+
+<script>alert()</script>
