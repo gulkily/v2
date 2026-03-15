@@ -24,6 +24,7 @@ from forum_cgi.moderation import submit_moderation
 from forum_cgi.posting import PostingError
 from forum_cgi.profile_updates import submit_profile_update
 from forum_cgi.service import submit_create_reply, submit_create_thread
+from forum_cgi.task_status import TaskStatusUpdateResult, submit_mark_task_done
 from forum_cgi.text import (
     render_error_body,
     render_identity_link_result,
@@ -795,7 +796,47 @@ def render_task_thread_summary(thread, *, moderation_state) -> tuple[str, str]:
     )
 
 
-def render_task_detail_page(task_id: str) -> str:
+def render_task_completion_feedback(
+    result: TaskStatusUpdateResult | None = None,
+    *,
+    error_message: str | None = None,
+) -> str:
+    if result is not None:
+        return (
+            '<section class="panel">'
+            '<div class="section-head"><h2>Task updated</h2>'
+            f"<p>Status changed from {html.escape(result.previous_status)} to done.</p></div>"
+            f'<p><strong>Commit:</strong> <code>{html.escape(result.commit_id)}</code></p>'
+            "</section>"
+        )
+    if error_message:
+        return (
+            '<section class="panel">'
+            '<div class="section-head"><h2>Task update failed</h2>'
+            f"<p>{html.escape(error_message)}</p></div>"
+            "</section>"
+        )
+    return ""
+
+
+def render_task_status_action(thread) -> str:
+    task = thread.root.task_metadata
+    assert task is not None
+    if task.status.strip().lower() == "done":
+        return '<p class="discussion-note">This task is already marked done.</p>'
+    return (
+        f'<form method="post" action="/planning/tasks/{html.escape(thread.root.post_id)}/mark-done" class="field-stack">'
+        '<button type="submit">mark task done</button>'
+        "</form>"
+    )
+
+
+def render_task_detail_page(
+    task_id: str,
+    *,
+    completion_result: TaskStatusUpdateResult | None = None,
+    completion_error: str | None = None,
+) -> str:
     _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
     task_threads = load_task_threads(grouped_threads, moderation_state)
     thread = index_task_threads(task_threads).get(task_id)
@@ -821,6 +862,11 @@ def render_task_detail_page(task_id: str) -> str:
         task_difficulty=f"{task.implementation_difficulty:.2f}",
         dependency_html=render_task_dependency_links(task.dependencies),
         source_html=render_task_source_targets(task.sources),
+        completion_feedback_html=render_task_completion_feedback(
+            completion_result,
+            error_message=completion_error,
+        ),
+        task_status_action_html=render_task_status_action(thread),
         discussion_html=discussion_html,
     )
     return render_page(
@@ -1330,6 +1376,30 @@ def application(environ, start_response):
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
+
+        if path.startswith("/planning/tasks/") and path.endswith("/mark-done"):
+            task_id = unquote(path.removeprefix("/planning/tasks/").removesuffix("/mark-done")).rstrip("/")
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            try:
+                result = submit_mark_task_done(task_id, get_repo_root())
+                body = render_task_detail_page(task_id, completion_result=result).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except LookupError:
+                body = render_missing_resource("task").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+            except PostingError as exc:
+                body = render_task_detail_page(task_id, completion_error=exc.message).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response(exc.status, headers)
+                return [body]
 
         if path.startswith("/planning/tasks/"):
             task_id = unquote(path.removeprefix("/planning/tasks/")).rstrip("/")
