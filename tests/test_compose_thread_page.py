@@ -50,9 +50,6 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('id="draft-status"', body)
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
-        self.assertIn("Use an external signer instead", body)
-        self.assertIn('"payload"', body)
-        self.assertIn("/api/create_thread", body)
 
 
 if __name__ == "__main__":

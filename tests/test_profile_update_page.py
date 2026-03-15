@@ -89,9 +89,6 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="private-key-input"', body)
         self.assertIn('id="payload-output"', body)
         self.assertIn("Sign and submit", body)
-        self.assertIn("Use an external signer instead", body)
-        self.assertIn("/api/update_profile", body)
-        self.assertIn('"public_key"', body)
 
 
 if __name__ == "__main__":

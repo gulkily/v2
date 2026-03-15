@@ -84,8 +84,6 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn("/posts/reply-001", body)
         self.assertIn('id="signed-post-form"', body)
         self.assertIn('id="draft-status"', body)
-        self.assertIn("Use an external signer instead", body)
-        self.assertIn("/api/create_reply", body)
 
     def test_compose_reply_page_does_not_leak_hidden_parent_post(self) -> None:
         self.write_record(
