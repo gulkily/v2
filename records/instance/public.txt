@@ -1,0 +1,7 @@
+Instance-Name: Forum V2 Local Instance
+Admin-Name: Local operator
+Admin-Contact: forum-operator@example.invalid
+Retention-Policy: Canonical repository records are retained in git history; public-instance visibility may change through moderation and future retention policy updates.
+Install-Date: 2026-03-15
+
+Local development instance for the repository-backed forum reader. This page publishes the current public operator and policy facts for this instance.
