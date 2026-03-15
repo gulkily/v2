@@ -58,3 +58,11 @@ The response is `text/plain` and includes the command name, model, and generated
 6. Create a thread through the usual browser or `/api/create_thread` flow.
 
 When enabled, the server stores the root thread first and then makes one best-effort attempt to add a canonical assistant reply beneath it. `/api/create_thread` reports `Auto-Reply-Status` in its plain-text response. The preferred path is a signed assistant reply. If assistant key files are missing, the server will try to generate them automatically; if signing setup still fails, it falls back once to an unsigned reply instead of dropping the generated comment. If the LLM call itself fails, the original thread still succeeds and remains stored.
+
+The stored auto-reply now includes visible provenance in the reply itself:
+- the reply subject is `model-generated reply (<model>)`
+- the reply body begins with `[Model-generated reply via <model>]`
+
+Prompt location for this feature:
+- The user prompt is built in [auto_reply.py](/home/wsl/v2/forum_cgi/auto_reply.py) by `build_thread_auto_reply_prompt(...)`.
+- The system instruction is the inline `"role": "system"` message inside `generate_thread_auto_reply(...)` in the same file.

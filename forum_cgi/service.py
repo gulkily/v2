@@ -44,6 +44,7 @@ class SubmissionResult:
     auto_reply_status: str | None = None
     auto_reply_record_id: str | None = None
     auto_reply_message: str | None = None
+    auto_reply_model: str | None = None
 
 
 def submit_create_thread(
@@ -224,12 +225,14 @@ def maybe_create_thread_auto_reply(
             status="created_unsigned",
             record_id=reply_result.record_id,
             message=auto_reply.status_message,
+            model=auto_reply.model,
         )
 
     return _with_auto_reply(
         result,
         status="created",
         record_id=reply_result.record_id,
+        model=auto_reply.model,
     )
 
 
@@ -239,6 +242,7 @@ def _with_auto_reply(
     status: str,
     record_id: str | None = None,
     message: str | None = None,
+    model: str | None = None,
 ) -> SubmissionResult:
     return SubmissionResult(
         command_name=result.command_name,
@@ -257,4 +261,5 @@ def _with_auto_reply(
         auto_reply_status=status,
         auto_reply_record_id=record_id,
         auto_reply_message=message,
+        auto_reply_model=model,
     )

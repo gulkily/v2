@@ -192,6 +192,7 @@ process.stdout.write(signature);
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: thread-enabled-001", body)
         self.assertIn("Auto-Reply-Status: created", body)
+        self.assertIn("Auto-Reply-Model: openai/gpt-4o-mini", body)
         auto_reply_record_id = body.split("Auto-Reply-Record-ID: ", 1)[1].splitlines()[0].strip()
         self.assertTrue((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt").exists())
         self.assertTrue((self.repo_root / "records" / "system" / "thread-auto-reply-private.asc").exists())
@@ -200,6 +201,8 @@ process.stdout.write(signature);
         thread_status, _, thread_body = self.request("/threads/thread-enabled-001")
         self.assertEqual(thread_status, "200 OK")
         self.assertIn("Helpful assistant reply.", thread_body)
+        self.assertIn("model-generated reply (openai/gpt-4o-mini)", thread_body)
+        self.assertIn("[Model-generated reply via openai/gpt-4o-mini]", thread_body)
 
     def test_api_create_thread_keeps_root_thread_when_auto_reply_generation_fails(self) -> None:
         payload_text = self.build_thread_payload(
@@ -253,6 +256,7 @@ process.stdout.write(signature);
         self.assertIn("Record-ID: thread-unsigned-001", body)
         self.assertIn("Auto-Reply-Status: created_unsigned", body)
         self.assertIn("Auto-Reply-Message: assistant signing keys could not be prepared:", body)
+        self.assertIn("Auto-Reply-Model: openai/gpt-4o-mini", body)
         auto_reply_record_id = body.split("Auto-Reply-Record-ID: ", 1)[1].splitlines()[0].strip()
         self.assertTrue((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt").exists())
         self.assertFalse((self.repo_root / "records" / "posts" / f"{auto_reply_record_id}.txt.asc").exists())
@@ -261,6 +265,7 @@ process.stdout.write(signature);
         thread_status, _, thread_body = self.request("/threads/thread-unsigned-001")
         self.assertEqual(thread_status, "200 OK")
         self.assertIn("Unsigned assistant reply.", thread_body)
+        self.assertIn("model-generated reply (openai/gpt-4o-mini)", thread_body)
 
 
 if __name__ == "__main__":

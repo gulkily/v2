@@ -48,3 +48,14 @@
   - Ran a disposable-repo smoke harness for both follow-on cases: confirmed missing assistant keys were generated under `records/system/` for the signed path, and confirmed forced key-generation failure produced `Auto-Reply-Status: created_unsigned`.
 - Notes:
   - This changes the operator story materially: assistant key paths are now optional rather than mandatory for the feature to work.
+
+## Follow-on - Visible model provenance
+- Changes:
+  - Extended [auto_reply.py](/home/wsl/v2/forum_cgi/auto_reply.py) so the stored auto-reply now includes the model name in both the reply subject and a visible body prefix, and the generated payload carries the model through the auto-reply result contract.
+  - Extended [service.py](/home/wsl/v2/forum_cgi/service.py) and [text.py](/home/wsl/v2/forum_cgi/text.py) so `/api/create_thread` reports `Auto-Reply-Model` alongside the existing auto-reply status fields.
+  - Updated [test_thread_auto_reply.py](/home/wsl/v2/tests/test_thread_auto_reply.py) and [developer_commands.md](/home/wsl/v2/docs/developer_commands.md) to cover the visible provenance behavior and document where the prompt lives.
+- Verification:
+  - Ran `python3 -m unittest tests.test_thread_auto_reply`; the focused suite passed (`Ran 5 tests ... OK`).
+  - Ran `python3 -m py_compile forum_cgi/auto_reply.py forum_cgi/service.py forum_cgi/text.py`.
+- Notes:
+  - The prompt location remains code-local in `forum_cgi/auto_reply.py`: `build_thread_auto_reply_prompt(...)` builds the user prompt and `generate_thread_auto_reply(...)` contains the system instruction.

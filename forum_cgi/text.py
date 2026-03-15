@@ -31,6 +31,7 @@ def render_preview_body(
     auto_reply_status: str | None = None,
     auto_reply_record_id: str | None = None,
     auto_reply_message: str | None = None,
+    auto_reply_model: str | None = None,
 ) -> str:
     fields = [
         ("Command", command_name),
@@ -64,6 +65,8 @@ def render_preview_body(
         fields.append(("Auto-Reply-Record-ID", auto_reply_record_id))
     if auto_reply_message:
         fields.append(("Auto-Reply-Message", auto_reply_message))
+    if auto_reply_model:
+        fields.append(("Auto-Reply-Model", auto_reply_model))
     return render_body(fields)
 
 
@@ -83,6 +86,7 @@ def render_success_body(
     auto_reply_status: str | None = None,
     auto_reply_record_id: str | None = None,
     auto_reply_message: str | None = None,
+    auto_reply_model: str | None = None,
 ) -> str:
     fields = [
         ("Record-ID", record_id),
@@ -114,6 +118,8 @@ def render_success_body(
         fields.append(("Auto-Reply-Record-ID", auto_reply_record_id))
     if auto_reply_message:
         fields.append(("Auto-Reply-Message", auto_reply_message))
+    if auto_reply_model:
+        fields.append(("Auto-Reply-Model", auto_reply_model))
     return render_body(fields)
 
 
@@ -144,6 +150,7 @@ def render_submission_result(result) -> str:
             auto_reply_status=result.auto_reply_status,
             auto_reply_record_id=result.auto_reply_record_id,
             auto_reply_message=result.auto_reply_message,
+            auto_reply_model=result.auto_reply_model,
         )
 
     return render_success_body(
@@ -161,6 +168,7 @@ def render_submission_result(result) -> str:
         auto_reply_status=result.auto_reply_status,
         auto_reply_record_id=result.auto_reply_record_id,
         auto_reply_message=result.auto_reply_message,
+        auto_reply_model=result.auto_reply_model,
     )
 
 

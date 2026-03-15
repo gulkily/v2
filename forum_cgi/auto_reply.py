@@ -36,6 +36,7 @@ class AutoReplyPayload:
     public_key_text: str | None
     signer_fingerprint: str | None
     identity_id: str | None
+    model: str
     signing_mode: str
     status_message: str | None = None
 
@@ -61,6 +62,7 @@ def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> AutoRep
     if not thread_post.is_root:
         raise AutoReplyError("thread auto reply requires a thread root post")
 
+    model = get_llm_model()
     output_text = run_llm(
         [
             {
@@ -78,7 +80,7 @@ def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> AutoRep
         ]
     )
     body = normalize_auto_reply_body(output_text)
-    payload_text = build_auto_reply_payload(thread_post=thread_post, body_text=body)
+    payload_text = build_auto_reply_payload(thread_post=thread_post, body_text=body, model=model)
     try:
         private_key_text, public_key_text = load_or_generate_thread_auto_reply_keys(repo_root=repo_root)
         signer_fingerprint = fingerprint_from_public_key_text(public_key_text)
@@ -94,6 +96,7 @@ def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> AutoRep
             public_key_text=None,
             signer_fingerprint=None,
             identity_id=None,
+            model=model,
             signing_mode="unsigned",
             status_message=str(exc),
         )
@@ -104,6 +107,7 @@ def generate_thread_auto_reply(*, thread_post: Post, repo_root: Path) -> AutoRep
         public_key_text=public_key_text,
         signer_fingerprint=signer_fingerprint,
         identity_id=identity_id,
+        model=model,
         signing_mode="signed",
     )
 
@@ -133,15 +137,21 @@ def normalize_auto_reply_body(output_text: str) -> str:
     return ensure_ascii_text(normalized + "\n", field_name="auto_reply_body")
 
 
-def build_auto_reply_payload(*, thread_post: Post, body_text: str) -> str:
+def build_auto_reply_payload(*, thread_post: Post, body_text: str, model: str) -> str:
     ensure_ascii_text(body_text, field_name="auto_reply_body")
+    ensure_ascii_text(model, field_name="auto_reply_model")
+    full_body_text = (
+        f"[Model-generated reply via {model}]\n\n"
+        f"{body_text}"
+    )
     headers = [
         f"Post-ID: {generate_auto_reply_post_id(body_text)}",
         f"Board-Tags: {' '.join(thread_post.board_tags)}",
+        f"Subject: model-generated reply ({model})",
         f"Thread-ID: {thread_post.post_id}",
         f"Parent-ID: {thread_post.post_id}",
     ]
-    return f"{chr(10).join(headers)}\n\n{body_text}"
+    return f"{chr(10).join(headers)}\n\n{full_body_text}"
 
 
 def generate_auto_reply_post_id(body_text: str) -> str:
