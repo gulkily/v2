@@ -268,6 +268,15 @@ def render_api_get_post(post_id: str | None) -> tuple[str, str]:
     return "200 OK", render_post_text(post)
 
 
+def normalize_board_tags_text(raw_text: str) -> str:
+    tags = [tag for tag in raw_text.split() if tag]
+    return " ".join(tags) or "general"
+
+
+def describe_board_tags(board_tags: str) -> str:
+    return " ".join(f"/{tag}/" for tag in board_tags.split())
+
+
 def render_compose_page(
     *,
     command_name: str,
@@ -275,6 +284,8 @@ def render_compose_page(
     compose_heading: str,
     compose_text: str,
     dry_run: bool,
+    board_tags: str,
+    context_text: str,
     thread_id: str = "",
     parent_id: str = "",
 ) -> str:
@@ -286,17 +297,14 @@ def render_compose_page(
         breadcrumb_html=render_breadcrumb(breadcrumb_items),
         compose_heading=html.escape(compose_heading),
         compose_text=html.escape(compose_text),
+        context_text=html.escape(context_text),
         command_name=html.escape(command_name),
         endpoint_path=html.escape(endpoint_path),
         dry_run_value="true" if dry_run else "false",
-        post_id_value="",
-        board_tags_value="general",
-        subject_value="",
+        board_tags_value=html.escape(board_tags),
         thread_id_value=html.escape(thread_id),
         parent_id_value=html.escape(parent_id),
         body_value="",
-        thread_id_readonly="readonly" if command_name == "create_thread" or thread_id else "",
-        parent_id_readonly="readonly" if command_name == "create_thread" else "",
         submit_label="Sign and preview" if dry_run else "Sign and submit",
     )
     return render_page(
@@ -452,12 +460,16 @@ def application(environ, start_response):
             return [body]
 
         if path == "/compose/thread":
+            raw_board_tags = query_params.get("board_tags", [""])[0].strip() or query_params.get("board_tag", ["general"])[0].strip()
+            board_tags = normalize_board_tags_text(raw_board_tags)
             body = render_compose_page(
                 command_name="create_thread",
                 endpoint_path="/api/create_thread",
                 compose_heading="Compose a signed thread",
                 compose_text="Generate or import a local OpenPGP key, sign a canonical thread payload in the browser, and submit the signed thread directly into repository storage.",
                 dry_run=False,
+                board_tags=board_tags,
+                context_text=f"This page will open a new signed thread in {describe_board_tags(board_tags)}. The post ID and thread title are derived automatically from what you write.",
             ).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
@@ -466,12 +478,39 @@ def application(environ, start_response):
         if path == "/compose/reply":
             thread_id = query_params.get("thread_id", [""])[0].strip()
             parent_id = query_params.get("parent_id", [""])[0].strip()
+            if not thread_id:
+                body = render_missing_resource("thread").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+            posts, grouped_threads, _ = load_repository_state()
+            thread = index_threads(grouped_threads).get(thread_id)
+            if thread is None:
+                body = render_missing_resource("thread").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+            posts_by_id = index_posts(posts)
+            if not parent_id:
+                parent_id = thread.root.post_id
+            parent_post = posts_by_id.get(parent_id)
+            if parent_post is None or parent_post.root_thread_id != thread.root.post_id:
+                body = render_missing_resource("post").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+            board_tags = " ".join(thread.root.board_tags)
             body = render_compose_page(
                 command_name="create_reply",
                 endpoint_path="/api/create_reply",
                 compose_heading="Compose a signed reply",
                 compose_text="Generate or import a local OpenPGP key, sign a canonical reply payload in the browser, and submit the signed reply directly into repository storage.",
                 dry_run=False,
+                board_tags=board_tags,
+                context_text=f"This signed reply will go into thread {thread.root.post_id} in {describe_board_tags(board_tags)} under parent {parent_id}. Reply linkage is filled in automatically.",
                 thread_id=thread_id,
                 parent_id=parent_id,
             ).encode("utf-8")

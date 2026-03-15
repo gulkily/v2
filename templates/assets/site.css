@@ -339,6 +339,17 @@ button:disabled {
   gap: 0.85rem;
 }
 
+.compose-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.compose-details[open] summary {
+  margin-bottom: 1rem;
+}
+
 .field-stack {
   display: grid;
   gap: 0.4rem;
