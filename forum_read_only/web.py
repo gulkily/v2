@@ -31,7 +31,7 @@ from forum_read_only.api_text import (
     render_profile_text,
     render_thread_text,
 )
-from forum_read_only.profiles import find_profile_summary
+from forum_read_only.profiles import find_profile_summary, load_identity_context
 from forum_read_only.repository import (
     group_threads,
     index_posts,
@@ -56,7 +56,8 @@ def load_repository_state():
     board_tags = list_board_tags(posts)
     moderation_records = load_moderation_records(moderation_records_dir(repo_root))
     moderation_state = derive_moderation_state(moderation_records)
-    return posts, threads, board_tags, moderation_records, moderation_state
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+    return posts, threads, board_tags, moderation_records, moderation_state, identity_context
 
 
 def visible_threads(threads, moderation_state, *, board_tag: str | None = None):
@@ -113,8 +114,14 @@ def render_thread_status_badges(thread_id: str, moderation_state) -> str:
     )
 
 
+def resolved_profile_identity_id(identity_context, identity_id: str | None) -> str | None:
+    if identity_id is None:
+        return None
+    return identity_context.canonical_identity_id(identity_id) or identity_id
+
+
 def render_board_index() -> str:
-    posts, threads, _, _, moderation_state = load_repository_state()
+    posts, threads, _, _, moderation_state, _ = load_repository_state()
     public_threads = visible_threads(threads, moderation_state)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
     board_sections = [
@@ -174,7 +181,7 @@ def render_board_section(tag: str, threads, moderation_state) -> str:
 
 
 def render_thread(thread_id: str) -> str:
-    posts, grouped_threads, _, _, moderation_state = load_repository_state()
+    posts, grouped_threads, _, _, moderation_state, identity_context = load_repository_state()
     threads = index_threads(grouped_threads)
     thread = threads.get(thread_id)
     if thread is None or thread_is_hidden(moderation_state, thread_id):
@@ -201,11 +208,16 @@ def render_thread(thread_id: str) -> str:
         thread_heading=html.escape(thread.root.subject or thread.root.post_id),
         thread_meta=thread_meta,
         reply_link_html=reply_link_html,
-        root_post_html=render_post_card(thread.root, root_thread_id=thread.root.post_id),
+        root_post_html=render_post_card(
+            thread.root,
+            root_thread_id=thread.root.post_id,
+            identity_context=identity_context,
+        ),
         replies_html="".join(
             render_post_card(
                 reply,
                 root_thread_id=thread.root.post_id,
+                identity_context=identity_context,
                 hidden=post_is_hidden(moderation_state, reply.post_id, thread.root.post_id),
             )
             for reply in thread.replies
@@ -221,7 +233,7 @@ def render_thread(thread_id: str) -> str:
 
 
 def render_post(post_id: str) -> str:
-    posts, _, _, _, moderation_state = load_repository_state()
+    posts, _, _, _, moderation_state, identity_context = load_repository_state()
     post = index_posts(posts).get(post_id)
     if post is None:
         raise LookupError(f"unknown post: {post_id}")
@@ -248,7 +260,12 @@ def render_post(post_id: str) -> str:
         ),
         post_heading=html.escape(heading),
         reply_link_html=reply_link_html,
-        post_card_html=render_post_card(post, root_thread_id=thread_target, hidden=hidden),
+        post_card_html=render_post_card(
+            post,
+            root_thread_id=thread_target,
+            identity_context=identity_context,
+            hidden=hidden,
+        ),
     )
     return render_page(
         title=heading,
@@ -260,12 +277,12 @@ def render_post(post_id: str) -> str:
 
 
 def render_moderation_log_page(*, limit: int, before: str | None) -> str:
-    _, _, _, moderation_records, _ = load_repository_state()
+    _, _, _, moderation_records, _, identity_context = load_repository_state()
     try:
         records = moderation_log_slice(moderation_records, limit=limit, before=before)
     except ValueError as exc:
         raise PostingError("bad_request", str(exc)) from exc
-    entries_html = "".join(render_moderation_card(record) for record in records)
+    entries_html = "".join(render_moderation_card(record, identity_context=identity_context) for record in records)
     if not entries_html:
         entries_html = '<article class="post-card"><p class="post-link">No moderation records are visible yet.</p></article>'
     content = load_template("moderation.html").substitute(
@@ -284,11 +301,12 @@ def render_moderation_log_page(*, limit: int, before: str | None) -> str:
 
 
 def render_profile(identity_id: str) -> str:
-    posts, _, _, _, _ = load_repository_state()
+    posts, _, _, _, _, identity_context = load_repository_state()
     summary = find_profile_summary(
         repo_root=get_repo_root(),
         posts=posts,
         identity_id=identity_id,
+        identity_context=identity_context,
     )
     if summary is None:
         raise LookupError(f"unknown identity: {identity_id}")
@@ -308,28 +326,34 @@ def render_profile(identity_id: str) -> str:
         profile_subhead=html.escape(summary.identity_id),
         stat_html=(
             '<div class="stat-grid">'
+            f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
             f'<article class="stat-card"><span class="stat-number">{len(summary.post_ids)}</span><span class="stat-label">visible posts</span></article>'
             f'<article class="stat-card"><span class="stat-number">{len(summary.thread_ids)}</span><span class="stat-label">threads touched</span></article>'
             "</div>"
         ),
         bootstrap_identity_id=html.escape(summary.identity_id),
+        bootstrap_source_identity_id=html.escape(summary.bootstrap_identity_id),
         bootstrap_fingerprint=html.escape(summary.signer_fingerprint),
         bootstrap_post_id=html.escape(summary.bootstrap_post_id),
         bootstrap_thread_id=html.escape(summary.bootstrap_thread_id),
         bootstrap_path=html.escape(summary.bootstrap_path),
         public_key_text=html.escape(summary.public_key_text),
+        member_identity_html="".join(
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(member_identity_id))}">{html.escape(member_identity_id)}</a>'
+            for member_identity_id in summary.member_identity_ids
+        ),
         post_links_html=post_links_html,
     )
     return render_page(
         title=summary.identity_id,
         hero_kicker="Profile View",
         hero_title=short_identity_label(summary.signer_fingerprint),
-        hero_text="This profile view is derived from visible repository records. It shows the current identity anchor and the signed posts that map to the same key-backed identity.",
+        hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
         content_html=content,
     )
 
 
-def render_post_card(post, *, root_thread_id: str, hidden: bool = False) -> str:
+def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False) -> str:
     board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
     subject_html = ""
     if post.subject:
@@ -344,8 +368,9 @@ def render_post_card(post, *, root_thread_id: str, hidden: bool = False) -> str:
 
     identity_html = ""
     if post.identity_id and post.signer_fingerprint:
+        canonical_identity_id = resolved_profile_identity_id(identity_context, post.identity_id)
         identity_html = (
-            f'<p class="post-identity">signed by <a href="/profiles/{html.escape(identity_slug(post.identity_id))}">'
+            f'<p class="post-identity">signed by <a href="/profiles/{html.escape(identity_slug(canonical_identity_id or post.identity_id))}">'
             f'{html.escape(short_identity_label(post.signer_fingerprint))}</a></p>'
         )
 
@@ -371,12 +396,13 @@ def render_post_card(post, *, root_thread_id: str, hidden: bool = False) -> str:
     )
 
 
-def render_moderation_card(record) -> str:
+def render_moderation_card(record, *, identity_context) -> str:
     target_href = f"/threads/{html.escape(record.target_id)}" if record.target_type == "thread" else f"/posts/{html.escape(record.target_id)}"
     moderator_html = ""
     if record.identity_id and record.signer_fingerprint:
+        canonical_identity_id = resolved_profile_identity_id(identity_context, record.identity_id)
         moderator_html = (
-            f'<p class="post-identity">moderated by <a href="/profiles/{html.escape(identity_slug(record.identity_id))}">'
+            f'<p class="post-identity">moderated by <a href="/profiles/{html.escape(identity_slug(canonical_identity_id or record.identity_id))}">'
             f'{html.escape(short_identity_label(record.signer_fingerprint))}</a></p>'
         )
     reason_html = (
@@ -443,7 +469,7 @@ def render_missing_resource(resource_name: str) -> str:
 
 
 def render_api_home() -> str:
-    posts, threads, board_tags, _, moderation_state = load_repository_state()
+    posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
     return render_api_home_text(
         post_count=len(posts),
         thread_count=len(visible_threads(threads, moderation_state)),
@@ -452,7 +478,7 @@ def render_api_home() -> str:
 
 
 def render_api_list_index(board_tag: str | None) -> str:
-    _, threads, board_tags, _, moderation_state = load_repository_state()
+    _, threads, board_tags, _, moderation_state, _ = load_repository_state()
     if board_tag and board_tag not in board_tags:
         return render_bad_request_text(f"unknown board_tag: {board_tag}")
 
@@ -474,7 +500,7 @@ def render_api_get_thread(thread_id: str | None) -> tuple[str, str]:
     if not thread_id:
         return "400 Bad Request", render_bad_request_text("missing required query parameter: thread_id")
 
-    _, grouped_threads, _, _, moderation_state = load_repository_state()
+    _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
     thread = index_threads(grouped_threads).get(thread_id)
     if thread is None or thread_is_hidden(moderation_state, thread_id):
         return "404 Not Found", render_not_found_text("thread", thread_id)
@@ -495,7 +521,7 @@ def render_api_get_post(post_id: str | None) -> tuple[str, str]:
     if not post_id:
         return "400 Bad Request", render_bad_request_text("missing required query parameter: post_id")
 
-    posts, _, _, _, moderation_state = load_repository_state()
+    posts, _, _, _, moderation_state, _ = load_repository_state()
     post = index_posts(posts).get(post_id)
     if post is None:
         return "404 Not Found", render_not_found_text("post", post_id)
@@ -512,11 +538,12 @@ def render_api_get_profile(identity_id: str | None) -> tuple[str, str]:
     if not identity_id:
         return "400 Bad Request", render_bad_request_text("missing required query parameter: identity_id")
 
-    posts, _, _, _, _ = load_repository_state()
+    posts, _, _, _, _, identity_context = load_repository_state()
     summary = find_profile_summary(
         repo_root=get_repo_root(),
         posts=posts,
         identity_id=identity_id,
+        identity_context=identity_context,
     )
     if summary is None:
         return "404 Not Found", render_not_found_text("identity", identity_id)
@@ -525,7 +552,7 @@ def render_api_get_profile(identity_id: str | None) -> tuple[str, str]:
 
 
 def render_api_get_moderation_log(limit: int, before: str | None) -> tuple[str, str]:
-    _, _, _, moderation_records, _ = load_repository_state()
+    _, _, _, moderation_records, _, _ = load_repository_state()
     try:
         records = moderation_log_slice(moderation_records, limit=limit, before=before)
     except ValueError as exc:
@@ -818,7 +845,7 @@ def application(environ, start_response):
                 start_response("404 Not Found", headers)
                 return [body]
 
-            posts, grouped_threads, _, _, moderation_state = load_repository_state()
+            posts, grouped_threads, _, _, moderation_state, _ = load_repository_state()
             thread = index_threads(grouped_threads).get(thread_id)
             if thread is None or thread_is_hidden(moderation_state, thread_id):
                 body = render_missing_resource("thread").encode("utf-8")

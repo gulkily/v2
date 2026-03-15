@@ -24,11 +24,13 @@ class IdentityBootstrap:
 @dataclass(frozen=True)
 class ProfileSummary:
     identity_id: str
+    bootstrap_identity_id: str
     signer_fingerprint: str
     bootstrap_record_id: str
     bootstrap_post_id: str
     bootstrap_thread_id: str
     bootstrap_path: str
+    member_identity_ids: tuple[str, ...]
     post_ids: tuple[str, ...]
     thread_ids: tuple[str, ...]
     public_key_text: str
@@ -202,16 +204,25 @@ def build_bootstrap_payload(
 def render_profile_summary_text(summary: ProfileSummary) -> str:
     lines = [
         f"Identity-ID: {summary.identity_id}",
+        f"Bootstrap-Identity-ID: {summary.bootstrap_identity_id}",
         f"Signer-Fingerprint: {summary.signer_fingerprint}",
         f"Bootstrap-Record-ID: {summary.bootstrap_record_id}",
         f"Bootstrap-Path: {summary.bootstrap_path}",
         f"Bootstrap-By-Post: {summary.bootstrap_post_id}",
         f"Bootstrap-By-Thread: {summary.bootstrap_thread_id}",
+        f"Member-Identity-Count: {len(summary.member_identity_ids)}",
         f"Post-Count: {len(summary.post_ids)}",
         f"Thread-Count: {len(summary.thread_ids)}",
         "",
-        "Posts:",
+        "Member-Identities:",
     ]
+    lines.extend(summary.member_identity_ids)
+    lines.extend(
+        [
+        "",
+        "Posts:",
+        ]
+    )
     lines.extend(summary.post_ids)
     lines.extend(["", "Public-Key:", summary.public_key_text])
     return "\n".join(lines) + "\n"
