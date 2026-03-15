@@ -24,6 +24,8 @@ The command contract is intentionally small: future backends such as Perl should
 - Explicit process environment variables still override `.env`.
 - `FORUM_HOST` and `FORUM_PORT` control the local server bind address for `./forum start`.
 - `DEDALUS_API_KEY` enables the server-side `/api/call_llm` baseline LLM endpoint.
+- `FORUM_ENABLE_THREAD_AUTO_REPLY=1` enables one best-effort Dedalus-generated assistant reply after successful thread creation.
+- `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH` and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH` must point to the assistant's ASCII-armored signing key files when thread auto reply is enabled.
 - The wrapper prefers `.venv/bin/python3` when present and otherwise falls back to `python3`.
 
 ## Public instance info
@@ -46,3 +48,12 @@ curl -s http://127.0.0.1:8000/api/call_llm \
 ```
 
 The response is `text/plain` and includes the command name, model, and generated output.
+
+## Thread auto reply
+1. Install dependencies with `python3 -m pip install -r requirements.txt`.
+2. Run `./forum env-sync`.
+3. Set `DEDALUS_API_KEY=...`, `FORUM_ENABLE_THREAD_AUTO_REPLY=1`, `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH=...`, and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH=...` in the repo-root `.env`.
+4. Restart the relevant process after changing `.env`.
+5. Create a thread through the usual browser or `/api/create_thread` flow.
+
+When enabled, the server stores the root thread first and then makes one best-effort attempt to add a canonical signed assistant reply beneath it. `/api/create_thread` reports `Auto-Reply-Status` in its plain-text response. If the auto-reply path fails, the original thread still succeeds and remains stored.

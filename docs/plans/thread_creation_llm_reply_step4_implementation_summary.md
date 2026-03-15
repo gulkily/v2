@@ -26,3 +26,14 @@
   - Confirmed the disabled case reported `Auto-Reply-Status: disabled`, the enabled-success case created a real reply record under `records/posts/`, and the forced-failure case preserved the root thread while returning `Auto-Reply-Status: failed`.
 - Notes:
   - The current implementation creates the assistant reply as a second commit after the root-thread commit, which preserves the existing write contract and keeps failure rollback simple.
+
+## Stage 4 - Tests and operator docs
+- Changes:
+  - Added [test_thread_auto_reply.py](/home/wsl/v2/tests/test_thread_auto_reply.py) covering feature-flag parsing plus `/api/create_thread` behavior for disabled, enabled-success, and enabled-failure auto-reply flows through the real WSGI application.
+  - Extended [test_runtime_env.py](/home/wsl/v2/tests/test_runtime_env.py) so the committed `.env.example` is now asserted to expose `FORUM_ENABLE_THREAD_AUTO_REPLY` alongside the existing Dedalus config.
+  - Updated [developer_commands.md](/home/wsl/v2/docs/developer_commands.md) with the new feature flag, assistant key-path settings, and the operator workflow for best-effort thread auto reply.
+- Verification:
+  - Ran `python3 -m unittest tests.test_runtime_env tests.test_thread_auto_reply`; the targeted suite passed (`Ran 9 tests ... OK`).
+  - Ran `python3 -m unittest tests.test_llm_api`; the existing Dedalus API suite still passed (`Ran 4 tests ... OK`).
+- Notes:
+  - The test runs emit the existing missing-`.env` warning from runtime env loading, but the suites still pass and the warning is expected in disposable test repos without synced `.env` files.
