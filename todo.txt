@@ -61,3 +61,28 @@ things that need to be folded into the dev process:
 - how do i view user's public key from profile page?
 
 - on compose reply page, I want to see the content I'm replying to for reference.
+
+- when importing gpg key, add provision for this happening:
+	- Signed posting failed: Error signing message: Signing key is not decrypted.
+
+- bring todo.txt and ideas.txt to the web interface
+	- generally make code more accessible and transparent
+		- as a pathway to self-modification api
+
+- review unanswered posts with a question and reply to the best of my ability.
+
+- key manager. do not discard previous key when generating new one.
+
+- user directory
+
+- recognize hashtags
+
+- implement proof of work button as a captcha
+
+- root mod should be able to grant moderator privileges to other users,
+	- there should be a page for managing moderators and their permissions.
+	- other mods should be able to grant mod to other users.
+	- the whole tree of mod-granting should be visible on the site, so that users can see who granted mod to whom, and who the root mod is.
+	- removing mod privileges from a user should also remove any mod privileges that they granted to other users, and this should also be reflected in the mod tree.
+
+- what's the easiest way to host this?
