@@ -33,3 +33,16 @@
   - Requested `GET /compose/thread` through the PHP shim and confirmed the rendered page still points at `/api/create_thread`.
 - Notes:
   - The write smoke harness reports the current auto-reply failure path when no Dedalus connectivity is available, but the root thread write still succeeds and remains committed as expected.
+
+## Stage 4 - Tests and operator docs
+- Changes:
+  - Extended [wsgi_gateway.py](/home/wsl/v2/forum_cgi/wsgi_gateway.py) with injectable environment and body-stream parameters so the CGI-to-WSGI bridge can be tested directly without depending on process-global stdin and environment state.
+  - Added [test_wsgi_gateway.py](/home/wsl/v2/tests/test_wsgi_gateway.py) covering request-shape translation and CGI response serialization.
+  - Extended [php_primary_host_installation.md](/home/wsl/v2/docs/php_primary_host_installation.md) with concrete installation steps and post-install checks for the supported PHP-primary host profile.
+  - Updated [developer_commands.md](/home/wsl/v2/docs/developer_commands.md) to point operators at the PHP-host deployment profile and clarify the difference between `FORUM_PHP_APP_ROOT` and `FORUM_REPO_ROOT`.
+- Verification:
+  - Ran `python3 -m unittest tests.test_wsgi_gateway` and confirmed both CGI bridge tests passed.
+  - Ran `REQUEST_METHOD=GET REQUEST_URI=/ QUERY_STRING= SERVER_NAME=localhost SERVER_PORT=80 SERVER_PROTOCOL=HTTP/1.1 php php_host/public/index.php` and confirmed the PHP shim still returned the board index HTML after the helper refactor.
+  - Reviewed the final installation doc and confirmed it now covers the sample files, required capabilities, writable paths, and post-install smoke checks.
+- Notes:
+  - The automated coverage is focused on the Python bridge seam; the PHP front controller itself is still verified through manual smoke checks rather than a PHP test runner.

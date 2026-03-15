@@ -34,6 +34,12 @@ The command contract is intentionally small: future backends such as Perl should
 - Commit ID and commit date are derived from the current git checkout at render time.
 - Moderation settings are derived from the current moderator allowlist configuration.
 
+## PHP-primary host profile
+- The supported PHP-primary deployment profile is documented in [php_primary_host_installation.md](/home/wsl/v2/docs/php_primary_host_installation.md).
+- Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the public web root for that profile.
+- Use `FORUM_PHP_APP_ROOT` only to help the PHP adapter locate the deployed application checkout; keep `FORUM_REPO_ROOT` reserved for the forum data repository root.
+- The PHP adapter keeps the existing `/api/create_thread` and `/api/create_reply` routes intact rather than introducing PHP-specific write endpoints.
+
 ## Dedalus baseline
 1. Install dependencies with `python3 -m pip install -r requirements.txt`.
 2. Run `./forum env-sync` and set `DEDALUS_API_KEY=...` in the repo-root `.env`.

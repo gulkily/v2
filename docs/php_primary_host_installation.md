@@ -54,3 +54,18 @@ The PHP adapter must do only the following:
 - return the Python-generated status, headers, and body unchanged except for host-required transport details
 
 Any host-specific glue should stay inside the adapter and deployment docs, not spread into the forum logic.
+
+## Installation Steps
+1. Deploy this repository to the host so the Python code, `cgi-bin/`, and `records/` tree remain available on disk.
+2. Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the host's public web root.
+3. If the public web root is not inside the application checkout, set `FORUM_PHP_APP_ROOT` so `index.php` can find the deployed Python code.
+4. Set `FORUM_REPO_ROOT` to the forum data repository root when runtime data should live somewhere other than the application checkout.
+5. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
+6. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
+
+## Post-Install Checks
+- Request `/` and confirm the board index renders through the PHP front controller.
+- Request `/threads/<existing-thread-id>` and confirm a thread page renders.
+- Request `/assets/site.css` and confirm the canonical asset path still resolves.
+- Open `/compose/thread` and confirm the page still targets `/api/create_thread`.
+- Submit one signed thread and one signed reply, then confirm git commits and stored record files appear in the forum repository.
