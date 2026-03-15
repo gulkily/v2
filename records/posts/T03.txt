@@ -2,7 +2,7 @@ Post-ID: T03
 Board-Tags: planning
 Subject: Node configuration and instance status page
 Thread-Type: task
-Task-Status: proposed
+Task-Status: done
 Task-Presentability-Impact: 0.88
 Task-Implementation-Difficulty: 0.37
 Task-Depends-On: T01
