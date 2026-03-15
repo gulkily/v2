@@ -36,6 +36,7 @@ The command contract is intentionally small: future backends such as Perl should
 
 ## PHP-primary host profile
 - The supported PHP-primary deployment profile is documented in [php_primary_host_installation.md](/home/wsl/v2/docs/php_primary_host_installation.md).
+- The documented source checkout for that profile is `https://github.com/gulkily/v2`.
 - Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the public web root for that profile.
 - Use `FORUM_PHP_APP_ROOT` only to help the PHP adapter locate the deployed application checkout; keep `FORUM_REPO_ROOT` reserved for the forum data repository root.
 - The PHP adapter keeps the existing `/api/create_thread` and `/api/create_reply` routes intact rather than introducing PHP-specific write endpoints.

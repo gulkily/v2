@@ -56,12 +56,13 @@ The PHP adapter must do only the following:
 Any host-specific glue should stay inside the adapter and deployment docs, not spread into the forum logic.
 
 ## Installation Steps
-1. Deploy this repository to the host so the Python code, `cgi-bin/`, and `records/` tree remain available on disk.
-2. Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the host's public web root.
-3. If the public web root is not inside the application checkout, set `FORUM_PHP_APP_ROOT` so `index.php` can find the deployed Python code.
-4. Set `FORUM_REPO_ROOT` to the forum data repository root when runtime data should live somewhere other than the application checkout.
-5. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
-6. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
+1. Deploy the application checkout from `https://github.com/gulkily/v2` onto the host so the Python code, `cgi-bin/`, and `records/` tree remain available on disk.
+2. If the host supports `git`, clone or update the checkout directly, for example `git clone https://github.com/gulkily/v2.git`.
+3. Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the host's public web root.
+4. If the public web root is not inside the application checkout, set `FORUM_PHP_APP_ROOT` so `index.php` can find the deployed Python code.
+5. Set `FORUM_REPO_ROOT` to the forum data repository root when runtime data should live somewhere other than the application checkout.
+6. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
+7. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
 
 ## Post-Install Checks
 - Request `/` and confirm the board index renders through the PHP front controller.
