@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from forum_core.identity import build_bootstrap_payload, build_identity_id
 from forum_cgi.posting import (
     PostingError,
     StoredArtifacts,
@@ -10,6 +11,7 @@ from forum_cgi.posting import (
     ensure_ascii_text,
     ensure_post_id_available,
     parse_payload,
+    resolve_identity_bootstrap_path,
     resolve_public_key_path,
     resolve_signature_path,
     store_post,
@@ -31,6 +33,9 @@ class SubmissionResult:
     signature_path: str | None = None
     public_key_path: str | None = None
     signer_fingerprint: str | None = None
+    identity_id: str | None = None
+    identity_bootstrap_path: str | None = None
+    identity_bootstrap_created: bool | None = None
 
 
 def submit_create_thread(
@@ -93,6 +98,10 @@ def _submit_post(
     signer_fingerprint = None
     signature_path = None
     public_key_path = None
+    identity_id = None
+    identity_bootstrap_path = None
+    identity_bootstrap_created = None
+    identity_bootstrap_text = None
 
     if require_signature and (signature_text is None or public_key_text is None):
         raise PostingError("bad_request", "signature and public_key are required")
@@ -104,8 +113,20 @@ def _submit_post(
             signature_text=signature_text,
             public_key_text=public_key_text,
         )
+        identity_id = build_identity_id(signer_fingerprint)
         signature_path = str(resolve_signature_path(repo_root, post.post_id).relative_to(repo_root))
         public_key_path = str(resolve_public_key_path(repo_root, post.post_id).relative_to(repo_root))
+        bootstrap_path = resolve_identity_bootstrap_path(repo_root, identity_id)
+        identity_bootstrap_path = str(bootstrap_path.relative_to(repo_root))
+        identity_bootstrap_created = not bootstrap_path.exists()
+        if identity_bootstrap_created:
+            _, identity_bootstrap_text = build_bootstrap_payload(
+                identity_id=identity_id,
+                signer_fingerprint=signer_fingerprint,
+                bootstrap_post_id=post.post_id,
+                bootstrap_thread_id=post.root_thread_id,
+                public_key_text=public_key_text,
+            )
 
     ensure_post_id_available(post, repo_root)
 
@@ -122,6 +143,9 @@ def _submit_post(
             signature_path=signature_path,
             public_key_path=public_key_path,
             signer_fingerprint=signer_fingerprint,
+            identity_id=identity_id,
+            identity_bootstrap_path=identity_bootstrap_path,
+            identity_bootstrap_created=identity_bootstrap_created,
         )
 
     commit_id, artifacts = store_post(
@@ -131,6 +155,12 @@ def _submit_post(
         payload_text,
         signature_text=signature_text,
         public_key_text=public_key_text,
+        identity_bootstrap_path=(
+            resolve_identity_bootstrap_path(repo_root, identity_id)
+            if identity_bootstrap_created and identity_id and identity_bootstrap_text
+            else None
+        ),
+        identity_bootstrap_text=identity_bootstrap_text,
     )
     return SubmissionResult(
         command_name=command_name,
@@ -143,4 +173,7 @@ def _submit_post(
         signature_path=artifacts.signature_path,
         public_key_path=artifacts.public_key_path,
         signer_fingerprint=signer_fingerprint,
+        identity_id=identity_id,
+        identity_bootstrap_path=artifacts.identity_bootstrap_path or identity_bootstrap_path,
+        identity_bootstrap_created=identity_bootstrap_created,
     )

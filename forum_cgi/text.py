@@ -25,6 +25,9 @@ def render_preview_body(
     signature_path: str | None = None,
     public_key_path: str | None = None,
     signer_fingerprint: str | None = None,
+    identity_id: str | None = None,
+    identity_bootstrap_path: str | None = None,
+    identity_bootstrap_created: bool | None = None,
 ) -> str:
     fields = [
         ("Command", command_name),
@@ -46,6 +49,12 @@ def render_preview_body(
         fields.append(("Public-Key-Path", public_key_path))
     if signer_fingerprint:
         fields.append(("Signer-Fingerprint", signer_fingerprint))
+    if identity_id:
+        fields.append(("Identity-ID", identity_id))
+    if identity_bootstrap_path:
+        fields.append(("Identity-Bootstrap-Path", identity_bootstrap_path))
+    if identity_bootstrap_created is not None:
+        fields.append(("Identity-Bootstrap-Created", "yes" if identity_bootstrap_created else "no"))
     return render_body(fields)
 
 
@@ -59,6 +68,9 @@ def render_success_body(
     signature_path: str | None = None,
     public_key_path: str | None = None,
     signer_fingerprint: str | None = None,
+    identity_id: str | None = None,
+    identity_bootstrap_path: str | None = None,
+    identity_bootstrap_created: bool | None = None,
 ) -> str:
     fields = [
         ("Record-ID", record_id),
@@ -78,6 +90,12 @@ def render_success_body(
         fields.append(("Public-Key-Path", public_key_path))
     if signer_fingerprint:
         fields.append(("Signer-Fingerprint", signer_fingerprint))
+    if identity_id:
+        fields.append(("Identity-ID", identity_id))
+    if identity_bootstrap_path:
+        fields.append(("Identity-Bootstrap-Path", identity_bootstrap_path))
+    if identity_bootstrap_created is not None:
+        fields.append(("Identity-Bootstrap-Created", "yes" if identity_bootstrap_created else "no"))
     return render_body(fields)
 
 
@@ -102,6 +120,9 @@ def render_submission_result(result) -> str:
             signature_path=result.signature_path,
             public_key_path=result.public_key_path,
             signer_fingerprint=result.signer_fingerprint,
+            identity_id=result.identity_id,
+            identity_bootstrap_path=result.identity_bootstrap_path,
+            identity_bootstrap_created=result.identity_bootstrap_created,
         )
 
     return render_success_body(
@@ -113,4 +134,7 @@ def render_submission_result(result) -> str:
         signature_path=result.signature_path,
         public_key_path=result.public_key_path,
         signer_fingerprint=result.signer_fingerprint,
+        identity_id=result.identity_id,
+        identity_bootstrap_path=result.identity_bootstrap_path,
+        identity_bootstrap_created=result.identity_bootstrap_created,
     )

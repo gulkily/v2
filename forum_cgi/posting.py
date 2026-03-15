@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from forum_core.identity import build_bootstrap_record_id
 from forum_read_only.repository import Post, index_posts, load_posts, parse_post_text
 
 
@@ -32,6 +33,7 @@ class StoredArtifacts:
     post_path: str
     signature_path: str | None = None
     public_key_path: str | None = None
+    identity_bootstrap_path: str | None = None
 
 
 def get_repo_root() -> Path:
@@ -43,6 +45,10 @@ def get_repo_root() -> Path:
 
 def records_dir(repo_root: Path) -> Path:
     return repo_root / "records" / "posts"
+
+
+def identity_records_dir(repo_root: Path) -> Path:
+    return repo_root / "records" / "identity"
 
 
 def read_ascii_payload() -> str:
@@ -139,6 +145,10 @@ def resolve_public_key_path(repo_root: Path, post_id: str) -> Path:
     return records_dir(repo_root) / f"{post_id}.txt.pub.asc"
 
 
+def resolve_identity_bootstrap_path(repo_root: Path, identity_id: str) -> Path:
+    return identity_records_dir(repo_root) / f"{build_bootstrap_record_id(identity_id)}.txt"
+
+
 def write_ascii_file(path: Path, text: str) -> Path:
     path.write_text(text, encoding="ascii")
     return path
@@ -152,11 +162,14 @@ def store_post(
     *,
     signature_text: str | None = None,
     public_key_text: str | None = None,
+    identity_bootstrap_path: Path | None = None,
+    identity_bootstrap_text: str | None = None,
 ) -> tuple[str, StoredArtifacts]:
     ensure_post_id_available(post, repo_root)
     post_path = write_post_file(post, repo_root, payload_text)
     signature_path = None
     public_key_path = None
+    stored_identity_bootstrap_path = None
     paths = [post_path]
     if signature_text is not None:
         signature_path = write_ascii_file(
@@ -170,6 +183,13 @@ def store_post(
             ensure_ascii_text(public_key_text, field_name="public_key"),
         )
         paths.append(public_key_path)
+    if identity_bootstrap_path is not None and identity_bootstrap_text is not None:
+        identity_bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+        stored_identity_bootstrap_path = write_ascii_file(
+            identity_bootstrap_path,
+            ensure_ascii_text(identity_bootstrap_text, field_name="identity_bootstrap"),
+        )
+        paths.append(stored_identity_bootstrap_path)
 
     commit_id = commit_post(
         repo_root,
@@ -180,6 +200,11 @@ def store_post(
         post_path=str(post_path.relative_to(repo_root)),
         signature_path=str(signature_path.relative_to(repo_root)) if signature_path else None,
         public_key_path=str(public_key_path.relative_to(repo_root)) if public_key_path else None,
+        identity_bootstrap_path=(
+            str(stored_identity_bootstrap_path.relative_to(repo_root))
+            if stored_identity_bootstrap_path
+            else None
+        ),
     )
 
 
