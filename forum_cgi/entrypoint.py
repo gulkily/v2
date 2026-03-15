@@ -4,12 +4,16 @@ import subprocess
 import sys
 
 from forum_cgi.posting import PostingError, get_repo_root, read_ascii_payload
+from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
 from forum_cgi.service import submit_create_reply, submit_create_thread
 from forum_cgi.text import (
     render_cgi_response,
     render_error_body,
     render_submission_result,
 )
+
+load_repo_env()
+notify_missing_env_defaults()
 
 
 def run_create_thread() -> int:

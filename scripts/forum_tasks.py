@@ -13,7 +13,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from forum_core.runtime_env import get_missing_env_defaults, repo_env_paths, sync_env_defaults
+from forum_core.runtime_env import (
+    get_missing_env_defaults,
+    load_repo_env,
+    notify_missing_env_defaults,
+    repo_env_paths,
+    sync_env_defaults,
+)
 
 
 @dataclass(frozen=True)
@@ -100,6 +106,8 @@ def run_start() -> int:
 
 
 def run_tests(test_pattern: str | None = None) -> int:
+    load_repo_env(repo_root=REPO_ROOT)
+    notify_missing_env_defaults(repo_root=REPO_ROOT)
     command = [sys.executable, "-m", "unittest", "discover", "-s", "tests"]
     if test_pattern:
         command.extend(["-p", test_pattern])

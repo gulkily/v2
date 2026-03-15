@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
+from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
 from forum_core.moderation import (
     derive_moderation_state,
     load_moderation_records,
@@ -48,11 +49,18 @@ from forum_read_only.repository import (
 )
 from forum_read_only.templates import load_asset_text, load_template, render_page
 
+load_repo_env()
+notify_missing_env_defaults()
+
 
 def get_repo_root() -> Path:
     env_root = os.environ.get("FORUM_REPO_ROOT")
     if env_root:
         return Path(env_root).resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+def get_app_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
@@ -550,6 +558,11 @@ def render_missing_resource(resource_name: str) -> str:
     )
 
 
+def render_task_priorities_document() -> str:
+    document_path = get_app_root() / "docs" / "plans" / "task_priorities.html"
+    return document_path.read_text(encoding="utf-8")
+
+
 def render_api_home() -> str:
     posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
     return render_api_home_text(
@@ -926,6 +939,12 @@ def application(environ, start_response):
 
         if path == "/":
             body = render_board_index().encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path in {"/planning/task-priorities", "/planning/task-priorities/"}:
+            body = render_task_priorities_document().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

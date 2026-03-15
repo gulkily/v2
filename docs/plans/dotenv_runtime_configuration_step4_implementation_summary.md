@@ -20,3 +20,17 @@
   - Ran a temp-directory smoke script that loaded `scripts/forum_tasks.py`, pointed `REPO_ROOT` at a disposable repo state, called `run_env_sync()` twice, and confirmed the first run created `.env` with only the missing keys while the second run reported that nothing remained to sync.
 - Notes:
   - The sync helper currently inserts a marker comment before appended keys so later operator-added values remain visually distinct from synced defaults.
+
+## Stage 3 - Runtime `.env` Loading And Missing-Key Notices
+- Changes:
+  - Added `notify_missing_env_defaults(...)` to `forum_core/runtime_env.py` with one-per-process warning suppression and a stable `./forum env-sync` operator hint.
+  - Updated `scripts/run_read_only.py` to load repo-root `.env` before importing the WSGI application so `FORUM_HOST` and `FORUM_PORT` can come from `.env`.
+  - Updated `forum_read_only/web.py` and `forum_cgi/entrypoint.py` to load `.env` and emit read-only missing-key notices on direct WSGI and CGI entrypoints.
+  - Updated `scripts/forum_tasks.py` so the `test` subcommand loads `.env` and uses the same missing-key notice flow.
+- Verification:
+  - Ran `python3 -m py_compile forum_core/runtime_env.py scripts/forum_tasks.py scripts/run_read_only.py forum_read_only/web.py forum_cgi/entrypoint.py`.
+  - Ran a disposable `.env` harness that imported `forum_read_only.web`, `forum_cgi.entrypoint`, `forum_cgi.posting`, and `forum_core.moderation`, confirming both read and write repo-root resolution came from `.env` and that the moderator allowlist resolved the `.env` fingerprint.
+  - Ran a disposable `.env` harness around `./forum start` with `PYTHONUNBUFFERED=1` and confirmed the startup message used the `.env` host/port.
+  - Ran a partial `.env` import harness for `forum_read_only.web` with logging enabled and confirmed the warning pointed to `./forum env-sync` while leaving `.env` unchanged.
+- Notes:
+  - Missing-key notices are intentionally read-only at runtime; only `./forum env-sync` mutates `.env`.

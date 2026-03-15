@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
@@ -12,6 +13,8 @@ _COMMENTED_ASSIGNMENT_RE = re.compile(
 )
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC_NOTE = "# Added automatically from .env.example via ./forum env-sync."
+logger = logging.getLogger(__name__)
+_NOTIFIED_MISSING_DEFAULTS: set[tuple[Path, str]] = set()
 
 
 def repo_env_paths(repo_root: Path | None = None) -> tuple[Path, Path]:
@@ -137,6 +140,32 @@ def sync_env_defaults(env_path: Path, env_example_path: Path) -> dict[str, int |
         "added_count": len(missing_entries),
         "updated": True,
     }
+
+
+def notify_missing_env_defaults(
+    *,
+    repo_root: Path | None = None,
+    command_hint: str = "./forum env-sync",
+) -> bool:
+    env_path, env_example_path = repo_env_paths(repo_root)
+    status = get_missing_env_defaults(env_path=env_path, env_example_path=env_example_path)
+    if not status.get("example_found"):
+        return False
+
+    missing_count = int(status.get("missing_count", 0))
+    if missing_count <= 0:
+        return False
+
+    notification_key = (env_path.resolve(), command_hint)
+    if notification_key in _NOTIFIED_MISSING_DEFAULTS:
+        return False
+    _NOTIFIED_MISSING_DEFAULTS.add(notification_key)
+    logger.warning(
+        "Detected %s missing .env settings. Run `%s` to append defaults from .env.example.",
+        missing_count,
+        command_hint,
+    )
+    return True
 
 
 def load_repo_env(*, repo_root: Path | None = None, override: bool = False) -> bool:

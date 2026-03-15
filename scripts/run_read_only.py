@@ -9,6 +9,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from forum_core.runtime_env import load_repo_env
+
+load_repo_env(repo_root=REPO_ROOT)
+
 from forum_read_only.web import application
 
 
