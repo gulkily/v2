@@ -33,7 +33,7 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
 
 ## Follow-On Slices
 
-- [ ] Loop 6: Identity bootstrap and profile read model
+- [x] Loop 6: Identity bootstrap and profile read model
   - Goal: make key-post bootstrap and profile lookup coherent.
   - Includes: public-key bootstrap post shape, profile summary derivation, user/profile view.
   - Demonstrable result: a user identity can be created and viewed from repository data.
