@@ -34,3 +34,17 @@
   - Ran a partial `.env` import harness for `forum_read_only.web` with logging enabled and confirmed the warning pointed to `./forum env-sync` while leaving `.env` unchanged.
 - Notes:
   - Missing-key notices are intentionally read-only at runtime; only `./forum env-sync` mutates `.env`.
+
+## Stage 4 - Tests And Operator Docs
+- Changes:
+  - Added `tests/test_runtime_env.py` covering missing-default parsing, append-only sync, non-overriding `.env` loading, and one-time warning behavior.
+  - Added `tests/test_forum_tasks.py` covering `env-sync` argument parsing and the `run_env_sync()` create/no-op flows against a disposable repo root.
+  - Updated `.env.example` to document `./forum env-sync`, no-overwrite semantics, env precedence, and restart expectations.
+  - Updated `docs/developer_commands.md` to document `./forum env-sync`, automatic `.env` loading coverage, precedence rules, and restart expectations.
+- Verification:
+  - Ran `./forum test test_runtime_env.py`.
+  - Ran `./forum test test_forum_tasks.py`.
+  - Ran `./forum test test_profile_update_page.py` as a regression check on the env-aware web import path.
+  - Ran `./forum help` and confirmed the documented `env-sync` subcommand still appears in the canonical CLI help surface.
+- Notes:
+  - With no local `.env`, `./forum test` currently surfaces the read-only missing-key warning before running the suite; this is expected and does not mutate repo state.
