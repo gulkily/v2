@@ -71,7 +71,7 @@ This is not a Step 3 development plan. It is a checklist of candidate feature sl
 ## Optional Later Slices
 
 - [ ] Loop 13: Profile updates and display-name changes
-- [ ] Loop 14: Identity merge and key rotation records
+- [x] Loop 14: Identity merge and key rotation records
 - [ ] Loop 15: Raw object/debug views
 - [ ] Loop 16: Derived index persistence policy
 - [ ] Loop 17: Additional moderation actions such as bans
