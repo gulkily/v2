@@ -16,3 +16,13 @@
   - Ran a disposable-repo smoke harness with generated OpenPGP keys and mocked `run_llm(...)`; confirmed the helper produced a canonical reply payload and that `verify_detached_signature(...)` accepted the generated signature.
 - Notes:
   - The helper is intentionally not wired into thread creation yet; that integration happens in the next stage.
+
+## Stage 3 - Best-effort thread creation integration
+- Changes:
+  - Extended [service.py](/home/wsl/v2/forum_cgi/service.py) so `submit_create_thread(...)` now annotates its result with auto-reply status, checks the feature flag after the root thread is stored, and attempts one best-effort assistant reply without rolling back the root thread on failure.
+  - Extended [text.py](/home/wsl/v2/forum_cgi/text.py) so thread-creation responses can expose `Auto-Reply-Status`, `Auto-Reply-Record-ID`, and `Auto-Reply-Message` in both preview and success output when available.
+- Verification:
+  - Ran a disposable-repo smoke harness that exercised three cases through `submit_create_thread(...)`: feature disabled, feature enabled with mocked successful LLM output, and feature enabled with a forced helper crash.
+  - Confirmed the disabled case reported `Auto-Reply-Status: disabled`, the enabled-success case created a real reply record under `records/posts/`, and the forced-failure case preserved the root thread while returning `Auto-Reply-Status: failed`.
+- Notes:
+  - The current implementation creates the assistant reply as a second commit after the root-thread commit, which preserves the existing write contract and keeps failure rollback simple.

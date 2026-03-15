@@ -28,6 +28,9 @@ def render_preview_body(
     identity_id: str | None = None,
     identity_bootstrap_path: str | None = None,
     identity_bootstrap_created: bool | None = None,
+    auto_reply_status: str | None = None,
+    auto_reply_record_id: str | None = None,
+    auto_reply_message: str | None = None,
 ) -> str:
     fields = [
         ("Command", command_name),
@@ -55,6 +58,12 @@ def render_preview_body(
         fields.append(("Identity-Bootstrap-Path", identity_bootstrap_path))
     if identity_bootstrap_created is not None:
         fields.append(("Identity-Bootstrap-Created", "yes" if identity_bootstrap_created else "no"))
+    if auto_reply_status:
+        fields.append(("Auto-Reply-Status", auto_reply_status))
+    if auto_reply_record_id:
+        fields.append(("Auto-Reply-Record-ID", auto_reply_record_id))
+    if auto_reply_message:
+        fields.append(("Auto-Reply-Message", auto_reply_message))
     return render_body(fields)
 
 
@@ -71,6 +80,9 @@ def render_success_body(
     identity_id: str | None = None,
     identity_bootstrap_path: str | None = None,
     identity_bootstrap_created: bool | None = None,
+    auto_reply_status: str | None = None,
+    auto_reply_record_id: str | None = None,
+    auto_reply_message: str | None = None,
 ) -> str:
     fields = [
         ("Record-ID", record_id),
@@ -96,6 +108,12 @@ def render_success_body(
         fields.append(("Identity-Bootstrap-Path", identity_bootstrap_path))
     if identity_bootstrap_created is not None:
         fields.append(("Identity-Bootstrap-Created", "yes" if identity_bootstrap_created else "no"))
+    if auto_reply_status:
+        fields.append(("Auto-Reply-Status", auto_reply_status))
+    if auto_reply_record_id:
+        fields.append(("Auto-Reply-Record-ID", auto_reply_record_id))
+    if auto_reply_message:
+        fields.append(("Auto-Reply-Message", auto_reply_message))
     return render_body(fields)
 
 
@@ -123,6 +141,9 @@ def render_submission_result(result) -> str:
             identity_id=result.identity_id,
             identity_bootstrap_path=result.identity_bootstrap_path,
             identity_bootstrap_created=result.identity_bootstrap_created,
+            auto_reply_status=result.auto_reply_status,
+            auto_reply_record_id=result.auto_reply_record_id,
+            auto_reply_message=result.auto_reply_message,
         )
 
     return render_success_body(
@@ -137,6 +158,9 @@ def render_submission_result(result) -> str:
         identity_id=result.identity_id,
         identity_bootstrap_path=result.identity_bootstrap_path,
         identity_bootstrap_created=result.identity_bootstrap_created,
+        auto_reply_status=result.auto_reply_status,
+        auto_reply_record_id=result.auto_reply_record_id,
+        auto_reply_message=result.auto_reply_message,
     )
 
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from forum_cgi.auto_reply import AutoReplyError, generate_thread_auto_reply, thread_auto_reply_enabled
 from forum_core.identity import build_bootstrap_payload, build_identity_id
+from forum_core.llm_provider import LLMProviderError
 from forum_cgi.posting import (
     PostingError,
     StoredArtifacts,
@@ -19,6 +22,8 @@ from forum_cgi.posting import (
     validate_create_thread,
 )
 from forum_cgi.signing import verify_detached_signature
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -36,6 +41,9 @@ class SubmissionResult:
     identity_id: str | None = None
     identity_bootstrap_path: str | None = None
     identity_bootstrap_created: bool | None = None
+    auto_reply_status: str | None = None
+    auto_reply_record_id: str | None = None
+    auto_reply_message: str | None = None
 
 
 def submit_create_thread(
@@ -49,7 +57,7 @@ def submit_create_thread(
 ) -> SubmissionResult:
     post = parse_payload(ensure_ascii_text(payload_text, field_name="payload"))
     validate_create_thread(post)
-    return _submit_post(
+    result = _submit_post(
         "create_thread",
         post=post,
         repo_root=repo_root,
@@ -59,6 +67,7 @@ def submit_create_thread(
         public_key_text=public_key_text,
         require_signature=require_signature,
     )
+    return maybe_create_thread_auto_reply(post=post, repo_root=repo_root, dry_run=dry_run, result=result)
 
 
 def submit_create_reply(
@@ -176,4 +185,67 @@ def _submit_post(
         identity_id=identity_id,
         identity_bootstrap_path=artifacts.identity_bootstrap_path or identity_bootstrap_path,
         identity_bootstrap_created=identity_bootstrap_created,
+    )
+
+
+def maybe_create_thread_auto_reply(
+    *,
+    post,
+    repo_root: Path,
+    dry_run: bool,
+    result: SubmissionResult,
+) -> SubmissionResult:
+    if dry_run:
+        return _with_auto_reply(result, status="not_attempted", message="dry run")
+    if not thread_auto_reply_enabled():
+        return _with_auto_reply(result, status="disabled")
+
+    try:
+        signed_reply = generate_thread_auto_reply(thread_post=post, repo_root=repo_root)
+        reply_result = submit_create_reply(
+            signed_reply.payload_text,
+            repo_root,
+            dry_run=False,
+            signature_text=signed_reply.signature_text,
+            public_key_text=signed_reply.public_key_text,
+            require_signature=True,
+        )
+    except (AutoReplyError, LLMProviderError, PostingError) as exc:
+        logger.warning("Thread auto reply failed for %s: %s", post.post_id, exc)
+        return _with_auto_reply(result, status="failed", message=str(exc))
+    except Exception:
+        logger.exception("Thread auto reply crashed for %s", post.post_id)
+        return _with_auto_reply(result, status="failed", message="unexpected auto reply failure")
+
+    return _with_auto_reply(
+        result,
+        status="created",
+        record_id=reply_result.record_id,
+    )
+
+
+def _with_auto_reply(
+    result: SubmissionResult,
+    *,
+    status: str,
+    record_id: str | None = None,
+    message: str | None = None,
+) -> SubmissionResult:
+    return SubmissionResult(
+        command_name=result.command_name,
+        record_id=result.record_id,
+        thread_id=result.thread_id,
+        parent_id=result.parent_id,
+        stored_path=result.stored_path,
+        commit_id=result.commit_id,
+        dry_run=result.dry_run,
+        signature_path=result.signature_path,
+        public_key_path=result.public_key_path,
+        signer_fingerprint=result.signer_fingerprint,
+        identity_id=result.identity_id,
+        identity_bootstrap_path=result.identity_bootstrap_path,
+        identity_bootstrap_created=result.identity_bootstrap_created,
+        auto_reply_status=status,
+        auto_reply_record_id=record_id,
+        auto_reply_message=message,
     )
