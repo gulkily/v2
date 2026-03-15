@@ -394,7 +394,7 @@ def application(environ, start_response):
                 headers = [("Content-Type", "text/plain; charset=utf-8")]
                 start_response("405 Method Not Allowed", headers)
                 return [body]
-            status, body_text = render_api_create_thread(environ, default_dry_run=True)
+            status, body_text = render_api_create_thread(environ, default_dry_run=False)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
@@ -456,8 +456,8 @@ def application(environ, start_response):
                 command_name="create_thread",
                 endpoint_path="/api/create_thread",
                 compose_heading="Compose a signed thread",
-                compose_text="Generate or import a local OpenPGP key, sign a canonical thread payload in the browser, and preview the signed submission before it is written.",
-                dry_run=True,
+                compose_text="Generate or import a local OpenPGP key, sign a canonical thread payload in the browser, and submit the signed thread directly into repository storage.",
+                dry_run=False,
             ).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)

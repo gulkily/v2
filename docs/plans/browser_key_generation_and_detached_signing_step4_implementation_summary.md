@@ -11,3 +11,16 @@
 - Notes:
   - Stage 2 will switch signed thread creation from dry-run preview to real storage and git commits.
   - Stage 3 will do the same for signed replies.
+
+## Stage 2 - signed thread creation from the browser
+- Changes:
+  - Switched the browser-facing `/api/create_thread` route from dry-run preview to real write behavior.
+  - Switched the browser thread compose page from preview mode to real signed submission mode.
+  - Reused the shared signed-posting service so successful browser thread submissions now write the payload file, detached signature file, and public-key sidecar in one git-backed commit.
+- Verification:
+  - Submitted a signed thread to `/api/create_thread` against a temporary local clone and confirmed a `200 OK` response with `Record-ID`, `Commit-ID`, `Signature-Path`, `Public-Key-Path`, and `Signer-Fingerprint`.
+  - Confirmed the temporary clone contained `records/posts/stage2-browser-thread.txt`, `records/posts/stage2-browser-thread.txt.asc`, and `records/posts/stage2-browser-thread.txt.pub.asc`.
+  - Confirmed the temporary clone created git commit subject `create_thread: stage2-browser-thread`.
+  - Confirmed the new signed thread was immediately visible through `/api/get_thread?thread_id=stage2-browser-thread` and `/threads/stage2-browser-thread` when the reader was pointed at the temporary clone.
+- Notes:
+  - Signed reply creation remains in dry-run preview mode until Stage 3.
