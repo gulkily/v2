@@ -22,3 +22,15 @@
   - Confirmed signer/source mismatch returns `403 Forbidden` with the expected plain-text error.
 - Notes:
   - The route exists for API and CLI-style use now, but profile discovery text and read surfaces remain unchanged until later stages.
+
+## Stage 3 - resolved profile summaries with display names
+- Changes:
+  - Extended the profile summary model so `get_profile` now includes `Display-Name`, `Display-Name-Source`, `Fallback-Display-Name`, and optional profile-update provenance fields.
+  - Updated the shared identity context loader to read visible profile-update records alongside bootstraps and identity links.
+  - Resolved the current display name across all member identities in a linked set while preserving the existing fingerprint-derived fallback label when no visible update exists.
+- Verification:
+  - Compiled the updated modules with `python3 -m py_compile forum_cgi/*.py forum_core/*.py forum_read_only/*.py`.
+  - In a disposable repository clone, generated two signed identities, merged them with reciprocal `merge_identity` records, confirmed the pre-update profile summary still reports `Display-Name-Source: fingerprint_fallback`, then submitted a signed profile update from one member identity.
+  - Confirmed `render_api_get_profile(...)` returns `200 OK` for both merged aliases and that both responses include the same updated display name, fallback field, and display-name record metadata.
+- Notes:
+  - The HTML profile page and attribution labels still use the old fingerprint shorthand at this stage; those surfaces are updated in Stage 4.

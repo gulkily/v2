@@ -8,6 +8,7 @@ from forum_core.identity import (
     ProfileSummary,
     index_identity_bootstraps,
     load_identity_bootstraps,
+    short_identity_label,
 )
 from forum_core.identity_links import (
     IdentityResolution,
@@ -16,6 +17,12 @@ from forum_core.identity_links import (
     identity_link_records_dir,
     load_identity_link_records,
 )
+from forum_core.profile_updates import (
+    ProfileUpdateRecord,
+    profile_update_records_dir,
+    load_profile_update_records,
+    resolve_current_display_name,
+)
 from forum_read_only.repository import Post
 
 
@@ -23,6 +30,7 @@ from forum_read_only.repository import Post
 class IdentityContext:
     bootstraps_by_identity_id: dict[str, IdentityBootstrap]
     resolution: IdentityResolution
+    profile_update_records: tuple[ProfileUpdateRecord, ...]
 
     def canonical_identity_id(self, identity_id: str | None) -> str | None:
         return self.resolution.canonical_identity_id(identity_id)
@@ -47,6 +55,9 @@ def load_identity_context(*, repo_root: Path, posts: list[Post]) -> IdentityCont
     return IdentityContext(
         bootstraps_by_identity_id=index_identity_bootstraps(bootstraps),
         resolution=resolution,
+        profile_update_records=tuple(
+            load_profile_update_records(profile_update_records_dir(repo_root))
+        ),
     )
 
 
@@ -71,6 +82,11 @@ def find_profile_summary(
     if bootstrap is None:
         return None
 
+    fallback_display_name = short_identity_label(bootstrap.signer_fingerprint)
+    resolved_display_name = resolve_current_display_name(
+        member_identity_ids=member_identity_ids,
+        profile_updates=list(context.profile_update_records),
+    )
     matching_posts = tuple(
         sorted(
             [post for post in posts if post.identity_id in member_identity_ids],
@@ -82,6 +98,17 @@ def find_profile_summary(
         identity_id=canonical_identity_id,
         bootstrap_identity_id=bootstrap.identity_id,
         signer_fingerprint=bootstrap.signer_fingerprint,
+        display_name=(
+            resolved_display_name.display_name
+            if resolved_display_name is not None
+            else fallback_display_name
+        ),
+        display_name_source=(
+            "profile_update"
+            if resolved_display_name is not None
+            else "fingerprint_fallback"
+        ),
+        fallback_display_name=fallback_display_name,
         bootstrap_record_id=bootstrap.record_id,
         bootstrap_post_id=bootstrap.bootstrap_post_id,
         bootstrap_thread_id=bootstrap.bootstrap_thread_id,
@@ -90,6 +117,16 @@ def find_profile_summary(
         post_ids=tuple(post.post_id for post in matching_posts),
         thread_ids=thread_ids,
         public_key_text=bootstrap.public_key_text,
+        display_name_record_id=(
+            resolved_display_name.record_id
+            if resolved_display_name is not None
+            else None
+        ),
+        display_name_source_identity_id=(
+            resolved_display_name.source_identity_id
+            if resolved_display_name is not None
+            else None
+        ),
     )
 
 

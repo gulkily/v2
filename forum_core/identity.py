@@ -26,6 +26,9 @@ class ProfileSummary:
     identity_id: str
     bootstrap_identity_id: str
     signer_fingerprint: str
+    display_name: str
+    display_name_source: str
+    fallback_display_name: str
     bootstrap_record_id: str
     bootstrap_post_id: str
     bootstrap_thread_id: str
@@ -34,6 +37,8 @@ class ProfileSummary:
     post_ids: tuple[str, ...]
     thread_ids: tuple[str, ...]
     public_key_text: str
+    display_name_record_id: str | None = None
+    display_name_source_identity_id: str | None = None
 
 
 def normalize_fingerprint(fingerprint: str) -> str:
@@ -206,6 +211,9 @@ def render_profile_summary_text(summary: ProfileSummary) -> str:
         f"Identity-ID: {summary.identity_id}",
         f"Bootstrap-Identity-ID: {summary.bootstrap_identity_id}",
         f"Signer-Fingerprint: {summary.signer_fingerprint}",
+        f"Display-Name: {summary.display_name}",
+        f"Display-Name-Source: {summary.display_name_source}",
+        f"Fallback-Display-Name: {summary.fallback_display_name}",
         f"Bootstrap-Record-ID: {summary.bootstrap_record_id}",
         f"Bootstrap-Path: {summary.bootstrap_path}",
         f"Bootstrap-By-Post: {summary.bootstrap_post_id}",
@@ -213,9 +221,12 @@ def render_profile_summary_text(summary: ProfileSummary) -> str:
         f"Member-Identity-Count: {len(summary.member_identity_ids)}",
         f"Post-Count: {len(summary.post_ids)}",
         f"Thread-Count: {len(summary.thread_ids)}",
-        "",
-        "Member-Identities:",
     ]
+    if summary.display_name_record_id:
+        lines.append(f"Display-Name-Record-ID: {summary.display_name_record_id}")
+    if summary.display_name_source_identity_id:
+        lines.append(f"Display-Name-Source-Identity-ID: {summary.display_name_source_identity_id}")
+    lines.extend(["", "Member-Identities:"])
     lines.extend(summary.member_identity_ids)
     lines.extend(
         [
