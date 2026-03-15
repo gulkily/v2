@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,13 +53,23 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 
 def run_task(request: TaskRequest) -> int:
     if request.command == "start":
-        print("start is not implemented yet.", file=sys.stderr)
-        return 1
+        return run_start()
     if request.command == "test":
-        print("test is not implemented yet.", file=sys.stderr)
-        return 1
+        return run_tests(request.test_pattern)
     print(f"Unknown command: {request.command}", file=sys.stderr)
     return 1
+
+
+def run_start() -> int:
+    command = [sys.executable, str(REPO_ROOT / "scripts/run_read_only.py")]
+    return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
+
+
+def run_tests(test_pattern: str | None = None) -> int:
+    command = [sys.executable, "-m", "unittest", "discover", "-s", "tests"]
+    if test_pattern:
+        command.extend(["-p", test_pattern])
+    return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
 
 
 def main(argv: list[str] | None = None) -> int:
