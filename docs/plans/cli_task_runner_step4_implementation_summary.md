@@ -7,3 +7,8 @@
 - Changes: Wired `scripts/forum_tasks.py` to the existing repo workflows by delegating `start` to `scripts/run_read_only.py` and `test` to `python3 -m unittest discover -s tests`, with optional test-pattern forwarding for focused runs.
 - Verification: Ran `python3 scripts/forum_tasks.py help`; ran `python3 scripts/forum_tasks.py test test_profile_update_page.py` and confirmed the targeted unittest file passes; ran `env PYTHONUNBUFFERED=1 FORUM_PORT=8030 timeout 2s python3 scripts/forum_tasks.py start` and confirmed the server prints `Serving read-only forum on http://127.0.0.1:8030` before timeout.
 - Notes: The server-start verification required an unsandboxed run because the sandbox blocks listening sockets; the command behavior itself was otherwise unchanged.
+
+## Stage 3 - Add the repo-root wrapper
+- Changes: Added the repo-root `forum` wrapper as the canonical short command and made it executable. The wrapper forwards argv to `scripts/forum_tasks.py` while preferring `.venv/bin/python3` when present and falling back to `python3` otherwise.
+- Verification: Ran `./forum help`; ran `./forum test test_profile_update_page.py` and confirmed the targeted unittest file passes; ran `env PYTHONUNBUFFERED=1 FORUM_PORT=8031 timeout 2s ./forum start` and confirmed the wrapper reaches the local server path and prints `Serving read-only forum on http://127.0.0.1:8031` before timeout.
+- Notes: The wrapper keeps the backend handoff intentionally small so a later Perl runner can be introduced behind the same public subcommands without changing the user-facing contract.

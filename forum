@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+RUNNER_SCRIPT="$SCRIPT_DIR/scripts/forum_tasks.py"
+VENV_PY="$SCRIPT_DIR/.venv/bin/python3"
+
+if [ -x "$VENV_PY" ]; then
+  exec "$VENV_PY" "$RUNNER_SCRIPT" "$@"
+fi
+
+exec python3 "$RUNNER_SCRIPT" "$@"
