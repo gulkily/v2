@@ -24,7 +24,7 @@ from forum_core.profile_updates import (
     load_profile_update_records,
     resolve_current_display_name,
 )
-from forum_read_only.repository import Post
+from forum_web.repository import Post
 
 
 @dataclass(frozen=True)

@@ -8,7 +8,7 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 class TaskPrioritiesPageTests(unittest.TestCase):

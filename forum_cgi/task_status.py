@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forum_cgi.posting import PostingError, build_commit_message, commit_post, records_dir, write_ascii_file
-from forum_read_only.repository import is_task_root, parse_post
+from forum_web.repository import is_task_root, parse_post
 
 
 @dataclass(frozen=True)

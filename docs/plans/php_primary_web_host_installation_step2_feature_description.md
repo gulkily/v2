@@ -15,7 +15,7 @@ The application already runs as a Python-based web and CGI-style system, but ope
 - The slice must avoid a PHP-native rewrite, alternate repository format, parallel API contract, or host-specific matrix spanning multiple unrelated deployment models.
 
 ## Shared Component Inventory
-- Existing read web surface: reuse the current WSGI application in `forum_read_only/web.py` as the canonical renderer for forum pages; the PHP-facing layer is an adapter, not a new page system.
+- Existing read web surface: reuse the current WSGI application in `forum_web/web.py` as the canonical renderer for forum pages; the PHP-facing layer is an adapter, not a new page system.
 - Existing write command surface: reuse `cgi-bin/create_thread.py` and `cgi-bin/create_reply.py` as the canonical write entrypoints; the PHP-host installation path must not redefine their payload or response contracts.
 - Existing browser posting surface: reuse the current compose and browser-signing flows that already target `/api/create_thread` and `/api/create_reply`; host support should preserve these endpoints rather than introducing PHP-specific submission URLs.
 - Existing runtime configuration surface: reuse the current environment and repo-root configuration model instead of adding a PHP-only settings mechanism.

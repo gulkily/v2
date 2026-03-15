@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from forum_core.llm_provider import LLMProviderError
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 class LLMApiTests(unittest.TestCase):
@@ -55,8 +55,8 @@ class LLMApiTests(unittest.TestCase):
     def test_api_call_llm_returns_plain_text_result(self) -> None:
         request_body = json.dumps({"prompt": "Reply with ready."}).encode("utf-8")
 
-        with mock.patch("forum_read_only.web.run_llm", return_value="ready"), mock.patch(
-            "forum_read_only.web.get_llm_model",
+        with mock.patch("forum_web.web.run_llm", return_value="ready"), mock.patch(
+            "forum_web.web.get_llm_model",
             return_value="openai/gpt-4o-mini",
         ):
             status, headers, body = self.request("/api/call_llm", method="POST", body=request_body)
@@ -80,7 +80,7 @@ class LLMApiTests(unittest.TestCase):
         request_body = json.dumps({"prompt": "Reply with ready."}).encode("utf-8")
 
         with mock.patch(
-            "forum_read_only.web.run_llm",
+            "forum_web.web.run_llm",
             side_effect=LLMProviderError("DEDALUS_API_KEY is not configured."),
         ):
             status, _, body = self.request("/api/call_llm", method="POST", body=request_body)

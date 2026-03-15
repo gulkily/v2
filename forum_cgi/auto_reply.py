@@ -12,7 +12,7 @@ from forum_cgi.posting import PostingError, ensure_ascii_text
 from forum_cgi.signing import sign_detached_payload
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_text
 from forum_core.llm_provider import get_llm_model, run_llm
-from forum_read_only.repository import Post
+from forum_web.repository import Post
 
 
 class AutoReplyError(RuntimeError):

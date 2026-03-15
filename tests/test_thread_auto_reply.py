@@ -11,7 +11,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_cgi.auto_reply import AutoReplyError, AutoReplySigningError, thread_auto_reply_enabled
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 class ThreadAutoReplyTests(unittest.TestCase):

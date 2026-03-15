@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from textwrap import dedent
 
-from forum_read_only.repository import is_task_root, parse_post_text, root_thread_type
+from forum_web.repository import is_task_root, parse_post_text, root_thread_type
 
 
 class ThreadTypedRootParsingTests(unittest.TestCase):

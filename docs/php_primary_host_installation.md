@@ -23,7 +23,7 @@ This profile does not cover:
 ## Canonical Application Boundary
 The existing Python code remains canonical:
 
-- Read requests are served by the current WSGI application in `forum_read_only/web.py`.
+- Read requests are served by the current WSGI application in `forum_web/web.py`.
 - Write requests continue to use the existing CGI command entrypoints in `cgi-bin/create_thread.py` and `cgi-bin/create_reply.py`.
 - Browser posting continues to target `/api/create_thread` and `/api/create_reply`.
 

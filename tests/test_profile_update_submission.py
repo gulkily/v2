@@ -11,7 +11,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text, identity_slug
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 class ProfileUpdateSubmissionTests(unittest.TestCase):

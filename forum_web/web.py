@@ -32,7 +32,7 @@ from forum_cgi.text import (
     render_profile_update_result,
     render_submission_result,
 )
-from forum_read_only.api_text import (
+from forum_web.api_text import (
     render_api_home_text,
     render_bad_request_text,
     render_index_text,
@@ -43,8 +43,8 @@ from forum_read_only.api_text import (
     render_profile_text,
     render_thread_text,
 )
-from forum_read_only.profiles import find_profile_summary, load_identity_context, resolve_identity_display_name
-from forum_read_only.repository import (
+from forum_web.profiles import find_profile_summary, load_identity_context, resolve_identity_display_name
+from forum_web.repository import (
     group_threads,
     index_posts,
     index_threads,
@@ -53,8 +53,8 @@ from forum_read_only.repository import (
     load_posts,
     root_thread_type,
 )
-from forum_read_only.task_threads import index_task_threads, load_task_threads
-from forum_read_only.templates import load_asset_text, load_template, render_page
+from forum_web.task_threads import index_task_threads, load_task_threads
+from forum_web.templates import load_asset_text, load_template, render_page
 
 load_repo_env()
 notify_missing_env_defaults()

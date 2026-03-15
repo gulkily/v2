@@ -7,7 +7,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest import mock
 
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 class ComposeThreadPageTests(unittest.TestCase):

@@ -18,8 +18,8 @@ from forum_cgi.posting import (
     write_ascii_file,
 )
 from forum_cgi.signing import verify_detached_signature
-from forum_read_only.profiles import load_identity_context
-from forum_read_only.repository import load_posts
+from forum_web.profiles import load_identity_context
+from forum_web.repository import load_posts
 
 
 @dataclass(frozen=True)

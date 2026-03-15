@@ -19,7 +19,7 @@ from forum_cgi.posting import (
     write_ascii_file,
 )
 from forum_cgi.signing import verify_detached_signature
-from forum_read_only.repository import index_posts, load_posts
+from forum_web.repository import index_posts, load_posts
 
 
 @dataclass(frozen=True)

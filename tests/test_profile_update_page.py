@@ -8,7 +8,7 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 IDENTITY_ID = "openpgp:0123456789abcdef"

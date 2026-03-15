@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from forum_core.moderation import ModerationRecord
 from forum_core.identity import ProfileSummary, render_profile_summary_text
-from forum_read_only.repository import Post, Thread, is_task_root, root_thread_type
+from forum_web.repository import Post, Thread, is_task_root, root_thread_type
 
 
 def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list[str]) -> str:

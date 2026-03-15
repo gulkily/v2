@@ -13,7 +13,7 @@ from forum_core.runtime_env import load_repo_env
 
 load_repo_env(repo_root=REPO_ROOT)
 
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 def main() -> None:

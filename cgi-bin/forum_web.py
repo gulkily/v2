@@ -9,7 +9,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from forum_cgi.wsgi_gateway import render_cgi_response
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
-from forum_read_only.web import application
+from forum_web.web import application
 
 
 load_repo_env()

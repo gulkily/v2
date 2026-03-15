@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from forum_core.moderation import thread_is_hidden
-from forum_read_only.repository import Thread, is_task_root
+from forum_web.repository import Thread, is_task_root
 
 
 def load_task_threads(threads: list[Thread], moderation_state) -> list[Thread]:

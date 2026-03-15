@@ -8,7 +8,7 @@ from pathlib import Path
 
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
-from forum_read_only.repository import Post, index_posts, load_posts, parse_post_text
+from forum_web.repository import Post, index_posts, load_posts, parse_post_text
 
 
 class PostingError(Exception):
