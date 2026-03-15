@@ -1,0 +1,11 @@
+## Stage 1 - profile update entry point and dedicated page shell
+- Changes:
+  - Added a clear `update username` action link to the existing profile page so the browser flow is discoverable from the canonical read surface.
+  - Added a dedicated `/profiles/<identity-slug>/update` page with resolved identity context, a focused display-name field, and placeholder form structure for the later browser-signing stages.
+  - Added route handling plus focused smoke tests for the new profile-update page.
+- Verification:
+  - Ran `python3 -m unittest discover -s tests -p 'test_profile_update_page.py'` and confirmed the profile page links to the update flow and the dedicated update page renders the expected identity context.
+  - Ran `python3 -m unittest discover -s tests -p 'test_compose_reply_page.py'` to confirm the existing reply compose page still renders correctly.
+  - Ran `python3 -m py_compile forum_read_only/web.py`.
+- Notes:
+  - The page shell is intentionally static at this stage; the browser signing asset is wired in Stage 2.
