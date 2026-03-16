@@ -623,12 +623,22 @@ async function main() {
   const signatureOutput = $("signature-output");
   const responseOutput = $("response-output");
   const signSubmitButton = $("sign-submit-button");
+  const removeUnsupportedButton = $("remove-unsupported-button");
   const draftContext = composeDraftContext(commandName, defaults);
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
   let currentKeys = null;
   let pendingDraftTimer = 0;
 
-  if (!form || !privateKeyInput || !publicKeyOutput || !payloadOutput || !signatureOutput || !responseOutput || !signSubmitButton) {
+  if (
+    !form
+    || !privateKeyInput
+    || !publicKeyOutput
+    || !payloadOutput
+    || !signatureOutput
+    || !responseOutput
+    || !signSubmitButton
+    || !removeUnsupportedButton
+  ) {
     return;
   }
 
@@ -774,6 +784,7 @@ async function main() {
     } else {
       updateComposeNormalizationStatus("");
     }
+    removeUnsupportedButton.disabled = result.unsupportedCount === 0;
     return result;
   }
 
@@ -820,6 +831,14 @@ async function main() {
     } catch (error) {
       setStatus("key-status", `Key import failed: ${error.message}`);
     }
+  });
+
+  removeUnsupportedButton.addEventListener("click", () => {
+    normalizeBodyInput({ removeUnsupported: true });
+    updatePayloadPreview(state, commandName, defaults);
+    signatureOutput.value = "";
+    responseOutput.value = "";
+    scheduleDraftSave();
   });
 
   if (state.body) {
