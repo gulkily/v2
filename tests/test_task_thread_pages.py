@@ -35,6 +35,17 @@ class TaskThreadPagesTests(unittest.TestCase):
             Ship a task thread through the normal discussion flow.
             """,
         )
+        self.write_record(
+            "records/posts/reply-20260316093045-follow-up-note-12345678.txt",
+            """
+            Post-ID: reply-20260316093045-follow-up-note-12345678
+            Board-Tags: planning
+            Thread-ID: T01
+            Parent-ID: T01
+
+            Follow-up task note.
+            """,
+        )
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -113,6 +124,26 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn("0.35", body)
         self.assertIn("/threads/T00", body)
         self.assertIn("/compose/reply?thread_id=T01&parent_id=T01", body)
+
+    def test_task_thread_page_hides_low_value_slug_metadata_and_formats_permalink(self) -> None:
+        status, _, body = self.get("/threads/T01")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn('<p class="post-id">', body)
+        self.assertNotIn('<p class="post-tags">', body)
+        self.assertNotIn('<p class="post-relation">', body)
+        self.assertIn("Mar 16, 2026 at 09:30", body)
+        self.assertNotIn(">permalink<", body)
+
+    def test_post_permalink_page_uses_same_compact_metadata(self) -> None:
+        status, _, body = self.get("/posts/reply-20260316093045-follow-up-note-12345678")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn('<p class="post-id">', body)
+        self.assertNotIn('<p class="post-tags">', body)
+        self.assertNotIn('<p class="post-relation">', body)
+        self.assertIn("Mar 16, 2026 at 09:30", body)
+        self.assertNotIn(">permalink<", body)
 
     def test_task_detail_page_shows_mark_done_action(self) -> None:
         status, _, body = self.get("/planning/tasks/T01")

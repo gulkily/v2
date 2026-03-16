@@ -3,7 +3,9 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 from pathlib import Path
+from datetime import datetime
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
@@ -347,6 +349,7 @@ def render_thread(thread_id: str) -> str:
             thread.root,
             root_thread_id=thread.root.post_id,
             identity_context=identity_context,
+            compact_thread_view=True,
         ),
         replies_html="".join(
             render_post_card(
@@ -354,6 +357,7 @@ def render_thread(thread_id: str) -> str:
                 root_thread_id=thread.root.post_id,
                 identity_context=identity_context,
                 hidden=post_is_hidden(moderation_state, reply.post_id, thread.root.post_id),
+                compact_thread_view=True,
             )
             for reply in thread.replies
         ),
@@ -404,6 +408,7 @@ def render_post(post_id: str) -> str:
             root_thread_id=thread_target,
             identity_context=identity_context,
             hidden=hidden,
+            compact_thread_view=True,
         ),
     )
     return render_page(
@@ -574,14 +579,13 @@ def render_profile_update_page(identity_id: str) -> str:
     )
 
 
-def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False) -> str:
-    board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
+def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False, compact_thread_view: bool = False) -> str:
     subject_html = ""
     if post.subject:
         subject_html = f'<h3 class="post-subject">{html.escape(post.subject)}</h3>'
 
     relation_html = ""
-    if not post.is_root:
+    if not compact_thread_view and not post.is_root:
         relation_html = (
             f'<p class="post-relation">thread <a href="/threads/{html.escape(root_thread_id)}">{html.escape(root_thread_id)}</a>'
             f' · parent <a href="/posts/{html.escape(post.parent_id or "")}">{html.escape(post.parent_id or "")}</a></p>'
@@ -606,20 +610,38 @@ def render_post_card(post, *, root_thread_id: str, identity_context, hidden: boo
         else f'<div class="post-body">{render_body_html(post.body)}</div>'
     )
     hidden_class = " post-card--hidden" if hidden else ""
+    meta_html = ""
+    if not compact_thread_view:
+        board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
+        meta_html = (
+            '<div class="post-meta-row">'
+            f'<p class="post-id">{html.escape(post.post_id)}</p>'
+            f'<p class="post-tags">{board_tags}</p>'
+            "</div>"
+        )
+    permalink_label = format_post_permalink_label(post.post_id)
 
     return (
         f'<article class="post-card{hidden_class}">'
-        '<div class="post-meta-row">'
-        f'<p class="post-id">{html.escape(post.post_id)}</p>'
-        f'<p class="post-tags">{board_tags}</p>'
-        "</div>"
+        f"{meta_html}"
         f"{subject_html}"
         f"{identity_html}"
         f"{relation_html}"
         f"{body_html}"
-        f'<p class="post-link"><a href="/posts/{html.escape(post.post_id)}">permalink</a></p>'
+        f'<p class="post-link"><a href="/posts/{html.escape(post.post_id)}">{html.escape(permalink_label)}</a></p>'
         "</article>"
     )
+
+
+def format_post_permalink_label(post_id: str) -> str:
+    match = re.search(r"-(\d{14})-", post_id)
+    if match is None:
+        return "View post"
+    try:
+        timestamp = datetime.strptime(match.group(1), "%Y%m%d%H%M%S")
+    except ValueError:
+        return "View post"
+    return timestamp.strftime("%b %d, %Y at %H:%M")
 
 
 def render_compose_reference(post, *, root_thread_id: str, identity_context) -> str:
