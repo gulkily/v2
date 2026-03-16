@@ -61,6 +61,8 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('id="compose-normalization-status"', body)
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
+        self.assertNotIn("<h2>Compose a signed thread</h2>", body)
+        self.assertNotIn(">Signed Post<", body)
         self.assertNotIn("Only the body is typed manually", body)
         self.assertNotIn(">Technical details<", body)
         self.assertIn(">Advanced<", body)

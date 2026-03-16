@@ -124,6 +124,8 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn("0.35", body)
         self.assertIn("/threads/T00", body)
         self.assertIn("/compose/reply?thread_id=T01&parent_id=T01", body)
+        self.assertNotIn("<h2>Example task thread</h2>", body)
+        self.assertEqual(body.count("Example task thread"), 2)
 
     def test_task_thread_page_hides_low_value_slug_metadata_and_formats_permalink(self) -> None:
         status, _, body = self.get("/threads/T01")

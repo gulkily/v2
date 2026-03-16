@@ -89,6 +89,8 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertNotIn('<p class="post-id">', body)
         self.assertNotIn('<p class="post-tags">', body)
         self.assertNotIn('<p class="post-relation">', body)
+        self.assertNotIn("<h2>Compose a signed reply</h2>", body)
+        self.assertNotIn(">Signed Post<", body)
         self.assertIn('id="signed-post-form"', body)
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)

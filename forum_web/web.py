@@ -304,7 +304,7 @@ def render_thread(thread_id: str) -> str:
         breadcrumb_html=render_breadcrumb(
             [
                 ('/', 'board index'),
-                ('/threads/' + thread.root.post_id, thread.root.subject or thread.root.post_id),
+                ('/threads/' + thread.root.post_id, 'thread'),
             ]
         ),
         thread_heading=html.escape(thread.root.subject or thread.root.post_id),
@@ -316,6 +316,7 @@ def render_thread(thread_id: str) -> str:
             root_thread_id=thread.root.post_id,
             identity_context=identity_context,
             compact_thread_view=True,
+            show_subject=False,
         ),
         replies_html="".join(
             render_post_card(
@@ -545,9 +546,9 @@ def render_profile_update_page(identity_id: str) -> str:
     )
 
 
-def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False, compact_thread_view: bool = False) -> str:
+def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False, compact_thread_view: bool = False, show_subject: bool = True) -> str:
     subject_html = ""
-    if post.subject:
+    if show_subject and post.subject:
         subject_html = f'<h3 class="post-subject">{html.escape(post.subject)}</h3>'
 
     relation_html = ""
