@@ -1,10 +1,10 @@
-<section class="panel">
+<section class="panel page-section">
   ${breadcrumb_html}
-  <div class="section-head">
+  <div class="section-head page-lede">
     <h2>${update_heading}</h2>
     <p>${update_subhead}</p>
   </div>
-  <div class="profile-grid">
+  <div class="detail-grid">
     <p><strong>Current display name:</strong> <code>${current_display_name}</code></p>
     <p><strong>Resolved Identity-ID:</strong> <code>${identity_id}</code></p>
     <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
@@ -14,14 +14,14 @@
 
 <section
   id="profile-update-app"
-  class="panel compose-panel"
+  class="panel compose-panel page-section"
   data-command="update_profile"
   data-endpoint="/api/update_profile"
   data-dry-run="${dry_run_value}"
   data-source-identity-id="${source_identity_id}"
   data-profile-slug="${profile_slug}"
 >
-  <div class="section-head">
+  <div class="section-head page-lede">
     <h2>Signed Username Update</h2>
     <p>The browser will build one canonical profile-update payload for this resolved identity, sign it locally, and submit it directly to repository-backed storage.</p>
   </div>
@@ -39,11 +39,11 @@
   <p id="submit-status" class="status-note">Waiting for signed submission.</p>
 </section>
 
-<details class="panel compose-details">
+<details class="panel compose-details page-section">
   <summary>Technical details</summary>
   <div class="compose-grid">
     <section class="compose-card">
-      <div class="section-head">
+      <div class="section-head page-lede">
         <h2>Key material</h2>
         <p>Reuse the local key for this profile when available, or import the matching private key before signing.</p>
       </div>
@@ -62,7 +62,7 @@
     </section>
 
     <section class="compose-card">
-      <div class="section-head">
+      <div class="section-head page-lede">
         <h2>Derived payload</h2>
         <p>The browser derives the canonical payload, detached signature, and shows the exact server response.</p>
       </div>

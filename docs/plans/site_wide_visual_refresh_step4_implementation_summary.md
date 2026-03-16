@@ -18,3 +18,13 @@
   - Ran a direct shell smoke check with `python - <<'PY' ... render_not_found() ... PY` and confirmed standard pages now render through the new `site-header--page` shell.
 - Notes:
   - This stage keeps existing routes and content hierarchy intact while shifting the read surfaces onto the refreshed visual system.
+
+## Stage 3 - Write and planning surface restyle
+- Changes:
+  - Restyled compose, profile update, task priorities, and task detail templates around the same page-section and page-lede structure used by the read surfaces.
+  - Extended shared form, button, compose-card, task-table, and task-metadata styling so write and planning pages match the calmer site-wide shell without changing DOM hooks.
+- Verification:
+  - Ran `python -m unittest tests.test_compose_thread_page tests.test_profile_update_page tests.test_task_priorities_page tests.test_task_thread_pages` and confirmed all 17 tests passed.
+  - Ran a direct shell smoke check with `python - <<'PY' ... render_page(...) ... PY` and confirmed standard write/planning pages render with the shared `site-header--page` shell and `site-footer`.
+- Notes:
+  - Existing ids, data attributes, and table hooks were preserved so browser-signing and task-priority behavior remain unchanged under the new presentation.

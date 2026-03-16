@@ -481,8 +481,8 @@ input,
 textarea {
   width: 100%;
   padding: 0.8rem 0.9rem;
-  border: 1px solid rgba(139, 94, 52, 0.2);
-  border-radius: 14px;
+  border: 1px solid var(--accent-soft);
+  border-radius: 0;
   background: rgba(255, 251, 244, 0.96);
   color: var(--ink);
 }
@@ -493,9 +493,9 @@ textarea {
 
 button {
   padding: 0.8rem 1rem;
-  border: 1px solid rgba(139, 94, 52, 0.22);
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 247, 235, 0.98), rgba(239, 223, 199, 0.98));
+  border: 1px solid var(--accent-soft);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(255, 247, 235, 0.98), rgba(236, 228, 200, 0.98));
   color: var(--ink);
   cursor: pointer;
 }
@@ -514,6 +514,9 @@ button:disabled {
 .compose-card {
   display: grid;
   gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--accent-soft);
+  background: rgba(255, 249, 240, 0.72);
 }
 
 .compose-details summary {
@@ -565,6 +568,7 @@ button:disabled {
   width: 100%;
   min-width: 1080px;
   border-collapse: collapse;
+  border: 1px solid var(--accent-soft);
 }
 
 .priority-table .col-task-id {
@@ -610,7 +614,7 @@ button:disabled {
 }
 
 .priority-table tbody tr:nth-child(even) {
-  background: rgba(255, 249, 240, 0.54);
+  background: rgba(255, 249, 240, 0.68);
 }
 
 .priority-table tbody tr:target {
@@ -655,8 +659,8 @@ button:disabled {
 .task-id {
   display: inline-flex;
   padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(139, 94, 52, 0.1);
+  border-radius: 0;
+  background: rgba(45, 91, 115, 0.1);
   color: var(--accent);
   font: 0.82rem/1.2 "Courier New", Courier, monospace;
   text-decoration: none;
@@ -712,8 +716,8 @@ button:disabled {
   gap: 0.9rem;
   margin: 1rem 0;
   padding: 1rem;
-  border: 1px solid rgba(139, 94, 52, 0.16);
-  border-radius: 18px;
+  border: 1px solid var(--accent-soft);
+  border-radius: 0;
   background: rgba(255, 249, 240, 0.72);
 }
 
