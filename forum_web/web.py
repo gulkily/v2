@@ -1179,6 +1179,7 @@ def render_api_create_thread(environ, *, default_dry_run: bool) -> tuple[str, st
         dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
         signature_text=read_optional_text(payload, "signature"),
         public_key_text=read_optional_text(payload, "public_key"),
+        pow_stamp=read_optional_text(payload, "pow_stamp"),
         require_signature=True,
     )
     return "200 OK", render_submission_result(result)
@@ -1193,6 +1194,7 @@ def render_api_create_reply(environ, *, default_dry_run: bool) -> tuple[str, str
         dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
         signature_text=read_optional_text(payload, "signature"),
         public_key_text=read_optional_text(payload, "public_key"),
+        pow_stamp=read_optional_text(payload, "pow_stamp"),
         require_signature=True,
     )
     return "200 OK", render_submission_result(result)

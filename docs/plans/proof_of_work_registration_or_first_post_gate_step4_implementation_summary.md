@@ -7,3 +7,14 @@
   - Ran `python -m unittest tests.test_proof_of_work tests.test_runtime_env`.
 - Notes:
   - First-post detection is currently defined as "no identity bootstrap record exists for this signer fingerprint."
+
+## Stage 2 - Add canonical PoW verification to signed posting APIs
+- Changes:
+  - Added a canonical first-post PoW message format and verifier using SHA-256 leading-zero-bit difficulty.
+  - Extended signed create-thread/create-reply API requests to accept `pow_stamp`.
+  - Enforced PoW verification for signed first-post submissions, including dry-run preview requests, when the feature flag is enabled.
+- Verification:
+  - Ran `python -m unittest tests.test_proof_of_work tests.test_first_post_pow_submission`.
+- Notes:
+  - The accepted stamp format is `v1:<hex nonce>`.
+  - Verification binds the work to signer fingerprint, exact `Post-ID`, and configured difficulty.
