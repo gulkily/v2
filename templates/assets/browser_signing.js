@@ -305,14 +305,14 @@ function normalizeDisplayName(displayName) {
   return value;
 }
 
-function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = "" } = {}) {
+function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = "", postId = "" } = {}) {
   const body = normalizeNewlines(requiredTrimmed(form.body.value, "Body")).replace(/\n*$/, "\n");
-  const postId = generatePostId(commandName, body);
+  const resolvedPostId = postId || generatePostId(commandName, body);
   const boardTags = requiredTrimmed(defaults.boardTags, "Board-Tags");
   const subject = commandName === "create_thread" ? deriveSubjectFromBody(body) : "";
   const threadType = defaults.threadType ? normalizeSingleLineAscii(defaults.threadType, "Thread-Type") : "";
 
-  ensureAscii(postId, "Post-ID");
+  ensureAscii(resolvedPostId, "Post-ID");
   ensureAscii(boardTags, "Board-Tags");
   ensureAscii(subject, "Subject");
   ensureAscii(defaults.threadId, "Thread-ID");
@@ -320,7 +320,7 @@ function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = 
   ensureAscii(body, "Body");
 
   const headers = [
-    `Post-ID: ${postId}`,
+    `Post-ID: ${resolvedPostId}`,
     `Board-Tags: ${boardTags}`,
   ];
   if (subject) {
@@ -361,7 +361,7 @@ function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = 
 
   return {
     payload: `${headers.join("\n")}\n\n${body}`,
-    postId,
+    postId: resolvedPostId,
     subject,
   };
 }
@@ -777,7 +777,10 @@ async function main() {
               );
             },
           });
-          built = buildCanonicalPostPayload(state, commandName, defaults, { proofOfWork });
+          built = buildCanonicalPostPayload(state, commandName, defaults, {
+            proofOfWork,
+            postId: built.postId,
+          });
         }
       }
 
