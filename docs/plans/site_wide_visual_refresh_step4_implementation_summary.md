@@ -28,3 +28,12 @@
   - Ran a direct shell smoke check with `python - <<'PY' ... render_page(...) ... PY` and confirmed standard write/planning pages render with the shared `site-header--page` shell and `site-footer`.
 - Notes:
   - Existing ids, data attributes, and table hooks were preserved so browser-signing and task-priority behavior remain unchanged under the new presentation.
+
+## Stage 4 - Regression coverage
+- Changes:
+  - Updated homepage coverage to assert that the removed board-tag directory stays absent.
+  - Added representative shared-shell assertions across compose, profile-update, and task-detail tests so homepage, write, and planning surfaces all verify the new site-wide frame.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_compose_thread_page tests.test_profile_update_page tests.test_task_priorities_page tests.test_task_thread_pages tests.test_instance_info_page` and confirmed all 22 tests passed.
+- Notes:
+  - The coverage stays structural: it checks the presence of the new shared shell and the absence of the removed homepage section without tying the suite to every line of visual copy.

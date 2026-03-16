@@ -91,8 +91,8 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn("/threads/root-001", body)
         self.assertIn("Hello world", body)
         self.assertIn("First line preview.", body)
-        self.assertIn("#board-general", body)
-        self.assertIn("#board-planning", body)
+        self.assertNotIn("Browse by board tag", body)
+        self.assertNotIn('class="front-board-directory"', body)
 
     def test_board_index_preserves_key_destination_links(self) -> None:
         status, _, body = self.get("/")

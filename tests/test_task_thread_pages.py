@@ -118,6 +118,7 @@ class TaskThreadPagesTests(unittest.TestCase):
         status, _, body = self.get("/planning/tasks/T01")
 
         self.assertEqual(status, "200 OK")
+        self.assertIn('class="site-header site-header--page"', body)
         self.assertIn("Task actions", body)
         self.assertIn("/planning/tasks/T01/mark-done", body)
         self.assertIn("mark task done", body)

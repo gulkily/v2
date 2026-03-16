@@ -79,6 +79,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/update")
 
         self.assertEqual(status, "200 OK")
+        self.assertIn('class="site-header site-header--page"', body)
         self.assertIn("Update username", body)
         self.assertIn(DISPLAY_NAME, body)
         self.assertIn(IDENTITY_ID, body)

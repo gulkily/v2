@@ -52,6 +52,8 @@ class ComposeThreadPageTests(unittest.TestCase):
         status, _, body = self.get("/compose/thread")
 
         self.assertEqual(status, "200 OK")
+        self.assertIn('class="site-header site-header--page"', body)
+        self.assertIn('class="site-footer"', body)
         self.assertIn("Compose a signed thread", body)
         self.assertIn('id="signed-post-form"', body)
         self.assertIn('id="draft-status"', body)
