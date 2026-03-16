@@ -97,3 +97,12 @@ things that need to be folded into the dev process:
 	- should be able to select which content to include in the export (e.g. only threads with a certain tag, only threads created by a certain user, etc.)
 	- should be able to import the zip file back into the system, restoring all content and metadata as it was at the time of export.
 	- the zip file format should be text files with a clear and consistent structure, so that it can be easily parsed and understood by both humans and machines.
+
+- if user is submitting non-ascii text, do some basic attempts
+	- convert single quotes and double quotes to ascii equivalents
+	- convert common punctuation to ascii equivalents
+	- if the text contains a high percentage of non-ascii characters, display a warning to the user that their content may not be displayed correctly on all devices or platforms, and suggest that they use ascii characters where possible for better compatibility.
+
+- when a new thread is created, automatically use llm to assess its 0-1 zen value.
+	- this can be done by sending the thread content to an llm with a prompt that asks it to evaluate the zen value of the thread on a scale of 0 to 1, where 0 is not zen at all and 1 is extremely zen.
+	- the resulting zen value can then be stored in the database and displayed on the thread page, allowing users to quickly assess the zen quality of a thread before reading it.
