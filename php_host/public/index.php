@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/cache.php';
+
 function forum_app_root(): string
 {
     $configured = getenv('FORUM_PHP_APP_ROOT');
@@ -54,10 +56,11 @@ function forum_cgi_environment(): array
     return $environment;
 }
 
-function forum_apply_cgi_response(string $response): void
+function forum_parse_cgi_response(string $response): array
 {
     [$rawHeaders, $body] = array_pad(preg_split("/\r?\n\r?\n/", $response, 2), 2, '');
     $statusCode = 200;
+    $headers = [];
     foreach (preg_split("/\r?\n/", trim($rawHeaders)) as $line) {
         if ($line === '') {
             continue;
@@ -65,15 +68,37 @@ function forum_apply_cgi_response(string $response): void
         if (stripos($line, 'Status:') === 0) {
             $statusLine = trim(substr($line, 7));
             $statusCode = (int) strtok($statusLine, ' ');
-            http_response_code($statusCode);
             continue;
         }
+        $headers[] = $line;
+    }
+
+    return [
+        'status_code' => $statusCode,
+        'headers' => $headers,
+        'body' => $body,
+    ];
+}
+
+function forum_apply_response_headers(array $headers): void
+{
+    foreach ($headers as $line) {
         header($line, false);
     }
+}
+
+function forum_apply_cgi_response(string $response, array $extraHeaders = []): array
+{
+    $parsed = forum_parse_cgi_response($response);
+    $statusCode = (int) $parsed['status_code'];
     if ($statusCode === 0) {
-        http_response_code(500);
+        $statusCode = 500;
     }
-    echo $body;
+    http_response_code($statusCode);
+    forum_apply_response_headers($parsed['headers']);
+    forum_apply_response_headers($extraHeaders);
+    echo $parsed['body'];
+    return $parsed;
 }
 
 function forum_input_stream()
@@ -86,6 +111,12 @@ function forum_input_stream()
         fclose($input);
     }
     return fopen('php://stdin', 'rb');
+}
+
+$cachedResponse = forum_read_cached_response();
+if (is_string($cachedResponse)) {
+    forum_apply_cgi_response($cachedResponse, array_merge(['X-Forum-Php-Cache: HIT'], forum_asset_cache_headers()));
+    exit;
 }
 
 $appRoot = forum_app_root();
@@ -127,4 +158,7 @@ if ($exitCode !== 0) {
     exit;
 }
 
-forum_apply_cgi_response($stdout === false ? '' : $stdout);
+$response = $stdout === false ? '' : $stdout;
+$parsed = forum_parse_cgi_response($response);
+forum_store_cached_response($parsed, $response);
+forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], forum_asset_cache_headers()));
