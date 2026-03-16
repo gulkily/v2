@@ -623,6 +623,7 @@ async function main() {
   const signatureOutput = $("signature-output");
   const responseOutput = $("response-output");
   const signSubmitButton = $("sign-submit-button");
+  const normalizationActions = $("compose-normalization-actions");
   const removeUnsupportedButton = $("remove-unsupported-button");
   const draftContext = composeDraftContext(commandName, defaults);
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
@@ -637,6 +638,7 @@ async function main() {
     || !signatureOutput
     || !responseOutput
     || !signSubmitButton
+    || !normalizationActions
     || !removeUnsupportedButton
   ) {
     return;
@@ -784,6 +786,7 @@ async function main() {
     } else {
       updateComposeNormalizationStatus("");
     }
+    normalizationActions.hidden = result.unsupportedCount === 0;
     removeUnsupportedButton.disabled = result.unsupportedCount === 0;
     return result;
   }

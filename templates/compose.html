@@ -20,13 +20,15 @@ ${reply_target_html}
     </label>
     ${extra_fields_html}
     <div class="action-row">
-      <button id="remove-unsupported-button" type="button">Remove Unsupported Characters</button>
       <button id="sign-submit-button" type="submit">${submit_label}</button>
     </div>
   </form>
   <p id="draft-status" class="status-note">Drafts are saved locally in this browser.</p>
   <p id="key-status" class="status-note">Preparing local signing key...</p>
   <p id="compose-normalization-status" class="status-note"></p>
+  <div id="compose-normalization-actions" class="action-row" hidden>
+    <button id="remove-unsupported-button" type="button" disabled>Remove unsupported characters</button>
+  </div>
   <p id="submit-status" class="status-note">Waiting for signed submission.</p>
 </section>
 
