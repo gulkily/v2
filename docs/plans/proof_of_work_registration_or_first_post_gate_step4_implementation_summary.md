@@ -28,3 +28,12 @@
   - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_first_post_pow_submission`.
 - Notes:
   - When the feature flag is enabled, signed thread and reply compose both compute PoW before preview/submit; the server still decides whether the stamp is required for that signer.
+
+## Stage 4 - Cover failure modes and operator-facing defaults
+- Changes:
+  - Added regression coverage for missing-stamp rejection, valid-stamp acceptance, dry-run enforcement, and established-identity bypass behavior.
+  - Kept operator-facing defaults in `.env.example` as the single configuration surface.
+- Verification:
+  - Ran `python -m unittest tests.test_proof_of_work tests.test_first_post_pow_submission tests.test_compose_thread_page tests.test_compose_reply_page tests.test_thread_auto_reply`.
+- Notes:
+  - Existing signed identities are not blocked by the first-post PoW gate once their bootstrap record exists.
