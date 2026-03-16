@@ -29,6 +29,16 @@ The existing Python code remains canonical:
 
 The PHP layer is only a thin adapter for host compatibility. It must not reimplement routing, rendering, payload validation, repository writes, or API response rules.
 
+## PHP Microcache Boundary
+The sample PHP adapter includes a short-lived file microcache for explicitly safe public `GET` routes. This cache is adapter-only:
+
+- canonical rendering still comes from the Python read surface
+- write endpoints remain uncached
+- successful writes routed through the PHP shim clear cached public reads
+- canonical static asset routes receive explicit cache headers
+
+The adapter allowlist is intentionally narrow. It is meant for public read routes such as `/`, thread pages, post pages, `/instance/`, `/llms.txt`, and selected read APIs. Compose flows, signed submission flows, and request-context-sensitive behavior should not be added to the cache allowlist casually.
+
 ## Planned Public Layout
 The supported installation shape assumes:
 
@@ -63,10 +73,22 @@ Any host-specific glue should stay inside the adapter and deployment docs, not s
 5. Set `FORUM_REPO_ROOT` to the forum data repository root when runtime data should live somewhere other than the application checkout.
 6. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
 7. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
+8. Confirm the PHP front controller can write to a cache directory. By default it uses `sys_get_temp_dir() . '/forum_php_cache'`, or you can set `FORUM_PHP_CACHE_DIR` to a host-specific writable path.
+9. If needed, tune the short read-cache lifetime with `FORUM_PHP_MICROCACHE_TTL`. The default is 5 seconds and should stay short unless you are willing to accept longer read staleness.
+
+## Adapter Cache Settings
+- `FORUM_PHP_APP_ROOT`: optional adapter-only override for locating the deployed Python application checkout.
+- `FORUM_PHP_CACHE_DIR`: optional writable directory for PHP-side microcache files.
+- `FORUM_PHP_MICROCACHE_TTL`: optional short TTL in seconds for allowlisted public read routes.
+
+These settings affect only the PHP compatibility layer. They do not change the canonical meaning of `FORUM_REPO_ROOT` or alter Python route behavior.
 
 ## Post-Install Checks
 - Request `/` and confirm the board index renders through the PHP front controller.
+- Request `/` twice in quick succession and confirm the second response is served from the PHP cache layer, for example by checking the adapter's `X-Forum-Php-Cache` response header for `HIT`.
 - Request `/threads/<existing-thread-id>` and confirm a thread page renders.
 - Request `/assets/site.css` and confirm the canonical asset path still resolves.
+- Confirm `/assets/site.css` includes an explicit `Cache-Control` header.
 - Open `/compose/thread` and confirm the page still targets `/api/create_thread`.
 - Submit one signed thread and one signed reply, then confirm git commits and stored record files appear in the forum repository.
+- After a successful write through the PHP-hosted path, request `/` or the affected thread again and confirm the adapter serves a fresh response rather than a stale cached copy.
