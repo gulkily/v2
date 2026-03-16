@@ -18,3 +18,13 @@
 - Notes:
   - The accepted stamp format is `v1:<hex nonce>`.
   - Verification binds the work to signer fingerprint, exact `Post-ID`, and configured difficulty.
+
+## Stage 3 - Extend browser signing compose flow to compute and submit PoW
+- Changes:
+  - Exposed PoW enablement and difficulty to compose pages through existing data attributes.
+  - Extended the shared browser signing script to derive the public-key fingerprint, solve the SHA-256 PoW in the browser, show progress in existing status text, and submit `pow_stamp`.
+  - Added compose-page coverage for the new PoW settings hooks.
+- Verification:
+  - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_first_post_pow_submission`.
+- Notes:
+  - When the feature flag is enabled, signed thread and reply compose both compute PoW before preview/submit; the server still decides whether the stamp is required for that signer.

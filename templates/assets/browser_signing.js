@@ -227,6 +227,7 @@ function composeDraftContext(commandName, defaults) {
 }
 
 function defaultContext(root) {
+  const rawDifficulty = Number.parseInt(root.dataset.powDifficulty || "0", 10);
   return {
     boardTags: normalizeBoardTags(root.dataset.boardTags || "general"),
     threadId: (root.dataset.threadId || "").trim(),
@@ -234,7 +235,67 @@ function defaultContext(root) {
     threadType: (root.dataset.threadType || "").trim(),
     sourceIdentityId: (root.dataset.sourceIdentityId || "").trim(),
     profileSlug: (root.dataset.profileSlug || "").trim(),
+    powEnabled: root.dataset.powEnabled === "true",
+    powDifficulty: Number.isFinite(rawDifficulty) && rawDifficulty > 0 ? rawDifficulty : 0,
   };
+}
+
+async function fingerprintFromPublicKey(armoredPublicKey) {
+  const publicKey = await openpgp.readKey({ armoredKey: armoredPublicKey });
+  return publicKey.getFingerprint().toUpperCase();
+}
+
+function buildPowMessage({ fingerprint, postId, difficulty, nonce }) {
+  return `forum-pow-v1\n${fingerprint}\n${postId}\n${difficulty}\n${nonce.toLowerCase()}\n`;
+}
+
+function countLeadingZeroBits(bytes) {
+  let count = 0;
+  for (const byte of bytes) {
+    if (byte === 0) {
+      count += 8;
+      continue;
+    }
+    for (let shift = 7; shift >= 0; shift -= 1) {
+      if ((byte & (1 << shift)) === 0) {
+        count += 1;
+      } else {
+        return count;
+      }
+    }
+  }
+  return count;
+}
+
+async function sha256Bytes(text) {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return new Uint8Array(digest);
+}
+
+async function solveProofOfWork({ fingerprint, postId, difficulty, onProgress }) {
+  let nonce = 0;
+  while (true) {
+    const candidate = nonce.toString(16);
+    const digest = await sha256Bytes(
+      buildPowMessage({
+        fingerprint,
+        postId,
+        difficulty,
+        nonce: candidate,
+      }),
+    );
+    if (countLeadingZeroBits(digest) >= difficulty) {
+      return `v1:${candidate}`;
+    }
+    nonce += 1;
+    if (nonce % 250 === 0) {
+      if (onProgress) {
+        onProgress(nonce);
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    }
+  }
 }
 
 function normalizeDisplayName(displayName) {
@@ -679,6 +740,23 @@ async function main() {
       payloadOutput.value = built.payload;
       setStatus("submit-status", "Signing payload...");
       const signature = await signPayload(built.payload, keys.privateKey);
+      let powStamp = null;
+
+      if (defaults.powEnabled && commandName !== "update_profile") {
+        const fingerprint = await fingerprintFromPublicKey(keys.publicKey);
+        setStatus("submit-status", `Computing proof-of-work (${defaults.powDifficulty} leading zero bits)...`);
+        powStamp = await solveProofOfWork({
+          fingerprint,
+          postId: built.postId,
+          difficulty: defaults.powDifficulty,
+          onProgress: (attempts) => {
+            setStatus(
+              "submit-status",
+              `Computing proof-of-work (${defaults.powDifficulty} leading zero bits, ${attempts} attempts)...`,
+            );
+          },
+        });
+      }
 
       signatureOutput.value = signature;
       setStatus("submit-status", submittingMessage());
@@ -692,6 +770,7 @@ async function main() {
           payload: built.payload,
           signature,
           public_key: keys.publicKey,
+          pow_stamp: powStamp,
           dry_run: dryRun,
         }),
       });

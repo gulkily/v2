@@ -48,7 +48,7 @@ class ComposeReplyPageTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def get(self, path: str, query_string: str) -> tuple[str, dict[str, str], str]:
+    def get(self, path: str, query_string: str, *, extra_env: dict[str, str] | None = None) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
             "QUERY_STRING": query_string,
@@ -62,7 +62,11 @@ class ComposeReplyPageTests(unittest.TestCase):
             response["status"] = status
             response["headers"] = headers
 
-        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
+        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
+        if extra_env:
+            env.update(extra_env)
+
+        with mock.patch.dict(os.environ, env):
             body = b"".join(application(environ, start_response)).decode("utf-8")
 
         return (
@@ -84,6 +88,20 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn("/posts/reply-001", body)
         self.assertIn('id="signed-post-form"', body)
         self.assertIn('id="draft-status"', body)
+
+    def test_compose_reply_page_exposes_pow_settings_when_enabled(self) -> None:
+        status, _, body = self.get(
+            "/compose/reply",
+            "thread_id=root-001&parent_id=reply-001",
+            extra_env={
+                "FORUM_ENABLE_FIRST_POST_POW": "1",
+                "FORUM_FIRST_POST_POW_DIFFICULTY": "10",
+            },
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('data-pow-enabled="true"', body)
+        self.assertIn('data-pow-difficulty="10"', body)
 
     def test_compose_reply_page_does_not_leak_hidden_parent_post(self) -> None:
         self.write_record(

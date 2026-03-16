@@ -10,6 +10,7 @@ from wsgiref.util import setup_testing_defaults
 from forum_core.instance_info import load_instance_info, render_public_value
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
+from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
 from forum_core.moderation import (
     derive_moderation_state,
@@ -1070,6 +1071,8 @@ def render_compose_page(
         thread_id_value=html.escape(thread_id),
         parent_id_value=html.escape(parent_id),
         thread_type_value=html.escape(thread_type),
+        pow_enabled_value="true" if first_post_pow_enabled() else "false",
+        pow_difficulty_value=str(first_post_pow_difficulty()),
         body_value="",
         extra_fields_html=extra_fields_html,
         submit_label="Sign and preview" if dry_run else "Sign and submit",
