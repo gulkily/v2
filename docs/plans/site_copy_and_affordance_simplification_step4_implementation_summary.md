@@ -25,3 +25,12 @@
   - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_profile_update_page` and confirmed all 7 tests passed.
 - Notes:
   - The compose/profile-update DOM hooks, ids, data attributes, and primary actions remain unchanged; only the surrounding scaffolding text was reduced.
+
+## Stage 4 - Regression coverage
+- Changes:
+  - Added representative absence checks for removed homepage affordances and trimmed copy on compose, profile-update, and task-priorities pages.
+  - Kept the coverage focused on structural simplification markers so the tests confirm what was removed without becoming copy-fragile.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_compose_thread_page tests.test_profile_update_page tests.test_task_priorities_page tests.test_task_thread_pages tests.test_instance_info_page` and confirmed all 24 tests passed.
+- Notes:
+  - The assertions focus on removed affordances and renamed secondary disclosures, while the existing tests continue to cover key actions and hooks.

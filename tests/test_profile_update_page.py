@@ -90,6 +90,8 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="private-key-input"', body)
         self.assertIn('id="payload-output"', body)
         self.assertIn("Sign and submit", body)
+        self.assertNotIn(">Technical details<", body)
+        self.assertIn(">Advanced<", body)
 
 
 if __name__ == "__main__":

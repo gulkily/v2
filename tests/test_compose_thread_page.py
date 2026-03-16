@@ -61,6 +61,9 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('id="compose-normalization-status"', body)
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
+        self.assertNotIn("Only the body is typed manually", body)
+        self.assertNotIn(">Technical details<", body)
+        self.assertIn(">Advanced<", body)
 
     def test_compose_thread_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get_with_env(

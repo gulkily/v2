@@ -91,6 +91,9 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn("/threads/root-001", body)
         self.assertIn("Hello world", body)
         self.assertIn("First line preview.", body)
+        self.assertNotIn('class="front-topic-strip"', body)
+        self.assertNotIn("What this view is", body)
+        self.assertNotIn("House style", body)
         self.assertNotIn("Browse by board tag", body)
         self.assertNotIn('class="front-board-directory"', body)
 

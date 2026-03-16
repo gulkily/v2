@@ -138,6 +138,7 @@ class TaskPrioritiesPageTests(unittest.TestCase):
         self.assertIn('class="page-shell page-shell-wide"', body)
         self.assertIn('href="/planning/task-priorities/?view=done"', body)
         self.assertIn('href="/planning/task-priorities/?view=all"', body)
+        self.assertNotIn("How to read this", body)
         self.assertNotIn("Future typed root", body)
 
     def test_done_task_view_shows_only_done_tasks(self) -> None:
