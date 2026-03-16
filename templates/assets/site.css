@@ -339,6 +339,22 @@ body {
   margin: 0;
 }
 
+.page-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.page-lede {
+  padding-bottom: 0.7rem;
+  border-bottom: 1px dotted var(--accent-soft);
+}
+
+.link-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
 .post-stack {
   display: grid;
   gap: 1rem;
@@ -346,9 +362,9 @@ body {
 
 .post-card {
   padding: 1rem;
-  border-radius: 20px;
-  border: 1px solid rgba(139, 94, 52, 0.16);
-  background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(247, 239, 226, 0.96));
+  border-radius: 0;
+  border: 1px solid var(--accent-soft);
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(244, 241, 232, 0.96));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
@@ -416,6 +432,16 @@ body {
   margin-bottom: 1rem;
 }
 
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.8rem 1rem;
+}
+
+.detail-grid > * {
+  margin: 0;
+}
+
 .profile-grid > * {
   margin: 0;
 }
@@ -434,8 +460,8 @@ body {
   overflow-x: auto;
   margin: 0;
   padding: 1rem;
-  border: 1px solid rgba(139, 94, 52, 0.16);
-  border-radius: 18px;
+  border: 1px solid var(--accent-soft);
+  border-radius: 0;
   background: rgba(255, 249, 240, 0.84);
   color: var(--ink);
   font: 0.82rem/1.45 "Courier New", Courier, monospace;

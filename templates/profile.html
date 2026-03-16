@@ -1,21 +1,21 @@
-<section class="panel">
+<section class="panel page-section">
   ${breadcrumb_html}
-  <div class="section-head">
+  <div class="section-head page-lede">
     <h2>${profile_heading}</h2>
     <p>${profile_subhead}</p>
   </div>
-  <div class="action-row">
+  <div class="action-row link-cluster">
     ${profile_action_html}
   </div>
   ${stat_html}
 </section>
 
-<section class="panel">
-  <div class="section-head">
+<section class="panel page-section">
+  <div class="section-head page-lede">
     <h2>Identity Resolution</h2>
     <p>This profile resolves one or more linked key-backed identities to a single canonical profile.</p>
   </div>
-  <div class="profile-grid">
+  <div class="detail-grid">
     <p><strong>Current display name:</strong> <code>${display_name}</code></p>
     <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
     <p><strong>Fallback label:</strong> <code>${fallback_display_name}</code></p>
@@ -26,18 +26,18 @@
     <p><strong>Bootstrap source thread:</strong> <a href="/threads/${bootstrap_thread_id}">${bootstrap_thread_id}</a></p>
     <p><strong>Bootstrap path:</strong> <code>${bootstrap_path}</code></p>
   </div>
-  <div class="profile-links">
+  <div class="profile-links link-cluster">
     ${member_identity_html}
   </div>
   <pre class="key-block">${public_key_text}</pre>
 </section>
 
-<section class="panel">
-  <div class="section-head">
+<section class="panel page-section">
+  <div class="section-head page-lede">
     <h2>Visible Signed Posts</h2>
     <p>These posts currently map to the same identity in repository state.</p>
   </div>
-  <div class="profile-links">
+  <div class="profile-links link-cluster">
     ${post_links_html}
   </div>
 </section>
