@@ -16,3 +16,12 @@
   - Ran `python -m unittest tests.test_instance_info_page tests.test_task_priorities_page tests.test_task_thread_pages tests.test_profile_update_page` and confirmed all 20 tests passed.
 - Notes:
   - This stage is strictly subtractive: routes, actions, structured data, and planning controls remain intact while the pages carry less framing copy.
+
+## Stage 3 - Write-surface copy cleanup
+- Changes:
+  - Removed repeated contextual and explanatory text from compose and profile-update pages while keeping the primary forms unchanged.
+  - Renamed the optional disclosure from `Technical details` to `Advanced` and trimmed the repeated explanatory paragraphs inside that secondary section.
+- Verification:
+  - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_profile_update_page` and confirmed all 7 tests passed.
+- Notes:
+  - The compose/profile-update DOM hooks, ids, data attributes, and primary actions remain unchanged; only the surrounding scaffolding text was reduced.

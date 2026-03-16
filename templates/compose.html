@@ -4,14 +4,12 @@
     <h2>${compose_heading}</h2>
     <p>${compose_text}</p>
   </div>
-  <p>${context_text}</p>
 </section>
 ${reply_target_html}
 
 <section id="compose-app" class="panel compose-panel page-section" data-command="${command_name}" data-endpoint="${endpoint_path}" data-dry-run="${dry_run_value}" data-board-tags="${board_tags_value}" data-thread-id="${thread_id_value}" data-parent-id="${parent_id_value}" data-thread-type="${thread_type_value}" data-pow-enabled="${pow_enabled_value}" data-pow-difficulty="${pow_difficulty_value}">
   <div class="section-head page-lede">
     <h2>Signed Post</h2>
-    <p>Only the body is typed manually. The browser prepares the key, canonical payload, detached signature, and submission automatically.</p>
   </div>
   <form id="signed-post-form" class="field-stack">
     <label class="field-stack" for="body-input">
@@ -33,12 +31,11 @@ ${reply_target_html}
 </section>
 
 <details class="panel compose-details page-section">
-  <summary>Technical details</summary>
+  <summary>Advanced</summary>
   <div class="compose-grid">
     <section class="compose-card">
       <div class="section-head page-lede">
         <h2>Key material</h2>
-        <p>A local key is generated automatically if none exists. You can replace it here if needed.</p>
       </div>
       <div class="action-row">
         <button id="generate-key-button" type="button">Generate New Key</button>
@@ -57,7 +54,6 @@ ${reply_target_html}
     <section class="compose-card">
       <div class="section-head page-lede">
         <h2>Derived payload</h2>
-        <p>The browser derives the canonical payload, detached signature, and shows the exact server response.</p>
       </div>
       <label class="field-stack" for="payload-output">
         <span>Canonical payload preview</span>

@@ -9,7 +9,6 @@
     <p><strong>Resolved Identity-ID:</strong> <code>${identity_id}</code></p>
     <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
   </div>
-  <p>${context_text}</p>
 </section>
 
 <section
@@ -23,7 +22,6 @@
 >
   <div class="section-head page-lede">
     <h2>Signed Username Update</h2>
-    <p>The browser will build one canonical profile-update payload for this resolved identity, sign it locally, and submit it directly to repository-backed storage.</p>
   </div>
   <form id="profile-update-form" class="field-stack">
     <label class="field-stack" for="display-name-input">
@@ -40,12 +38,11 @@
 </section>
 
 <details class="panel compose-details page-section">
-  <summary>Technical details</summary>
+  <summary>Advanced</summary>
   <div class="compose-grid">
     <section class="compose-card">
       <div class="section-head page-lede">
         <h2>Key material</h2>
-        <p>Reuse the local key for this profile when available, or import the matching private key before signing.</p>
       </div>
       <div class="action-row">
         <button id="generate-key-button" type="button">Generate New Key</button>
@@ -64,7 +61,6 @@
     <section class="compose-card">
       <div class="section-head page-lede">
         <h2>Derived payload</h2>
-        <p>The browser derives the canonical payload, detached signature, and shows the exact server response.</p>
       </div>
       <label class="field-stack" for="payload-output">
         <span>Canonical payload preview</span>
