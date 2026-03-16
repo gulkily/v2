@@ -221,6 +221,36 @@ def render_board_index_action_links() -> str:
     )
 
 
+def load_recent_records(*, limit: int = 12):
+    posts, _, _, _, _, identity_context = load_repository_state()
+    if limit <= 0:
+        return [], identity_context
+    recent = posts[-limit:]
+    return list(reversed(recent)), identity_context
+
+
+def git_status_summary(repo_root: Path) -> dict[str, str]:
+    info = load_instance_info(repo_root)
+    return {
+        "commit_id": info.commit_id or "unknown",
+        "commit_date": info.commit_date or "unknown",
+        "source_path": str(info.source_path),
+    }
+
+
+def build_site_activity_context(*, limit: int = 12) -> dict[str, object]:
+    repo_root = get_repo_root()
+    records, identity_context = load_recent_records(limit=limit)
+    git_summary = git_status_summary(repo_root)
+    return {
+        "recent_records": records,
+        "identity_context": identity_context,
+        "git_commit_id": git_summary["commit_id"],
+        "git_commit_date": git_summary["commit_date"],
+        "git_source_path": git_summary["source_path"],
+    }
+
+
 def render_board_index_header(context: dict[str, str]) -> str:
     return (
         '<header class="front-header">'
