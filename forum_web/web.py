@@ -152,6 +152,9 @@ def render_board_index() -> str:
         hero_title="Threads gathered straight from canonical text records",
         hero_text="This board view reads the git-tracked post files directly, groups thread roots by board tags, and keeps the dataset browsable without adding a database or durable index layer.",
         content_html=content,
+        page_header_html=render_board_index_header(context),
+        page_footer_html=render_board_index_footer(context["stats_html"]),
+        page_shell_class="page-shell-front",
     )
 
 
@@ -232,6 +235,35 @@ def render_board_index_action_links() -> str:
     )
 
 
+def render_board_index_header(context: dict[str, str]) -> str:
+    return (
+        '<header class="front-header">'
+        '<div class="front-ethos"><p>Kindness first. Clear words, useful threads, and no manipulative noise.</p></div>'
+        '<div class="front-branding">'
+        '<div class="front-brand-lockup">'
+        '<p class="front-mark">(*)</p>'
+        '<div>'
+        '<p class="front-site-title"><a href="/">Forum Reader</a></p>'
+        '<p class="front-site-tagline">calm threads from canonical text records</p>'
+        "</div>"
+        "</div>"
+        '<div class="front-brand-actions">'
+        '<a class="front-primary-link" href="/compose/thread">Post</a>'
+        '<p>share a signed thread or a useful update</p>'
+        "</div>"
+        "</div>"
+        '<div class="front-utility-row">'
+        '<nav class="front-nav" aria-label="Board actions">'
+        f'{context["action_links_html"]}'
+        "</nav>"
+        '<div class="front-topic-strip" aria-label="Board tags">'
+        f'{context["tags_html"]}'
+        "</div>"
+        "</div>"
+        "</header>"
+    )
+
+
 def render_board_index_sidebar_modules(board_tags: list[str]) -> str:
     tags_html = "".join(
         f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>'
@@ -243,6 +275,20 @@ def render_board_index_sidebar_modules(board_tags: list[str]) -> str:
         "<p>Each tag links to its section below.</p>"
         f'<div class="tag-list">{tags_html}</div>'
         "</section>"
+    )
+
+
+def render_board_index_footer(stats_html: str) -> str:
+    return (
+        '<footer class="front-footer">'
+        '<div class="front-footer-inner">'
+        '<div class="front-footer-copy">'
+        "<p>Best read with a clear mind and a modest browser window.</p>"
+        "<p>[ slow web ]</p>"
+        "</div>"
+        f"{stats_html}"
+        "</div>"
+        "</footer>"
     )
 
 

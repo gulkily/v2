@@ -22,14 +22,23 @@ def render_page(
     content_html: str,
     page_script_html: str = "",
     page_shell_class: str = "",
+    page_header_html: str | None = None,
+    page_footer_html: str = "",
 ) -> str:
     base = load_template("base.html")
+    if page_header_html is None:
+        page_header_html = (
+            '<header class="hero">'
+            f'<p class="hero-kicker">{html.escape(hero_kicker)}</p>'
+            f'<h1 class="hero-title">{html.escape(hero_title)}</h1>'
+            f'<p class="hero-text">{html.escape(hero_text)}</p>'
+            "</header>"
+        )
     return base.substitute(
         title=html.escape(title),
-        hero_kicker=html.escape(hero_kicker),
-        hero_title=html.escape(hero_title),
-        hero_text=html.escape(hero_text),
+        page_header_html=page_header_html,
         content_html=content_html,
+        page_footer_html=page_footer_html,
         page_script_html=page_script_html,
         page_shell_class=html.escape(page_shell_class),
     )

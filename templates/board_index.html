@@ -1,23 +1,41 @@
-<section class="panel">
-  <h2>Repository pulse</h2>
-  <p>The board index is rendered directly from canonical post files in the repository.</p>
-  <div class="action-row">
-    <a class="thread-chip" href="/compose/thread">compose a signed thread</a>
-    <a class="thread-chip" href="/instance/">instance info</a>
-    <a class="thread-chip" href="/moderation/">view moderation log</a>
-    <a class="thread-chip" href="/planning/task-priorities/">task priorities</a>
-  </div>
-  ${stats_html}
-</section>
+<section class="front-layout">
+  <section class="front-main-column" aria-labelledby="front-page-heading">
+    <div class="front-stream-head">
+      <div>
+        <p class="front-kicker">Quiet front page</p>
+        <h1 id="front-page-heading">Threads worth opening</h1>
+      </div>
+      <p>
+        The homepage stays text-first and repository-backed: open a thread, browse by board tag, or jump to a key forum tool without leaving the main flow.
+      </p>
+    </div>
 
-<section class="panel">
-  <div class="section-head">
-    <h2>Board tags</h2>
-    <p>Each tag links to its section below.</p>
-  </div>
-  <div class="tag-list">
-    ${tags_html}
-  </div>
-</section>
+    <section class="front-thread-stream" aria-label="Visible threads">
+      ${thread_rows_html}
+    </section>
 
-${board_sections_html}
+    <section class="panel front-board-directory">
+      <div class="section-head">
+        <h2>Browse by board tag</h2>
+        <p>Open the front page as a ranked stream first, then drop into the underlying board groupings when you want a narrower pass.</p>
+      </div>
+      ${board_sections_html}
+    </section>
+  </section>
+
+  <aside class="front-sidebar" aria-label="Homepage sidebar">
+    <section class="panel front-sidebar-note">
+      <h2>What this view is</h2>
+      <p>
+        This homepage replaces the old hero-and-card index with a calmer reading surface while still pointing at the same forum threads and tools.
+      </p>
+    </section>
+
+    <section class="panel front-sidebar-note">
+      <h2>House style</h2>
+      <p>Links stay visible, metadata stays compact, and the first goal is to help a reader decide what to open next.</p>
+    </section>
+
+    ${sidebar_modules_html}
+  </aside>
+</section>
