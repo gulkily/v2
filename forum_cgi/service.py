@@ -60,7 +60,6 @@ def submit_create_thread(
     dry_run: bool,
     signature_text: str | None = None,
     public_key_text: str | None = None,
-    pow_stamp: str | None = None,
     require_signature: bool = False,
 ) -> SubmissionResult:
     post = parse_payload(ensure_ascii_text(payload_text, field_name="payload"))
@@ -73,7 +72,6 @@ def submit_create_thread(
         dry_run=dry_run,
         signature_text=signature_text,
         public_key_text=public_key_text,
-        pow_stamp=pow_stamp,
         require_signature=require_signature,
     )
     return maybe_create_thread_auto_reply(post=post, repo_root=repo_root, dry_run=dry_run, result=result)
@@ -86,7 +84,6 @@ def submit_create_reply(
     dry_run: bool,
     signature_text: str | None = None,
     public_key_text: str | None = None,
-    pow_stamp: str | None = None,
     require_signature: bool = False,
 ) -> SubmissionResult:
     post = parse_payload(ensure_ascii_text(payload_text, field_name="payload"))
@@ -99,7 +96,6 @@ def submit_create_reply(
         dry_run=dry_run,
         signature_text=signature_text,
         public_key_text=public_key_text,
-        pow_stamp=pow_stamp,
         require_signature=require_signature,
     )
 
@@ -113,7 +109,6 @@ def _submit_post(
     dry_run: bool,
     signature_text: str | None,
     public_key_text: str | None,
-    pow_stamp: str | None,
     require_signature: bool,
 ) -> SubmissionResult:
     signer_fingerprint = None
@@ -156,7 +151,6 @@ def _submit_post(
                 verify_first_post_pow_stamp(
                     payload_text=payload_text,
                     signer_fingerprint=signer_fingerprint,
-                    stamp=pow_stamp or "",
                     difficulty=first_post_pow_difficulty(),
                 )
             except ValueError as exc:
@@ -233,7 +227,6 @@ def maybe_create_thread_auto_reply(
             dry_run=False,
             signature_text=auto_reply.signature_text,
             public_key_text=auto_reply.public_key_text,
-            pow_stamp=None,
             require_signature=auto_reply.signature_text is not None,
         )
     except (AutoReplyError, LLMProviderError, PostingError) as exc:

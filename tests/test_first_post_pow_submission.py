@@ -120,11 +120,16 @@ process.stdout.write(signature);
         return response["status"], dict(response["headers"]), body_text
 
     def build_thread_payload(self, *, post_id: str) -> str:
+        return self.build_thread_payload_with_pow(post_id=post_id, proof_of_work=None)
+
+    def build_thread_payload_with_pow(self, *, post_id: str, proof_of_work: str | None) -> str:
+        proof_header = f"Proof-Of-Work: {proof_of_work}\n" if proof_of_work else ""
         return dedent(
             f"""
             Post-ID: {post_id}
             Board-Tags: general
             Subject: First post pow
+            {proof_header}
 
             Hello from the first-post pow path.
             """
@@ -146,15 +151,13 @@ process.stdout.write(signature);
                 return f"v1:{candidate}"
             nonce += 1
 
-    def create_request_body(self, payload_text: str, *, dry_run: bool, pow_stamp: str | None) -> bytes:
+    def create_request_body(self, payload_text: str, *, dry_run: bool) -> bytes:
         request_payload: dict[str, object] = {
             "payload": payload_text,
             "signature": self.sign_payload(payload_text),
             "public_key": self.user_keys["publicKey"],
             "dry_run": dry_run,
         }
-        if pow_stamp is not None:
-            request_payload["pow_stamp"] = pow_stamp
         return json.dumps(request_payload).encode("utf-8")
 
     def write_identity_bootstrap(self) -> None:
@@ -176,7 +179,7 @@ process.stdout.write(signature);
         status, _, body = self.request(
             "/api/create_thread",
             method="POST",
-            body=self.create_request_body(payload_text, dry_run=False, pow_stamp=None),
+            body=self.create_request_body(payload_text, dry_run=False),
             extra_env={
                 "FORUM_ENABLE_FIRST_POST_POW": "1",
                 "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
@@ -186,16 +189,19 @@ process.stdout.write(signature);
 
         self.assertEqual(status, "400 Bad Request")
         self.assertIn("Error-Code: bad_request", body)
-        self.assertIn("Message: pow_stamp is required", body)
+        self.assertIn("Message: payload is missing Proof-Of-Work", body)
 
     def test_first_post_pow_accepts_valid_stamp(self) -> None:
-        payload_text = self.build_thread_payload(post_id="thread-pow-valid-001")
         pow_stamp = self.solve_pow(post_id="thread-pow-valid-001", difficulty=8)
+        payload_text = self.build_thread_payload_with_pow(
+            post_id="thread-pow-valid-001",
+            proof_of_work=pow_stamp,
+        )
 
         status, _, body = self.request(
             "/api/create_thread",
             method="POST",
-            body=self.create_request_body(payload_text, dry_run=False, pow_stamp=pow_stamp),
+            body=self.create_request_body(payload_text, dry_run=False),
             extra_env={
                 "FORUM_ENABLE_FIRST_POST_POW": "1",
                 "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
@@ -206,6 +212,8 @@ process.stdout.write(signature);
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: thread-pow-valid-001", body)
         self.assertIn("Identity-Bootstrap-Created: yes", body)
+        stored_post = (self.repo_root / "records" / "posts" / "thread-pow-valid-001.txt").read_text(encoding="ascii")
+        self.assertIn(f"Proof-Of-Work: {pow_stamp}", stored_post)
 
     def test_first_post_pow_applies_to_dry_run_preview(self) -> None:
         payload_text = self.build_thread_payload(post_id="thread-pow-preview-001")
@@ -213,7 +221,7 @@ process.stdout.write(signature);
         status, _, body = self.request(
             "/api/create_thread",
             method="POST",
-            body=self.create_request_body(payload_text, dry_run=True, pow_stamp=None),
+            body=self.create_request_body(payload_text, dry_run=True),
             extra_env={
                 "FORUM_ENABLE_FIRST_POST_POW": "1",
                 "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
@@ -222,7 +230,7 @@ process.stdout.write(signature);
         )
 
         self.assertEqual(status, "400 Bad Request")
-        self.assertIn("Message: pow_stamp is required", body)
+        self.assertIn("Message: payload is missing Proof-Of-Work", body)
 
     def test_existing_identity_bypasses_pow_requirement(self) -> None:
         self.write_identity_bootstrap()
@@ -231,7 +239,7 @@ process.stdout.write(signature);
         status, _, body = self.request(
             "/api/create_thread",
             method="POST",
-            body=self.create_request_body(payload_text, dry_run=False, pow_stamp=None),
+            body=self.create_request_body(payload_text, dry_run=False),
             extra_env={
                 "FORUM_ENABLE_FIRST_POST_POW": "1",
                 "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
@@ -242,6 +250,42 @@ process.stdout.write(signature);
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: thread-pow-established-001", body)
         self.assertIn("Identity-Bootstrap-Created: no", body)
+
+    def test_pow_requirement_endpoint_reports_first_post_state(self) -> None:
+        request_body = json.dumps({"public_key": self.user_keys["publicKey"]}).encode("utf-8")
+
+        status, headers, body = self.request(
+            "/api/pow_requirement",
+            method="POST",
+            body=request_body,
+            extra_env={
+                "FORUM_ENABLE_FIRST_POST_POW": "1",
+                "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
+            },
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json; charset=utf-8")
+        payload = json.loads(body)
+        self.assertTrue(payload["required"])
+        self.assertEqual(payload["difficulty"], 8)
+        self.assertEqual(payload["signer_fingerprint"], self.fingerprint)
+
+        self.write_identity_bootstrap()
+
+        status, _, body = self.request(
+            "/api/pow_requirement",
+            method="POST",
+            body=request_body,
+            extra_env={
+                "FORUM_ENABLE_FIRST_POST_POW": "1",
+                "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
+            },
+        )
+
+        self.assertEqual(status, "200 OK")
+        payload = json.loads(body)
+        self.assertFalse(payload["required"])
 
 
 if __name__ == "__main__":

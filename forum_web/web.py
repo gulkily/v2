@@ -11,6 +11,7 @@ from forum_core.instance_info import load_instance_info, render_public_value
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
+from forum_core.proof_of_work import pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
 from forum_core.moderation import (
     derive_moderation_state,
@@ -1182,7 +1183,6 @@ def render_api_create_thread(environ, *, default_dry_run: bool) -> tuple[str, st
         dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
         signature_text=read_optional_text(payload, "signature"),
         public_key_text=read_optional_text(payload, "public_key"),
-        pow_stamp=read_optional_text(payload, "pow_stamp"),
         require_signature=True,
     )
     return "200 OK", render_submission_result(result)
@@ -1197,10 +1197,28 @@ def render_api_create_reply(environ, *, default_dry_run: bool) -> tuple[str, str
         dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
         signature_text=read_optional_text(payload, "signature"),
         public_key_text=read_optional_text(payload, "public_key"),
-        pow_stamp=read_optional_text(payload, "pow_stamp"),
         require_signature=True,
     )
     return "200 OK", render_submission_result(result)
+
+
+def render_api_pow_requirement(environ) -> tuple[str, bytes, str]:
+    payload = read_json_request(environ)
+    repo_root = get_repo_root()
+    public_key_text = read_required_text(payload, "public_key")
+
+    signer_fingerprint, required = pow_requirement_for_public_key(
+        repo_root=repo_root,
+        public_key_text=public_key_text,
+    )
+    body = json.dumps(
+        {
+            "required": first_post_pow_enabled() and required,
+            "difficulty": first_post_pow_difficulty(),
+            "signer_fingerprint": signer_fingerprint,
+        }
+    ).encode("utf-8")
+    return "200 OK", body, "application/json; charset=utf-8"
 
 
 def render_api_moderate(environ, *, default_dry_run: bool) -> tuple[str, str]:
@@ -1273,6 +1291,17 @@ def application(environ, start_response):
             status, body_text = render_api_create_reply(environ, default_dry_run=False)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/pow_requirement":
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body, content_type = render_api_pow_requirement(environ)
+            headers = [("Content-Type", content_type)]
             start_response(status, headers)
             return [body]
 

@@ -30,6 +30,7 @@ class Post:
     public_key_path: Path | None = None
     signer_fingerprint: str | None = None
     identity_id: str | None = None
+    proof_of_work: str | None = None
 
     @property
     def is_root(self) -> bool:
@@ -130,6 +131,7 @@ def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
     subject = headers.get("Subject", "")
     thread_id = headers.get("Thread-ID")
     parent_id = headers.get("Parent-ID")
+    proof_of_work = headers.get("Proof-Of-Work")
     thread_type = normalize_thread_type(headers.get("Thread-Type"))
     task_metadata = None
 
@@ -155,6 +157,7 @@ def parse_post_text(raw_text: str, *, source_path: Path | None = None) -> Post:
         path=source_path or Path("<request>"),
         thread_type=thread_type,
         task_metadata=task_metadata,
+        proof_of_work=proof_of_work,
     )
 
 
@@ -183,6 +186,7 @@ def parse_post(path: Path) -> Post:
         public_key_path=public_key_path,
         signer_fingerprint=signer_fingerprint,
         identity_id=identity_id,
+        proof_of_work=post.proof_of_work,
     )
 
 

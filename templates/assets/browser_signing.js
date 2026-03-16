@@ -240,11 +240,6 @@ function defaultContext(root) {
   };
 }
 
-async function fingerprintFromPublicKey(armoredPublicKey) {
-  const publicKey = await openpgp.readKey({ armoredKey: armoredPublicKey });
-  return publicKey.getFingerprint().toUpperCase();
-}
-
 function buildPowMessage({ fingerprint, postId, difficulty, nonce }) {
   return `forum-pow-v1\n${fingerprint}\n${postId}\n${difficulty}\n${nonce.toLowerCase()}\n`;
 }
@@ -310,7 +305,7 @@ function normalizeDisplayName(displayName) {
   return value;
 }
 
-function buildCanonicalPostPayload(form, commandName, defaults) {
+function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = "" } = {}) {
   const body = normalizeNewlines(requiredTrimmed(form.body.value, "Body")).replace(/\n*$/, "\n");
   const postId = generatePostId(commandName, body);
   const boardTags = requiredTrimmed(defaults.boardTags, "Board-Tags");
@@ -330,6 +325,9 @@ function buildCanonicalPostPayload(form, commandName, defaults) {
   ];
   if (subject) {
     headers.push(`Subject: ${subject}`);
+  }
+  if (proofOfWork) {
+    headers.push(`Proof-Of-Work: ${normalizeSingleLineAscii(proofOfWork, "Proof-Of-Work")}`);
   }
   if (threadType) {
     headers.push(`Thread-Type: ${threadType}`);
@@ -527,6 +525,31 @@ async function ensureLocalKeys({ forceGenerate = false, importedPrivateKey = "" 
 
   saveKeys(privateKey, publicKey);
   return { privateKey, publicKey };
+}
+
+async function fetchPowRequirement(publicKey) {
+  const response = await fetch("/api/pow_requirement", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      public_key: publicKey,
+    }),
+  });
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(responseText.trim() || `PoW requirement lookup failed with status ${response.status}`);
+  }
+  const payload = await response.json();
+  if (!payload || typeof payload !== "object") {
+    throw new Error("PoW requirement lookup returned an invalid response");
+  }
+  return {
+    required: payload.required === true,
+    difficulty: Number.isInteger(payload.difficulty) ? payload.difficulty : 0,
+    signerFingerprint: typeof payload.signer_fingerprint === "string" ? payload.signer_fingerprint : "",
+  };
 }
 
 async function main() {
@@ -736,28 +759,31 @@ async function main() {
 
     try {
       const keys = await resolveSubmitKeys();
-      const built = buildCanonicalPayload(state, commandName, defaults);
+      let built = buildCanonicalPayload(state, commandName, defaults);
+
+      if (defaults.powEnabled && commandName !== "update_profile") {
+        setStatus("submit-status", "Checking whether proof-of-work is required...");
+        const requirement = await fetchPowRequirement(keys.publicKey);
+        if (requirement.required) {
+          setStatus("submit-status", `Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
+          const proofOfWork = await solveProofOfWork({
+            fingerprint: requirement.signerFingerprint,
+            postId: built.postId,
+            difficulty: requirement.difficulty,
+            onProgress: (attempts) => {
+              setStatus(
+                "submit-status",
+                `Computing proof-of-work (${requirement.difficulty} leading zero bits, ${attempts} attempts)...`,
+              );
+            },
+          });
+          built = buildCanonicalPostPayload(state, commandName, defaults, { proofOfWork });
+        }
+      }
+
       payloadOutput.value = built.payload;
       setStatus("submit-status", "Signing payload...");
       const signature = await signPayload(built.payload, keys.privateKey);
-      let powStamp = null;
-
-      if (defaults.powEnabled && commandName !== "update_profile") {
-        const fingerprint = await fingerprintFromPublicKey(keys.publicKey);
-        setStatus("submit-status", `Computing proof-of-work (${defaults.powDifficulty} leading zero bits)...`);
-        powStamp = await solveProofOfWork({
-          fingerprint,
-          postId: built.postId,
-          difficulty: defaults.powDifficulty,
-          onProgress: (attempts) => {
-            setStatus(
-              "submit-status",
-              `Computing proof-of-work (${defaults.powDifficulty} leading zero bits, ${attempts} attempts)...`,
-            );
-          },
-        });
-      }
-
       signatureOutput.value = signature;
       setStatus("submit-status", submittingMessage());
 
@@ -770,7 +796,6 @@ async function main() {
           payload: built.payload,
           signature,
           public_key: keys.publicKey,
-          pow_stamp: powStamp,
           dry_run: dryRun,
         }),
       });

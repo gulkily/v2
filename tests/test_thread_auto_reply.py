@@ -113,7 +113,10 @@ process.stdout.write(signature);
             response["status"] = status
             response["headers"] = headers
 
-        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
+        env = {
+            "FORUM_REPO_ROOT": str(self.repo_root),
+            "FORUM_ENABLE_FIRST_POST_POW": "0",
+        }
         if extra_env:
             env.update(extra_env)
 
