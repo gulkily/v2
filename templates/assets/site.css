@@ -865,38 +865,26 @@ button:disabled {
 .front-primary-link:focus-visible,
 .front-nav a:hover,
 .front-nav a:focus-visible,
-.front-topic-strip a:hover,
-.front-topic-strip a:focus-visible,
 .board-index-thread-main h3 a:hover,
 .board-index-thread-main h3 a:focus-visible {
   background: #e4ece6;
   text-decoration: underline;
 }
 
-.front-nav,
-.front-topic-strip {
+.front-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.front-nav .thread-chip,
-.front-topic-strip .tag-chip {
+.front-nav .thread-chip {
   padding: 0.38rem 0.6rem;
   border-radius: 0;
   background: transparent;
 }
 
 .front-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.9fr);
-  gap: 1rem;
-}
-
-.front-main-column,
-.front-sidebar {
-  display: grid;
-  gap: 1rem;
+  display: block;
 }
 
 .front-stream-head,
@@ -1030,8 +1018,7 @@ button:disabled {
   .site-header-main,
   .site-footer-inner,
   .front-branding,
-  .front-utility-row,
-  .front-layout {
+  .front-utility-row {
     grid-template-columns: 1fr;
     flex-direction: column;
   }

@@ -163,26 +163,10 @@ def render_board_index() -> str:
 def build_board_index_page_context(posts, threads, moderation_state) -> dict[str, str]:
     public_threads = visible_threads(threads, moderation_state)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
-    board_sections = [
-        (
-            tag,
-            tuple(thread for thread in public_threads if tag in thread.root.board_tags),
-        )
-        for tag in board_tags
-    ]
     return {
         "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
-        "tags_html": "".join(
-            f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>'
-            for tag in board_tags
-        ),
-        "board_sections_html": "".join(
-            render_board_section(tag, section_threads, moderation_state)
-            for tag, section_threads in board_sections
-        ),
         "thread_rows_html": render_board_index_thread_rows(public_threads, moderation_state),
         "action_links_html": render_board_index_action_links(),
-        "sidebar_modules_html": render_board_index_sidebar_modules(board_tags),
     }
 
 
@@ -258,27 +242,9 @@ def render_board_index_header(context: dict[str, str]) -> str:
         '<nav class="front-nav" aria-label="Board actions">'
         f'{context["action_links_html"]}'
         "</nav>"
-        '<div class="front-topic-strip" aria-label="Board tags">'
-        f'{context["tags_html"]}'
-        "</div>"
         "</div>"
         "</header>"
     )
-
-
-def render_board_index_sidebar_modules(board_tags: list[str]) -> str:
-    tags_html = "".join(
-        f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>'
-        for tag in board_tags
-    )
-    return (
-        '<section class="panel">'
-        "<h2>Board tags</h2>"
-        "<p>Each tag links to its section below.</p>"
-        f'<div class="tag-list">{tags_html}</div>'
-        "</section>"
-    )
-
 
 def render_board_index_footer(stats_html: str) -> str:
     return (
