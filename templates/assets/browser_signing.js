@@ -20,6 +20,55 @@ function normalizeNewlines(text) {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
+const ASCII_COMPOSE_REPLACEMENTS = new Map([
+  ["\u2018", "'"],
+  ["\u2019", "'"],
+  ["\u201C", '"'],
+  ["\u201D", '"'],
+  ["\u2013", "-"],
+  ["\u2014", "-"],
+  ["\u2026", "..."],
+  ["\u00A0", " "],
+]);
+
+function unsupportedComposeCharacters(text) {
+  const characters = [];
+  for (const character of text) {
+    if (!/^[\x00-\x7F]$/.test(character)) {
+      characters.push(character);
+    }
+  }
+  return characters;
+}
+
+function normalizeComposeAscii(text, { removeUnsupported = false } = {}) {
+  let normalized = "";
+  let hadCorrections = false;
+  for (const character of normalizeNewlines(text)) {
+    const replacement = ASCII_COMPOSE_REPLACEMENTS.get(character);
+    if (replacement !== undefined) {
+      normalized += replacement;
+      hadCorrections = true;
+      continue;
+    }
+    normalized += character;
+  }
+
+  const unsupportedBeforeRemoval = unsupportedComposeCharacters(normalized);
+  if (removeUnsupported && unsupportedBeforeRemoval.length) {
+    normalized = Array.from(normalized)
+      .filter((character) => /^[\x00-\x7F]$/.test(character))
+      .join("");
+  }
+
+  return {
+    text: normalized,
+    hadCorrections,
+    unsupportedCount: removeUnsupported ? 0 : unsupportedBeforeRemoval.length,
+    removedUnsupportedCount: removeUnsupported ? unsupportedBeforeRemoval.length : 0,
+  };
+}
+
 function ensureAscii(text, fieldName) {
   if (!/^[\x00-\x7F]*$/.test(text)) {
     throw new Error(`${fieldName} must be ASCII`);
@@ -306,7 +355,7 @@ function normalizeDisplayName(displayName) {
 }
 
 function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = "", postId = "" } = {}) {
-  const body = normalizeNewlines(requiredTrimmed(form.body.value, "Body")).replace(/\n*$/, "\n");
+  const body = normalizeComposeAscii(requiredTrimmed(form.body.value, "Body")).text.replace(/\n*$/, "\n");
   const resolvedPostId = postId || generatePostId(commandName, body);
   const boardTags = requiredTrimmed(defaults.boardTags, "Board-Tags");
   const subject = commandName === "create_thread" ? deriveSubjectFromBody(body) : "";
@@ -485,6 +534,10 @@ function updatePayloadPreview(form, commandName, defaults) {
   } catch (_error) {
     payloadOutput.value = "";
   }
+}
+
+function updateComposeNormalizationStatus(message) {
+  setStatus("compose-normalization-status", message);
 }
 
 async function deriveStoredKeys() {
@@ -700,6 +753,30 @@ async function main() {
     return "Signed post accepted. Redirecting...";
   }
 
+  function normalizeBodyInput({ removeUnsupported = false } = {}) {
+    if (!state.body) {
+      return { text: "", hadCorrections: false, unsupportedCount: 0, removedUnsupportedCount: 0 };
+    }
+    const result = normalizeComposeAscii(state.body.value, { removeUnsupported });
+    if (state.body.value !== result.text) {
+      state.body.value = result.text;
+    }
+    if (result.removedUnsupportedCount > 0) {
+      updateComposeNormalizationStatus(
+        `Removed ${result.removedUnsupportedCount} unsupported character${result.removedUnsupportedCount === 1 ? "" : "s"} from the message.`,
+      );
+    } else if (result.unsupportedCount > 0) {
+      updateComposeNormalizationStatus(
+        `Unsupported characters remain in the message. Remove them before signing.`,
+      );
+    } else if (result.hadCorrections) {
+      updateComposeNormalizationStatus("Converted common non-ASCII punctuation to ASCII.");
+    } else {
+      updateComposeNormalizationStatus("");
+    }
+    return result;
+  }
+
   const previewInputs = commandName === "update_profile"
     ? [state.displayName]
     : [
@@ -712,6 +789,9 @@ async function main() {
       ].filter(Boolean);
   for (const input of previewInputs) {
     input.addEventListener("input", () => {
+      if (input === state.body) {
+        normalizeBodyInput();
+      }
       updatePayloadPreview(state, commandName, defaults);
       signatureOutput.value = "";
       responseOutput.value = "";
@@ -742,6 +822,9 @@ async function main() {
     }
   });
 
+  if (state.body) {
+    normalizeBodyInput();
+  }
   updatePayloadPreview(state, commandName, defaults);
   setStatus("key-status", "Preparing local signing key...");
   try {
@@ -758,6 +841,7 @@ async function main() {
     signatureOutput.value = "";
 
     try {
+      normalizeBodyInput();
       const keys = await resolveSubmitKeys();
       let built = buildCanonicalPayload(state, commandName, defaults);
 
@@ -834,4 +918,8 @@ async function main() {
   });
 }
 
-main();
+if (typeof document !== "undefined") {
+  main();
+}
+
+export { normalizeComposeAscii };
