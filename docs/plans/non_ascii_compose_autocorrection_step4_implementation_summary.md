@@ -18,3 +18,12 @@
   - Ran a temporary-module smoke import of `normalizeComposeAscii('emoji 🙂 test', { removeUnsupported: true })` and confirmed the helper returned ASCII-only text with one removed unsupported character.
 - Notes:
   - The first slice removes unsupported characters exactly as typed; it does not attempt emoji aliases or semantic replacements.
+
+## Stage 3 - Add focused helper and page coverage
+- Changes:
+  - Added [test_browser_signing_normalization.py](/home/wsl/v2/tests/test_browser_signing_normalization.py) to exercise the exported browser normalization helper against punctuation correction, unsupported-character detection, and explicit removal behavior through a Node-backed temporary module import.
+  - Extended [test_compose_thread_page.py](/home/wsl/v2/tests/test_compose_thread_page.py) and [test_compose_reply_page.py](/home/wsl/v2/tests/test_compose_reply_page.py) to assert that the shared compose pages expose the new remove-unsupported button and normalization status hook.
+- Verification:
+  - Ran `python3 -m unittest tests.test_browser_signing_normalization tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`; all 14 tests passed.
+- Notes:
+  - Coverage stays focused on the shared normalization seam and template hooks instead of introducing a larger browser test harness.

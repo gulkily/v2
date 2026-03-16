@@ -55,6 +55,8 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn("Compose a signed thread", body)
         self.assertIn('id="signed-post-form"', body)
         self.assertIn('id="draft-status"', body)
+        self.assertIn('id="remove-unsupported-button"', body)
+        self.assertIn('id="compose-normalization-status"', body)
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
 
