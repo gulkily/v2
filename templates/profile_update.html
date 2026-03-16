@@ -1,14 +1,11 @@
 <section class="panel page-section">
   ${breadcrumb_html}
-  <div class="section-head page-lede">
-    <h2>${update_heading}</h2>
-    <p>${update_subhead}</p>
-  </div>
   <div class="detail-grid">
     <p><strong>Current display name:</strong> <code>${current_display_name}</code></p>
     <p><strong>Resolved Identity-ID:</strong> <code>${identity_id}</code></p>
     <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
   </div>
+  <p class="compose-instructions">Enter a new display name and sign it with your local key to replace the resolved identity.</p>
 </section>
 
 <section
@@ -20,9 +17,6 @@
   data-source-identity-id="${source_identity_id}"
   data-profile-slug="${profile_slug}"
 >
-  <div class="section-head page-lede">
-    <h2>Signed Username Update</h2>
-  </div>
   <form id="profile-update-form" class="field-stack">
     <label class="field-stack" for="display-name-input">
       <span>New username / display name</span>

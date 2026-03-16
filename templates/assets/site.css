@@ -158,6 +158,12 @@ body {
   line-height: 1.55;
 }
 
+.compose-instructions {
+  color: var(--muted);
+  margin: 0.75rem 0;
+  line-height: 1.4;
+}
+
 .site-footer {
   margin-top: 1rem;
 }
