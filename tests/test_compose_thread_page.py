@@ -55,6 +55,8 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertIn("Compose a signed thread", body)
+        self.assertNotIn("Signed Posting", body)
+        self.assertNotIn('class="breadcrumb"', body)
         self.assertIn('id="signed-post-form"', body)
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)

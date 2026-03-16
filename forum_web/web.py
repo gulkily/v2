@@ -1151,15 +1151,7 @@ def render_compose_page(
     thread_type: str = "",
     extra_fields_html: str = "",
 ) -> str:
-    breadcrumb_items = [
-        ("/", "board index"),
-        (
-            compose_path or ("/compose/thread" if command_name == "create_thread" else "/compose/reply"),
-            breadcrumb_label,
-        ),
-    ]
     content = load_template("compose.html").substitute(
-        breadcrumb_html=render_breadcrumb(breadcrumb_items),
         compose_heading=html.escape(compose_heading),
         compose_text=html.escape(compose_text),
         context_text=html.escape(context_text),
@@ -1183,6 +1175,26 @@ def render_compose_page(
         hero_title=compose_heading,
         hero_text=compose_text,
         content_html=content,
+        page_header_html=(
+            '<header class="site-header site-header--page">'
+            '<div class="site-header-band"><p>Kindness first. Clear navigation, readable text, and calm visual rhythm.</p></div>'
+            '<div class="site-header-main">'
+            '<div class="site-header-lockup">'
+            '<p class="site-header-mark">(*)</p>'
+            '<div class="site-header-copy">'
+            '<p class="site-header-title"><a href="/">Forum Reader</a></p>'
+            '<p class="site-header-tagline">calm threads from canonical text records</p>'
+            "</div>"
+            "</div>"
+            '<nav class="site-header-nav" aria-label="Primary">'
+            '<a href="/">Home</a>'
+            '<a href="/compose/thread">Post</a>'
+            '<a href="/instance/">Instance</a>'
+            '<a href="/planning/task-priorities/">Planning</a>'
+            "</nav>"
+            "</div>"
+            "</header>"
+        ),
         page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
     )
 

@@ -86,6 +86,8 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn("Target reply body.", body)
         self.assertIn("Second line for context.", body)
         self.assertIn("/posts/reply-001", body)
+        self.assertNotIn("Signed Posting", body)
+        self.assertNotIn('class="breadcrumb"', body)
         self.assertNotIn('<p class="post-id">', body)
         self.assertNotIn('<p class="post-tags">', body)
         self.assertNotIn('<p class="post-relation">', body)
