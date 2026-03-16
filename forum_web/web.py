@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import parse_qs, unquote
@@ -51,6 +52,7 @@ from forum_web.api_text import (
 )
 from forum_web.profiles import find_profile_summary, load_identity_context, resolve_identity_display_name
 from forum_web.repository import (
+    Post,
     group_threads,
     index_posts,
     index_threads,
@@ -82,6 +84,97 @@ def load_repository_state():
     moderation_state = derive_moderation_state(moderation_records)
     identity_context = load_identity_context(repo_root=repo_root, posts=posts)
     return posts, threads, board_tags, moderation_records, moderation_state, identity_context
+
+
+@dataclass(frozen=True)
+class GitCommitEntry:
+    commit_id: str
+    commit_date: str
+    subject: str
+    files: tuple[str, ...]
+
+
+def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitEntry]:
+    if limit <= 0:
+        return []
+    field_sep = "\x1f"
+    format_string = f"%H{field_sep}%cI{field_sep}%s"
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "log",
+            f"--max-count={limit}",
+            f"--pretty=format:{format_string}",
+            "--name-only",
+            "--",
+            "records/posts",
+        ],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return []
+    entries: list[GitCommitEntry] = []
+    current_base: tuple[str, str, str] | None = None
+    current_files: list[str] = []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        if field_sep in line:
+            if current_base is not None:
+                entries.append(
+                    GitCommitEntry(
+                        commit_id=current_base[0],
+                        commit_date=current_base[1],
+                        subject=current_base[2],
+                        files=tuple(current_files),
+                    )
+                )
+            parts = line.split(field_sep, 2)
+            if len(parts) != 3:
+                current_base = None
+                current_files = []
+                continue
+            current_base = (parts[0], parts[1], parts[2])
+            current_files = []
+        elif current_base is not None:
+            normalized = line.strip()
+            if normalized:
+                current_files.append(normalized)
+    if current_base is not None:
+        entries.append(
+            GitCommitEntry(
+                commit_id=current_base[0],
+                commit_date=current_base[1],
+                subject=current_base[2],
+                files=tuple(current_files),
+            )
+        )
+    return entries
+
+
+def build_posts_index(posts: list[Post], repo_root: Path) -> dict[str, Post]:
+    index: dict[str, object] = {}
+    for post in posts:
+        try:
+            relative = str(post.path.relative_to(repo_root))
+        except ValueError:
+            relative = str(post.path)
+        index[relative] = post
+    return index
+
+
+def resolve_commit_posts(commit: GitCommitEntry, posts_index: dict[str, Post]) -> list[Post]:
+    touched = []
+    for file_path in commit.files:
+        normalized = Path(file_path).as_posix()
+        if normalized in posts_index:
+            touched.append(posts_index[normalized])
+    return touched
 
 
 def visible_threads(threads, moderation_state, *, board_tag: str | None = None):

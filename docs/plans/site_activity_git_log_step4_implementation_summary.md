@@ -1,0 +1,4 @@
+## Stage 1 - Fetch git commits and resolve records
+- Changes: Added `GitCommitEntry`, `fetch_recent_commits`, `build_posts_index`, and `resolve_commit_posts` helpers in `forum_web/web.py` to shell out to `git log`, parse commit metadata, and map touched files back to canonical posts.
+- Verification: `python -m pytest tests/test_site_activity_git_log_helpers.py`
+- Notes: Helpers limit the log to commits touching `records/posts`; follow-up stages will reuse this context when rendering the activity feed.
