@@ -144,6 +144,18 @@ def resolved_profile_identity_id(identity_context, identity_id: str | None) -> s
 
 def render_board_index() -> str:
     posts, threads, _, _, moderation_state, _ = load_repository_state()
+    context = build_board_index_page_context(posts, threads, moderation_state)
+    content = load_template("board_index.html").substitute(context)
+    return render_page(
+        title="Forum Reader",
+        hero_kicker="Board Index",
+        hero_title="Threads gathered straight from canonical text records",
+        hero_text="This board view reads the git-tracked post files directly, groups thread roots by board tags, and keeps the dataset browsable without adding a database or durable index layer.",
+        content_html=content,
+    )
+
+
+def build_board_index_page_context(posts, threads, moderation_state) -> dict[str, str]:
     public_threads = visible_threads(threads, moderation_state)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
     board_sections = [
@@ -153,32 +165,84 @@ def render_board_index() -> str:
         )
         for tag in board_tags
     ]
+    return {
+        "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
+        "tags_html": "".join(
+            f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>'
+            for tag in board_tags
+        ),
+        "board_sections_html": "".join(
+            render_board_section(tag, section_threads, moderation_state)
+            for tag, section_threads in board_sections
+        ),
+        "thread_rows_html": render_board_index_thread_rows(public_threads, moderation_state),
+        "action_links_html": render_board_index_action_links(),
+        "sidebar_modules_html": render_board_index_sidebar_modules(board_tags),
+    }
 
-    stats_html = (
+
+def render_board_index_stats(post_count: int, thread_count: int, board_tag_count: int) -> str:
+    return (
         '<div class="stat-grid">'
-        f'<article class="stat-card"><span class="stat-number">{len(posts)}</span><span class="stat-label">posts loaded</span></article>'
-        f'<article class="stat-card"><span class="stat-number">{len(public_threads)}</span><span class="stat-label">visible threads</span></article>'
-        f'<article class="stat-card"><span class="stat-number">{len(board_tags)}</span><span class="stat-label">board tags</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{post_count}</span><span class="stat-label">posts loaded</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{thread_count}</span><span class="stat-label">visible threads</span></article>'
+        f'<article class="stat-card"><span class="stat-number">{board_tag_count}</span><span class="stat-label">board tags</span></article>'
         "</div>"
     )
 
-    tag_items = "".join(f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>' for tag in board_tags)
-    board_sections_html = "".join(
-        render_board_section(tag, section_threads, moderation_state)
-        for tag, section_threads in board_sections
+
+def render_board_index_thread_rows(threads, moderation_state) -> str:
+    return "".join(render_board_index_thread_row(index, thread, moderation_state) for index, thread in enumerate(threads, start=1))
+
+
+def render_board_index_thread_row(rank: int, thread, moderation_state) -> str:
+    subject = thread.root.subject or "Untitled thread"
+    preview = first_line(thread.root.body) or "No preview available."
+    tags_html = " ".join(f'[{html.escape(tag)}]' for tag in thread.root.board_tags)
+    meta_parts = [
+        f"{visible_reply_count(thread, moderation_state)} repl{'y' if visible_reply_count(thread, moderation_state) == 1 else 'ies'}",
+        html.escape(thread.root.post_id),
+    ]
+    if root_thread_type(thread.root):
+        meta_parts.append(html.escape(root_thread_type(thread.root)))
+    meta_text = " · ".join(meta_parts)
+    return (
+        '<article class="board-index-thread-row">'
+        f'<p class="board-index-thread-rank">{rank}.</p>'
+        '<div class="board-index-thread-main">'
+        f'<h3><a href="/threads/{html.escape(thread.root.post_id)}">{html.escape(subject)}</a></h3>'
+        f'<p class="board-index-thread-tags">{tags_html}</p>'
+        f'<p>{html.escape(preview)}</p>'
+        f'<p class="thread-meta">{meta_text}</p>'
+        "</div>"
+        "</article>"
     )
 
-    content = load_template("board_index.html").substitute(
-        stats_html=stats_html,
-        tags_html=tag_items,
-        board_sections_html=board_sections_html,
+
+def render_board_index_action_links() -> str:
+    links = [
+        ("/compose/thread", "compose a signed thread"),
+        ("/instance/", "instance info"),
+        ("/moderation/", "view moderation log"),
+        ("/planning/task-priorities/", "task priorities"),
+    ]
+    return "".join(
+        f'<a class="thread-chip" href="{html.escape(path)}">{html.escape(label)}</a>'
+        for path, label in links
     )
-    return render_page(
-        title="Forum Reader",
-        hero_kicker="Board Index",
-        hero_title="Threads gathered straight from canonical text records",
-        hero_text="This board view reads the git-tracked post files directly, groups thread roots by board tags, and keeps the dataset browsable without adding a database or durable index layer.",
-        content_html=content,
+
+
+def render_board_index_sidebar_modules(board_tags: list[str]) -> str:
+    tags_html = "".join(
+        f'<a class="tag-chip" href="#board-{html.escape(tag)}">{html.escape(tag)}</a>'
+        for tag in board_tags
+    )
+    return (
+        '<section class="panel">'
+        "<h2>Board tags</h2>"
+        "<p>Each tag links to its section below.</p>"
+        f'<div class="tag-list">{tags_html}</div>'
+        "</section>"
     )
 
 
