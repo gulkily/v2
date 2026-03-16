@@ -16,3 +16,11 @@
   - Ran a direct render smoke check with `python - <<'PY' ... render_board_index() ... PY` and confirmed the output contains `front-header`, `front-layout`, `Threads worth opening`, `compose a signed thread`, `instance info`, and `task priorities`.
 - Notes:
   - The homepage now uses a dedicated front-page shell while thread, detail, and planning pages still use the existing hero-based layout.
+
+## Stage 3 - Homepage regression coverage
+- Changes:
+  - Added a dedicated homepage test module that asserts the new front-page structure, repository-backed thread rendering, board-tag anchors, and preserved destination links.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_instance_info_page tests.test_task_priorities_page` and confirmed all 12 tests passed.
+- Notes:
+  - The new assertions target stable structural markers and key links rather than every line of display copy, which keeps the tests useful without making future copy edits expensive.
