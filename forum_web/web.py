@@ -347,20 +347,6 @@ def git_status_summary(repo_root: Path) -> dict[str, str]:
     }
 
 
-def build_site_activity_context(*, limit: int = 12) -> dict[str, object]:
-    repo_root = get_repo_root()
-    records, identity_context = load_recent_records(limit=limit)
-    git_summary = git_status_summary(repo_root)
-    return {
-        "recent_records": records,
-        "identity_context": identity_context,
-        "git_commit_id": git_summary["commit_id"],
-        "git_commit_date": git_summary["commit_date"],
-        "git_source_path": git_summary["source_path"],
-        "git_worktree": git_summary["worktree"],
-    }
-
-
 def render_board_index_header(context: dict[str, str]) -> str:
     return (
         '<header class="front-header">'
@@ -405,28 +391,64 @@ def render_board_index_footer(stats_html: str) -> str:
     )
 
 
-def render_site_activity_page() -> str:
-    context = build_site_activity_context()
-    records = context["recent_records"]
-    identity_context = context["identity_context"]
-    record_cards = "".join(
+def format_commit_date(commit_date: str) -> str:
+    if not commit_date:
+        return "unknown date"
+    try:
+        timestamp = datetime.fromisoformat(commit_date)
+    except ValueError:
+        return commit_date
+    return timestamp.strftime("%b %d, %Y · %H:%M:%S %z")
+
+
+def render_commit_card(commit: GitCommitEntry, posts: list[Post], identity_context) -> str:
+    post_cards = "".join(
         render_post_card(
-            record,
-            root_thread_id=record.root_thread_id,
+            post,
+            root_thread_id=post.root_thread_id,
             identity_context=identity_context,
+            compact_thread_view=True,
         )
-        for record in records
+        for post in posts
     )
-    record_cards_html = (
-        record_cards
-        or '<article class="post-card"><p class="post-link">No canonical records are visible yet.</p></article>'
+    if not post_cards:
+        post_cards = '<p class="post-link">No canonical records were touched by this commit.</p>'
+    return (
+        '<article class="commit-card">'
+        '<div class="commit-card-meta">'
+        f'<p class="commit-id">Commit {html.escape(commit.commit_id[:12])}</p>'
+        f'<p class="commit-date">{html.escape(format_commit_date(commit.commit_date))}</p>'
+        f'<p class="commit-subject">{html.escape(commit.subject or "No message")}</p>'
+        "</div>"
+        '<div class="commit-posts">'
+        f"{post_cards}"
+        "</div>"
+        "</article>"
     )
+
+
+def render_site_activity_page() -> str:
+    repo_root = get_repo_root()
+    posts, _, _, _, _, identity_context = load_repository_state()
+    posts_index = build_posts_index(posts, repo_root)
+    commits = fetch_recent_commits(repo_root)
+    commit_cards = "".join(
+        render_commit_card(
+            commit,
+            resolve_commit_posts(commit, posts_index),
+            identity_context,
+        )
+        for commit in commits
+    )
+    if not commit_cards:
+        commit_cards = '<article class="post-card"><p class="post-link">No recent git activity is available yet.</p></article>'
+    git_summary = git_status_summary(repo_root)
     content = load_template("activity.html").substitute(
-        record_cards_html=record_cards_html,
-        git_commit_id=html.escape(context["git_commit_id"]),
-        git_commit_date=html.escape(context["git_commit_date"]),
-        git_source_path=html.escape(context["git_source_path"]),
-        git_worktree=html.escape(context["git_worktree"]),
+        commit_cards_html=commit_cards,
+        git_commit_id=html.escape(git_summary["commit_id"]),
+        git_commit_date=html.escape(git_summary["commit_date"]),
+        git_source_path=html.escape(git_summary["source_path"]),
+        git_worktree=html.escape(git_summary["worktree"]),
     )
     return render_page(
         title="Site Activity",

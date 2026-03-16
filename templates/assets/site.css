@@ -366,6 +366,30 @@ body {
   gap: 1rem;
 }
 
+.commit-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.commit-card {
+  border: 1px solid var(--accent-soft);
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.95), rgba(245, 241, 232, 0.95));
+  padding: 1rem;
+}
+
+.commit-card-meta {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.commit-posts {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .post-card {
   padding: 1rem;
   border-radius: 0;

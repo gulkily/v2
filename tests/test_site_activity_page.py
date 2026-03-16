@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import tempfile
 import unittest
 from io import BytesIO
@@ -25,6 +26,8 @@ class SiteActivityPageTests(unittest.TestCase):
             Root body.
             """,
         )
+        self.init_git_repo()
+        self.commit_record("records/posts/root-010.txt", "Add root")
         self.write_record(
             "records/posts/reply-020.txt",
             """
@@ -36,6 +39,7 @@ class SiteActivityPageTests(unittest.TestCase):
             Reply body.
             """,
         )
+        self.commit_record("records/posts/reply-020.txt", "Add reply")
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -44,6 +48,27 @@ class SiteActivityPageTests(unittest.TestCase):
         path = self.repo_root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
+
+    def run_git(self, *args: str) -> None:
+        subprocess.run(["git", "-C", str(self.repo_root), *args], check=True)
+
+    def init_git_repo(self) -> None:
+        self.run_git("init")
+        self.run_git("config", "user.name", "Test User")
+        self.run_git("config", "user.email", "test@example.com")
+
+    def commit_record(self, relative_path: str, message: str) -> None:
+        self.run_git("add", relative_path)
+        self.run_git("commit", "-m", message)
+
+    def latest_commit_short(self) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(self.repo_root), "log", "-1", "--format=%H"],
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        return result.stdout.strip()[:12]
 
     def get(self, path: str) -> tuple[str, dict[str, str], str]:
         environ = {
@@ -74,11 +99,12 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("First root", body)
         self.assertIn("root-010", body)
         self.assertIn("reply-020", body)
-        self.assertIn("Commit", body)
-        self.assertIn("unknown", body)
-        self.assertIn("records/instance/public.txt", body)
+        self.assertIn("Add reply", body)
+        self.assertIn("Add root", body)
+        self.assertTrue(body.index("Add reply") < body.index("Add root"))
+        self.assertIn(self.latest_commit_short(), body)
         self.assertIn("Working tree", body)
-        self.assertIn("git status unavailable", body)
+        self.assertIn("records/instance/public.txt", body)
 
 
 if __name__ == "__main__":
