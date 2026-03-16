@@ -4,6 +4,7 @@ import html
 import json
 import os
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import parse_qs, unquote
@@ -229,12 +230,27 @@ def load_recent_records(*, limit: int = 12):
     return list(reversed(recent)), identity_context
 
 
+def describe_git_worktree(repo_root: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "status", "-sb"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return "git status unavailable"
+    status = result.stdout.strip()
+    return status or "clean"
+
+
 def git_status_summary(repo_root: Path) -> dict[str, str]:
     info = load_instance_info(repo_root)
     return {
         "commit_id": info.commit_id or "unknown",
         "commit_date": info.commit_date or "unknown",
         "source_path": str(info.source_path),
+        "worktree": describe_git_worktree(repo_root),
     }
 
 
@@ -248,6 +264,7 @@ def build_site_activity_context(*, limit: int = 12) -> dict[str, object]:
         "git_commit_id": git_summary["commit_id"],
         "git_commit_date": git_summary["commit_date"],
         "git_source_path": git_summary["source_path"],
+        "git_worktree": git_summary["worktree"],
     }
 
 
@@ -287,6 +304,38 @@ def render_board_index_footer(stats_html: str) -> str:
         f"{stats_html}"
         "</div>"
         "</footer>"
+    )
+
+
+def render_site_activity_page() -> str:
+    context = build_site_activity_context()
+    records = context["recent_records"]
+    identity_context = context["identity_context"]
+    record_cards = "".join(
+        render_post_card(
+            record,
+            root_thread_id=record.root_thread_id,
+            identity_context=identity_context,
+        )
+        for record in records
+    )
+    record_cards_html = (
+        record_cards
+        or '<article class="post-card"><p class="post-link">No canonical records are visible yet.</p></article>'
+    )
+    content = load_template("activity.html").substitute(
+        record_cards_html=record_cards_html,
+        git_commit_id=html.escape(context["git_commit_id"]),
+        git_commit_date=html.escape(context["git_commit_date"]),
+        git_source_path=html.escape(context["git_source_path"]),
+    )
+    return render_page(
+        title="Site Activity",
+        hero_kicker="Activity feed",
+        hero_title="Site activity",
+        hero_text="The latest signed posts and replies together with the git commit that powers this instance.",
+        content_html=content,
+        page_shell_class="page-shell-front",
     )
 
 
@@ -610,10 +659,12 @@ def render_post_card(post, *, root_thread_id: str, identity_context, hidden: boo
     meta_html = ""
     if not compact_thread_view:
         board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
+        timestamp_label = html.escape(format_post_timestamp(post.post_id))
         meta_html = (
             '<div class="post-meta-row">'
             f'<p class="post-id">{html.escape(post.post_id)}</p>'
             f'<p class="post-tags">{board_tags}</p>'
+            f'<p class="post-timestamp">{timestamp_label}</p>'
             "</div>"
         )
     permalink_label = format_post_permalink_label(post.post_id)
@@ -639,6 +690,17 @@ def format_post_permalink_label(post_id: str) -> str:
     except ValueError:
         return "View post"
     return timestamp.strftime("%b %d, %Y at %H:%M")
+
+
+def format_post_timestamp(post_id: str) -> str:
+    match = re.search(r"-(\d{14})-", post_id)
+    if match is None:
+        return "unknown date"
+    try:
+        timestamp = datetime.strptime(match.group(1), "%Y%m%d%H%M%S")
+    except ValueError:
+        return "unknown date"
+    return timestamp.strftime("%B %d, %Y · %H:%M:%S UTC")
 
 
 def render_compose_reference(post, *, root_thread_id: str, identity_context) -> str:
@@ -1558,6 +1620,12 @@ def application(environ, start_response):
 
         if path == "/instance/":
             body = render_instance_info_page().encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/activity/":
+            body = render_site_activity_page().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

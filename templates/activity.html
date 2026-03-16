@@ -1,0 +1,29 @@
+<section class="front-layout">
+  <section class="front-main-column" aria-labelledby="activity-heading">
+    <div class="front-stream-head">
+      <div>
+        <p class="front-kicker">Site activity</p>
+        <h1 id="activity-heading">Canonical activity stream</h1>
+      </div>
+      <p>Browse the freshest signed posts and replies alongside the git snapshot behind this instance.</p>
+    </div>
+    <section class="front-thread-stream">
+      <div class="post-stack">
+        ${record_cards_html}
+      </div>
+    </section>
+  </section>
+</section>
+
+<section class="panel page-section">
+  <div class="section-head page-lede">
+    <h2>Repository snapshot</h2>
+    <p>Commit metadata drives this instance; the flow below keeps it visible.</p>
+  </div>
+  <div class="detail-grid">
+    <div><strong>Commit</strong><span>${git_commit_id}</span></div>
+    <div><strong>Commit date</strong><span>${git_commit_date}</span></div>
+    <div><strong>Source path</strong><span>${git_source_path}</span></div>
+    <div><strong>Working tree</strong><span>${git_worktree}</span></div>
+  </div>
+</section>
