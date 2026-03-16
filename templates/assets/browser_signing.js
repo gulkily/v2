@@ -638,8 +638,6 @@ async function main() {
     || !signatureOutput
     || !responseOutput
     || !signSubmitButton
-    || !normalizationActions
-    || !removeUnsupportedButton
   ) {
     return;
   }
@@ -786,8 +784,12 @@ async function main() {
     } else {
       updateComposeNormalizationStatus("");
     }
-    normalizationActions.hidden = result.unsupportedCount === 0;
-    removeUnsupportedButton.disabled = result.unsupportedCount === 0;
+    if (normalizationActions) {
+      normalizationActions.hidden = result.unsupportedCount === 0;
+    }
+    if (removeUnsupportedButton) {
+      removeUnsupportedButton.disabled = result.unsupportedCount === 0;
+    }
     return result;
   }
 
@@ -836,13 +838,15 @@ async function main() {
     }
   });
 
-  removeUnsupportedButton.addEventListener("click", () => {
-    normalizeBodyInput({ removeUnsupported: true });
-    updatePayloadPreview(state, commandName, defaults);
-    signatureOutput.value = "";
-    responseOutput.value = "";
-    scheduleDraftSave();
-  });
+  if (removeUnsupportedButton) {
+    removeUnsupportedButton.addEventListener("click", () => {
+      normalizeBodyInput({ removeUnsupported: true });
+      updatePayloadPreview(state, commandName, defaults);
+      signatureOutput.value = "";
+      responseOutput.value = "";
+      scheduleDraftSave();
+    });
+  }
 
   if (state.body) {
     normalizeBodyInput();
