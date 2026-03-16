@@ -213,7 +213,7 @@ def render_board_index_action_links() -> str:
     links = [
         ("/compose/thread", "compose a signed thread"),
         ("/instance/", "instance info"),
-        ("/moderation/", "view moderation log"),
+        ("/activity/", "view site activity"),
         ("/planning/task-priorities/", "task priorities"),
     ]
     return "".join(
@@ -302,6 +302,11 @@ def render_board_index_footer(stats_html: str) -> str:
         "<p>[ slow web ]</p>"
         "</div>"
         f"{stats_html}"
+        '<div class="front-footer-actions">'
+        '<div class="link-cluster">'
+        '<a class="thread-chip" href="/moderation/">moderation log</a>'
+        "</div>"
+        "</div>"
         "</div>"
         "</footer>"
     )
@@ -328,6 +333,7 @@ def render_site_activity_page() -> str:
         git_commit_id=html.escape(context["git_commit_id"]),
         git_commit_date=html.escape(context["git_commit_date"]),
         git_source_path=html.escape(context["git_source_path"]),
+        git_worktree=html.escape(context["git_worktree"]),
     )
     return render_page(
         title="Site Activity",

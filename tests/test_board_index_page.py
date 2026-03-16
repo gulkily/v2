@@ -103,6 +103,9 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('/compose/thread', body)
         self.assertIn('/instance/', body)
+        self.assertIn('/activity/', body)
+        self.assertIn('view site activity', body)
+        self.assertNotIn('view moderation log', body)
         self.assertIn('/moderation/', body)
         self.assertIn('/planning/task-priorities/', body)
 
