@@ -7,3 +7,12 @@
   - Ran a direct render smoke check with `python - <<'PY' ... render_board_index() ... PY` and confirmed `front-topic-strip`, `What this view is`, and `House style` are absent while the core action links remain present.
 - Notes:
   - This stage removes unfinished or low-value homepage affordances only; broader read/write/planning copy cleanup follows in later stages.
+
+## Stage 2 - Read and planning copy cleanup
+- Changes:
+  - Removed repeated explanatory paragraphs from thread, moderation, instance, profile, task priorities, and task detail templates.
+  - Simplified section headings where the old labels repeated information the page layout already communicated, such as shortening profile and posts sections.
+- Verification:
+  - Ran `python -m unittest tests.test_instance_info_page tests.test_task_priorities_page tests.test_task_thread_pages tests.test_profile_update_page` and confirmed all 20 tests passed.
+- Notes:
+  - This stage is strictly subtractive: routes, actions, structured data, and planning controls remain intact while the pages carry less framing copy.
