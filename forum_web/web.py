@@ -651,7 +651,7 @@ def render_compose_reference(post, *, root_thread_id: str, identity_context) -> 
         "<h2>Replying to</h2>"
         "<p>This is the visible post your signed reply will target.</p>"
         "</div>"
-        f"{render_post_card(post, root_thread_id=root_thread_id, identity_context=identity_context)}"
+        f"{render_post_card(post, root_thread_id=root_thread_id, identity_context=identity_context, compact_thread_view=True)}"
         "</section>"
     )
 
