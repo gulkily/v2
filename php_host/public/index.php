@@ -162,3 +162,6 @@ $response = $stdout === false ? '' : $stdout;
 $parsed = forum_parse_cgi_response($response);
 forum_store_cached_response($parsed, $response);
 forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], forum_asset_cache_headers()));
+if (forum_mutating_request() && (int) $parsed['status_code'] >= 200 && (int) $parsed['status_code'] < 400) {
+    forum_clear_cache();
+}

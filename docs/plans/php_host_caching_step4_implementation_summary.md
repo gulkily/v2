@@ -8,3 +8,14 @@
   - Ran `FORUM_PHP_CACHE_DIR=<temp>/cache REQUEST_METHOD=GET REQUEST_URI=/assets/site.css QUERY_STRING= SERVER_NAME=localhost SERVER_PORT=80 SERVER_PROTOCOL=HTTP/1.1 php php_host/public/index.php` and confirmed no microcache file was created for the asset route.
 - Notes:
   - Stage 1 keeps the write-path invalidation work out of the committed scope; that will be finished in Stage 2.
+
+## Stage 2 - Add cache invalidation and focused coverage
+- Changes:
+  - Extended [cache.php](/home/wsl/v2/php_host/public/cache.php) with mutating-request detection and full microcache-directory clearing so successful write requests invalidate cached public reads.
+  - Updated [index.php](/home/wsl/v2/php_host/public/index.php) to clear the PHP microcache after successful non-`GET`/`HEAD` responses while leaving write responses themselves uncached.
+  - Added [test_php_host_cache.py](/home/wsl/v2/tests/test_php_host_cache.py) covering cache miss/hit headers for allowlisted reads, asset cache headers without asset microcaching, and cache invalidation after a successful `POST /api/create_thread` through the real `php-cgi` entrypoint.
+- Verification:
+  - Ran `python3 -m unittest tests.test_php_host_cache`; passed all 3 tests.
+  - Re-ran `php -l php_host/public/cache.php` and `php -l php_host/public/index.php`; both passed.
+- Notes:
+  - The focused test uses `php-cgi` instead of a local PHP server because that path exposes real CGI headers without requiring a long-lived listening socket in this environment.

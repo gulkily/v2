@@ -163,3 +163,29 @@ function forum_asset_cache_headers(): array
     }
     return ['Cache-Control: public, max-age=' . FORUM_PHP_ASSET_CACHE_MAX_AGE_SECONDS];
 }
+
+function forum_mutating_request(): bool
+{
+    return forum_request_method() !== 'GET' && forum_request_method() !== 'HEAD';
+}
+
+function forum_clear_cache(): void
+{
+    $cacheDir = forum_cache_dir();
+    if (!is_dir($cacheDir)) {
+        return;
+    }
+    $entries = scandir($cacheDir);
+    if ($entries === false) {
+        return;
+    }
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $cacheDir . DIRECTORY_SEPARATOR . $entry;
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+}
