@@ -7,3 +7,13 @@
   - Ran `python -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`
 - Notes:
   - This stage changes only the compose surfaces. The current instance-info framing remains in place until Stage 2.
+
+## Stage 2 - Reframe `/instance/` as project information
+- Changes:
+  - Updated `forum_web/web.py` so `/instance/` now renders with project-information framing rather than narrow instance-info wording.
+  - Expanded `templates/instance_info.html` with a project overview section and a compact FAQ-style panel while preserving the existing public facts and repository-derived metadata.
+  - Expanded `tests/test_instance_info_page.py` so the carried-forward facts and the new explanatory content are both covered.
+- Verification:
+  - Ran `python -m unittest tests.test_instance_info_page tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`
+- Notes:
+  - The route remains `/instance/` in this stage. Only the page framing and content model changed.

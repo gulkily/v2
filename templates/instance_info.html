@@ -1,9 +1,26 @@
 <section class="panel page-section">
   ${breadcrumb_html}
+  <div class="section-head page-lede">
+    <h2>Project overview</h2>
+    <p>${instance_summary}</p>
+  </div>
   <div class="stat-grid">
     <article class="stat-card"><span class="stat-number">${commit_id}</span><span class="stat-label">current commit</span></article>
     <article class="stat-card"><span class="stat-number">${install_date}</span><span class="stat-label">install date</span></article>
     <article class="stat-card"><span class="stat-number">${commit_date}</span><span class="stat-label">commit date</span></article>
+  </div>
+</section>
+
+<section class="panel page-section">
+  <div class="section-head page-lede">
+    <h2>Project FAQ</h2>
+    <p>These notes explain the constraints and assumptions behind the public writing and reading experience.</p>
+  </div>
+  <div class="detail-grid">
+    <div><strong>Why are posts ASCII-only?</strong> <span>Canonical text records stay easier for humans to read, patch, compare, and review across ordinary tools, while reducing Unicode lookalike obfuscation risks.</span></div>
+    <div><strong>What is stored here?</strong> <span>Threads, replies, moderation records, and public instance metadata are stored as canonical text records tracked in git.</span></div>
+    <div><strong>What is this page for?</strong> <span>It combines project orientation with the current public instance facts so readers can understand both the system and this deployment.</span></div>
+    <div><strong>What is not the goal?</strong> <span>This is not a generic social feed or a rich-text publishing stack; the project favors plain text, inspectable records, and deterministic history.</span></div>
   </div>
 </section>
 

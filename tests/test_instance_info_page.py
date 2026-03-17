@@ -76,13 +76,15 @@ class InstanceInfoPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn('/instance/', body)
-        self.assertIn("instance info", body)
+        self.assertIn(">Instance</a>", body)
 
     def test_instance_info_page_renders_public_facts(self) -> None:
         status, headers, body = self.get("/instance/")
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn("Project information", body)
+        self.assertIn("Project overview", body)
         self.assertIn("Demo instance", body)
         self.assertIn("Demo operator", body)
         self.assertIn("operator@example.invalid", body)
@@ -90,6 +92,9 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("2026-03-15", body)
         self.assertIn("records/instance/public.txt", body)
         self.assertIn("current commit", body)
+        self.assertIn("Project FAQ", body)
+        self.assertIn("Why are posts ASCII-only?", body)
+        self.assertIn("generic social feed", body)
 
     def test_instance_info_page_marks_missing_values(self) -> None:
         (self.repo_root / "records" / "instance" / "public.txt").unlink()
@@ -99,6 +104,7 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("Not published.", body)
         self.assertIn("records/instance/public.txt", body)
+        self.assertIn("Project information", body)
 
 
 if __name__ == "__main__":
