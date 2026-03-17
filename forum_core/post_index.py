@@ -184,6 +184,11 @@ def set_index_metadata(connection: sqlite3.Connection, key: str, value: str) -> 
     )
 
 
+def index_schema_is_current(connection: sqlite3.Connection) -> bool:
+    indexed_schema_version = get_index_metadata(connection, "indexed_schema_version")
+    return indexed_schema_version == str(POST_INDEX_SCHEMA_VERSION)
+
+
 def current_repo_head(repo_root: Path) -> str | None:
     result = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
@@ -425,6 +430,7 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
     indexed_head = current_repo_head(repo_root)
     set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
     set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
+    set_index_metadata(active_index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
     active_index.connection.commit()
     if owned_index:
         active_index.connection.close()
@@ -441,7 +447,11 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
     except ValueError:
         indexed_count = -1
     current_head = current_repo_head(repo_root)
-    if indexed_count != expected_count or indexed_head != current_head:
+    if (
+        indexed_count != expected_count
+        or indexed_head != current_head
+        or not index_schema_is_current(index.connection)
+    ):
         rebuild_post_index(repo_root, index=index)
     return index
 
@@ -472,6 +482,7 @@ def refresh_post_index_after_commit(
                 "indexed_post_count",
                 str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
             )
+            set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
             index.connection.commit()
             return
         posts = load_posts(records_posts_dir(repo_root))
@@ -504,6 +515,7 @@ def refresh_post_index_after_commit(
             "indexed_post_count",
             str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
         )
+        set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
         index.connection.commit()
     finally:
         index.connection.close()

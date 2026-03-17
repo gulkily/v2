@@ -16,6 +16,9 @@ from forum_core.post_index import (
     author_id_for_post,
     author_row_for_post,
     current_post_index_schema_version,
+    ensure_post_index_current,
+    get_index_metadata,
+    index_schema_is_current,
     load_indexed_authors,
     load_indexed_root_posts,
     open_post_index,
@@ -109,6 +112,64 @@ class PostIndexSchemaTests(unittest.TestCase):
             self.assertEqual(current_post_index_schema_version(index.connection), POST_INDEX_SCHEMA_VERSION)
         finally:
             index.connection.close()
+
+    def test_ensure_post_index_current_rebuilds_when_schema_backfill_metadata_is_missing(self) -> None:
+        (self.repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
+        (self.repo_root / "records" / "posts" / "root-001.txt").write_text(
+            dedent(
+                """
+                Post-ID: root-001
+                Board-Tags: general
+                Subject: Hello
+
+                Body.
+                """
+            ).lstrip(),
+            encoding="ascii",
+        )
+        subprocess.run(["git", "-C", str(self.repo_root), "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.email", "test@example.com"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "add", "records/posts"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "commit", "-m", "initial"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        index = open_post_index(self.repo_root)
+        try:
+            index.connection.execute(
+                """
+                INSERT INTO posts (post_id, relative_path, subject, thread_id, parent_id, root_thread_id, body, is_root)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                ("root-001", "records/posts/root-001.txt", "Hello", None, None, "root-001", "Body.", 1),
+            )
+            index.connection.execute(
+                "INSERT INTO post_index_metadata (key, value) VALUES (?, ?)",
+                ("indexed_post_count", "1"),
+            )
+            head = subprocess.run(
+                ["git", "-C", str(self.repo_root), "rev-parse", "HEAD"],
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip()
+            index.connection.execute(
+                "INSERT INTO post_index_metadata (key, value) VALUES (?, ?)",
+                ("indexed_head", head),
+            )
+            index.connection.commit()
+            self.assertFalse(index_schema_is_current(index.connection))
+        finally:
+            index.connection.close()
+
+        rebuilt = ensure_post_index_current(self.repo_root)
+        try:
+            self.assertEqual(
+                get_index_metadata(rebuilt.connection, "indexed_schema_version"),
+                str(POST_INDEX_SCHEMA_VERSION),
+            )
+            self.assertTrue(index_schema_is_current(rebuilt.connection))
+        finally:
+            rebuilt.connection.close()
 
 
 class PostIndexAuthorHelpersTests(unittest.TestCase):
