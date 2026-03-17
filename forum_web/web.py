@@ -464,7 +464,6 @@ def build_board_index_page_context(posts, threads, moderation_state, *, repo_roo
     return {
         "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
         "thread_rows_html": render_board_index_thread_rows(public_threads, moderation_state),
-        "action_links_html": render_board_index_action_links(),
     }
 
 
@@ -504,22 +503,6 @@ def render_board_index_thread_row(rank: int, thread, moderation_state) -> str:
         "</div>"
         "</article>"
     )
-
-
-def render_board_index_action_links() -> str:
-    links = [
-        ("/compose/thread", "compose a signed thread"),
-        ("/instance/", "instance info"),
-        ("/activity/", "view repository history"),
-        ("/activity/?view=moderation", "moderation activity"),
-        ("/planning/task-priorities/", "task priorities"),
-    ]
-    return "".join(
-        f'<a class="thread-chip" href="{html.escape(path)}">{html.escape(label)}</a>'
-        for path, label in links
-    )
-
-
 def load_recent_records(*, limit: int = 12):
     posts, _, _, _, _, identity_context = load_repository_state()
     if limit <= 0:

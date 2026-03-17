@@ -111,13 +111,6 @@ class TaskPrioritiesPageTests(unittest.TestCase):
 
         return response["status"], dict(response["headers"]), body
 
-    def test_board_index_links_to_task_priorities_page(self) -> None:
-        status, _, body = self.get("/")
-
-        self.assertEqual(status, "200 OK")
-        self.assertIn('/planning/task-priorities/', body)
-        self.assertIn("task priorities", body)
-
     def test_task_priorities_page_renders_sortable_table(self) -> None:
         status, headers, body = self.get("/planning/task-priorities/")
 
