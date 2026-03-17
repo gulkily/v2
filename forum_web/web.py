@@ -100,6 +100,28 @@ class GitCommitEntry:
     files: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ActivityEvent:
+    kind: str
+    sort_timestamp: datetime
+    commit: GitCommitEntry | None = None
+    moderation_record: object | None = None
+
+
+def activity_filter_mode_from_request(raw_mode: str | None) -> str:
+    mode = (raw_mode or "").strip().lower()
+    if mode in {"content", "moderation"}:
+        return mode
+    return "all"
+
+
+def parse_activity_sort_timestamp(raw_value: str) -> datetime:
+    normalized = raw_value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    return datetime.fromisoformat(normalized)
+
+
 def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitEntry]:
     if limit <= 0:
         return []
@@ -181,6 +203,44 @@ def resolve_commit_posts(commit: GitCommitEntry, posts_index: dict[str, Post]) -
         if normalized in posts_index:
             touched.append(posts_index[normalized])
     return touched
+
+
+def load_activity_events(repo_root: Path, *, mode: str, limit: int = 12) -> list[ActivityEvent]:
+    events: list[ActivityEvent] = []
+    if mode in {"all", "content"}:
+        events.extend(
+            ActivityEvent(
+                kind="content",
+                sort_timestamp=parse_activity_sort_timestamp(commit.commit_date),
+                commit=commit,
+            )
+            for commit in fetch_recent_commits(repo_root, limit=limit)
+        )
+    if mode in {"all", "moderation"}:
+        moderation_records = load_moderation_records(moderation_records_dir(repo_root))
+        records = moderation_log_slice(moderation_records, limit=limit)
+        events.extend(
+            ActivityEvent(
+                kind="moderation",
+                sort_timestamp=parse_activity_sort_timestamp(record.timestamp),
+                moderation_record=record,
+            )
+            for record in records
+        )
+    return sort_activity_events(events, limit=limit)
+
+
+def sort_activity_events(events: list[ActivityEvent], *, limit: int = 12) -> list[ActivityEvent]:
+    ordered = sorted(
+        events,
+        key=lambda event: (
+            event.sort_timestamp,
+            event.commit.commit_id if event.commit is not None else "",
+            event.moderation_record.record_id if event.moderation_record is not None else "",
+        ),
+        reverse=True,
+    )
+    return ordered[:limit]
 
 
 def indexed_timestamp_value(timestamp_text: str | None) -> float:

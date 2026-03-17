@@ -9,7 +9,13 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_web.repository import load_posts
-from forum_web.web import build_posts_index, fetch_recent_commits, resolve_commit_posts
+from forum_web.web import (
+    activity_filter_mode_from_request,
+    build_posts_index,
+    fetch_recent_commits,
+    load_activity_events,
+    resolve_commit_posts,
+)
 
 
 class SiteActivityGitLogHelpersTests(unittest.TestCase):
@@ -34,6 +40,23 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
 
     def commit(self, message: str) -> str:
         self.run_git("add", "records/posts")
+        subprocess.run(
+            ["git", "-C", str(self.repo_root), "commit", "-m", message],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        result = subprocess.run(
+            ["git", "-C", str(self.repo_root), "rev-parse", "HEAD"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def commit_paths(self, paths: list[str], message: str) -> str:
+        self.run_git("add", *paths)
         subprocess.run(
             ["git", "-C", str(self.repo_root), "commit", "-m", message],
             check=True,
@@ -99,6 +122,79 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         resolved = resolve_commit_posts(commits[0], posts_index)
         self.assertEqual(len(resolved), 1)
         self.assertEqual(resolved[0].post_id, "root-010")
+
+    def test_activity_filter_mode_defaults_to_all(self) -> None:
+        self.assertEqual(activity_filter_mode_from_request(None), "all")
+        self.assertEqual(activity_filter_mode_from_request(""), "all")
+        self.assertEqual(activity_filter_mode_from_request("content"), "content")
+        self.assertEqual(activity_filter_mode_from_request("moderation"), "moderation")
+        self.assertEqual(activity_filter_mode_from_request("unknown"), "all")
+
+    def test_load_activity_events_merges_content_and_moderation_in_one_timeline(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+
+            Body one.
+            """,
+        )
+        self.commit("Add root-001")
+        self.write_record(
+            "records/moderation/pin-root-001.txt",
+            """
+            Record-ID: pin-root-001
+            Action: pin
+            Target-Type: thread
+            Target-ID: root-001
+            Timestamp: 2026-03-17T23:00:00Z
+
+            Pin it.
+            """,
+        )
+        self.commit_paths(["records/moderation/pin-root-001.txt"], "Pin root-001")
+
+        with mock.patch("forum_web.web.fetch_recent_commits") as mock_fetch:
+            mock_fetch.return_value = [
+                fetch_recent_commits(self.repo_root, limit=1)[0],
+            ]
+            events = load_activity_events(self.repo_root, mode="all", limit=5)
+
+        self.assertEqual([event.kind for event in events], ["moderation", "content"])
+        self.assertEqual(events[0].moderation_record.record_id, "pin-root-001")
+        self.assertEqual(events[1].commit.subject, "Add root-001")
+
+    def test_load_activity_events_filters_by_kind(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+
+            Body one.
+            """,
+        )
+        self.commit("Add root-001")
+        self.write_record(
+            "records/moderation/pin-root-001.txt",
+            """
+            Record-ID: pin-root-001
+            Action: pin
+            Target-Type: thread
+            Target-ID: root-001
+            Timestamp: 2026-03-17T23:00:00Z
+
+            Pin it.
+            """,
+        )
+        self.commit_paths(["records/moderation/pin-root-001.txt"], "Pin root-001")
+
+        content_events = load_activity_events(self.repo_root, mode="content", limit=5)
+        moderation_events = load_activity_events(self.repo_root, mode="moderation", limit=5)
+
+        self.assertTrue(all(event.kind == "content" for event in content_events))
+        self.assertTrue(all(event.kind == "moderation" for event in moderation_events))
 
 
 if __name__ == "__main__":
