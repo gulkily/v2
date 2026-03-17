@@ -54,7 +54,8 @@ class SiteActivityPageTests(unittest.TestCase):
         )
         self.commit_record("records/moderation/pin-root-010.txt", "Pin root")
         self.write_record("forum_web_stub.py", "print('helper')\n")
-        self.commit_record("forum_web_stub.py", "Add ui helper")
+        self.write_record("docs/notes.md", "# Activity notes\n")
+        self.commit_paths(["forum_web_stub.py", "docs/notes.md"], "Add ui helper")
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -71,9 +72,14 @@ class SiteActivityPageTests(unittest.TestCase):
         self.run_git("init")
         self.run_git("config", "user.name", "Test User")
         self.run_git("config", "user.email", "test@example.com")
+        self.run_git("remote", "add", "origin", "https://github.com/example/forum.git")
 
     def commit_record(self, relative_path: str, message: str) -> None:
         self.run_git("add", relative_path)
+        self.run_git("commit", "-m", message)
+
+    def commit_paths(self, relative_paths: list[str], message: str) -> None:
+        self.run_git("add", *relative_paths)
         self.run_git("commit", "-m", message)
 
     def latest_commit_short(self) -> str:
@@ -125,6 +131,12 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("pin thread", body)
         self.assertIn("Code commit", body)
         self.assertIn("Add ui helper", body)
+        self.assertIn("Test User &lt;test@example.com&gt;", body)
+        self.assertIn("Touched 2 files", body)
+        self.assertIn("Updated files: docs/notes.md, forum_web_stub.py", body)
+        self.assertIn("Markdown updates: docs/notes.md", body)
+        self.assertIn("view on GitHub", body)
+        self.assertIn("https://github.com/example/forum/commit/", body)
         self.assertIn("Add reply", body)
         self.assertIn("Add root", body)
         self.assertIn("Pin root", body)
@@ -148,6 +160,8 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertNotIn("Add ui helper", moderation_body)
         self.assertIn("Add ui helper", code_body)
         self.assertIn("Code commit", code_body)
+        self.assertIn("docs/notes.md", code_body)
+        self.assertIn("view on GitHub", code_body)
         self.assertNotIn("pin thread", code_body)
         self.assertNotIn("Add reply", code_body)
 

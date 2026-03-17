@@ -551,6 +551,23 @@ def format_commit_date(commit_date: str) -> str:
     return timestamp.strftime("%b %d, %Y · %H:%M:%S %z")
 
 
+def format_commit_area_summary(file_summary: CommitFileSummary) -> str:
+    parts = [f"Touched {file_summary.total_files} file{'s' if file_summary.total_files != 1 else ''}"]
+    for area, count in file_summary.area_counts:
+        if count:
+            parts.append(f"{count} {area}")
+    return " · ".join(parts)
+
+
+def format_commit_file_list(files: tuple[str, ...], *, limit: int = 8) -> str:
+    if not files:
+        return "No file paths available."
+    visible = list(files[:limit])
+    if len(files) > limit:
+        visible.append(f"+{len(files) - limit} more")
+    return ", ".join(visible)
+
+
 def render_commit_card(
     commit: GitCommitEntry,
     posts: list[Post],
@@ -575,13 +592,33 @@ def render_commit_card(
     activity_label = "Content commit"
     if activity_kind == "code":
         activity_label = "Code commit"
+    details = [
+        f'<p class="post-link">{html.escape(activity_label)}</p>',
+        f'<p class="commit-id">Commit {html.escape(commit.short_id)}</p>',
+        f'<p class="commit-date">{html.escape(format_commit_date(commit.commit_date))}</p>',
+        f'<p class="post-link">Author {html.escape(commit.author_name)} &lt;{html.escape(commit.author_email)}&gt;</p>',
+        f'<p class="commit-subject">{html.escape(commit.subject or "No message")}</p>',
+        f'<p class="post-link">{html.escape(format_commit_area_summary(commit.file_summary))}</p>',
+        f'<p class="post-link">Updated files: {html.escape(format_commit_file_list(commit.files))}</p>',
+    ]
+    if commit.file_summary.markdown_files:
+        details.append(
+            f'<p class="post-link">Markdown updates: {html.escape(", ".join(commit.file_summary.markdown_files))}</p>'
+        )
+    if commit.file_summary.post_ids:
+        details.append(f'<p class="post-link">Post targets: {html.escape(", ".join(commit.file_summary.post_ids))}</p>')
+    if commit.file_summary.moderation_record_ids:
+        details.append(
+            f'<p class="post-link">Moderation targets: {html.escape(", ".join(commit.file_summary.moderation_record_ids))}</p>'
+        )
+    if commit.github_url:
+        details.append(
+            f'<p><a class="thread-chip" href="{html.escape(commit.github_url)}">view on GitHub</a></p>'
+        )
     return (
         '<article class="commit-card">'
         '<div class="commit-card-meta">'
-        f'<p class="post-link">{html.escape(activity_label)}</p>'
-        f'<p class="commit-id">Commit {html.escape(commit.commit_id[:12])}</p>'
-        f'<p class="commit-date">{html.escape(format_commit_date(commit.commit_date))}</p>'
-        f'<p class="commit-subject">{html.escape(commit.subject or "No message")}</p>'
+        f'{"".join(details)}'
         "</div>"
         '<div class="commit-posts">'
         f"{post_cards}"
