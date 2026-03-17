@@ -112,6 +112,7 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertNotIn('class="front-layout"', body)
+        self.assertIn("Repository history", body)
         self.assertIn("Repository activity stream", body)
         self.assertIn("all activity", body)
         self.assertIn("content activity", body)

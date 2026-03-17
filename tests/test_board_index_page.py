@@ -128,7 +128,7 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('/compose/thread', body)
         self.assertIn('/instance/', body)
         self.assertIn('/activity/', body)
-        self.assertIn('view site activity', body)
+        self.assertIn('view repository history', body)
         self.assertIn('/activity/?view=moderation', body)
         self.assertIn('moderation activity', body)
         self.assertNotIn('/moderation/', body)

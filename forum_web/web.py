@@ -409,7 +409,7 @@ def render_board_index_action_links() -> str:
     links = [
         ("/compose/thread", "compose a signed thread"),
         ("/instance/", "instance info"),
-        ("/activity/", "view site activity"),
+        ("/activity/", "view repository history"),
         ("/activity/?view=moderation", "moderation activity"),
         ("/planning/task-priorities/", "task priorities"),
     ]
@@ -564,9 +564,9 @@ def render_site_activity_page(*, view_mode: str) -> str:
         git_worktree=html.escape(git_worktree_value),
     )
     return render_page(
-        title="Site Activity",
+        title="Repository History",
         hero_kicker="Activity feed",
-        hero_title="Site activity",
+        hero_title="Repository history",
         hero_text="One filtered timeline for repository content, moderation, and code activity on this instance.",
         content_html=content,
     )
