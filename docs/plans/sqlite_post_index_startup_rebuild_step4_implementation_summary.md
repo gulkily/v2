@@ -16,3 +16,12 @@
   - Ran `python -m unittest tests.test_post_index tests.test_post_index_startup`
 - Notes:
   - This startup hook uses the same readiness path as indexed reads rather than inventing a separate initialization code path.
+
+## Stage 3 - Lock stale-index rebuild behavior into regression coverage
+- Changes:
+  - Expanded `tests/test_post_index_startup.py` with a startup-path regression that simulates a stale schema-upgraded index and confirms request-time startup initialization rebuilds and backfills the missing schema-dependent data.
+  - Kept the readiness behavior diagnosable through the explicit `indexed_schema_version` metadata written during rebuild and refresh.
+- Verification:
+  - Ran `python -m unittest tests.test_post_index tests.test_post_index_startup`
+- Notes:
+  - This stage specifically covers the observed failure mode where a new table existed after restart but historical rows had not been backfilled yet.
