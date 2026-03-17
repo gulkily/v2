@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from forum_core.moderation import ModerationRecord
 from forum_core.identity import ProfileSummary, render_profile_summary_text
+from forum_core.merge_requests import MergeManagementSummary
 from forum_web.repository import Post, Thread, is_task_root, root_thread_type
 
 
@@ -9,7 +10,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     lines = [
         "FORUM-API/1",
         "Mode: mixed",
-        "Available-Commands: list_index get_thread get_post get_profile get_moderation_log call_llm create_thread create_reply moderate link_identity update_profile",
+        "Available-Commands: list_index get_thread get_post get_profile get_merge_management get_moderation_log call_llm create_thread create_reply moderate link_identity merge_request update_profile",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
@@ -20,12 +21,14 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
         "/api/create_reply",
         "/api/moderate",
         "/api/link_identity",
+        "/api/merge_request",
         "/api/update_profile",
         "/api/call_llm",
         "/api/list_index",
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",
         "/api/get_profile?identity_id=<identity-id>",
+        "/api/get_merge_management?identity_id=<identity-id>",
         "/api/get_moderation_log?limit=<decimal>&before=<record-id-or-empty>",
     ]
     return "\n".join(lines) + "\n"
@@ -52,11 +55,13 @@ def render_llms_text() -> str:
         "- GET /api/get_thread?thread_id=<thread-id>",
         "- GET /api/get_post?post_id=<post-id>",
         "- GET /api/get_profile?identity_id=<identity-id>",
+        "- GET /api/get_merge_management?identity_id=<identity-id>",
         "- GET /api/get_moderation_log?limit=<decimal>&before=<record-id-or-empty>",
         "- POST /api/create_thread",
         "- POST /api/create_reply",
         "- POST /api/moderate",
         "- POST /api/link_identity",
+        "- POST /api/merge_request",
         "- POST /api/update_profile",
         "- POST /api/call_llm",
         "",
@@ -138,6 +143,43 @@ def render_post_text(post: Post, *, hidden: bool = False) -> str:
 
 def render_profile_text(summary: ProfileSummary) -> str:
     return render_profile_summary_text(summary)
+
+
+def render_merge_management_text(summary: MergeManagementSummary) -> str:
+    lines = [
+        "Command: get_merge_management",
+        f"Identity-ID: {summary.identity_id}",
+        f"Historical-Match-Count: {len(summary.historical_matches)}",
+        f"Outgoing-Request-Count: {len(summary.outgoing_requests)}",
+        f"Incoming-Request-Count: {len(summary.incoming_requests)}",
+        f"Dismissed-Request-Count: {len(summary.dismissed_requests)}",
+        f"Approved-Request-Count: {len(summary.approved_requests)}",
+        "",
+        "Historical-Matches:",
+    ]
+    for match in summary.historical_matches:
+        lines.append(
+            "\t".join(
+                [
+                    match.candidate_identity_id,
+                    match.candidate_display_name,
+                    " ".join(match.shared_display_names),
+                ]
+            )
+        )
+    lines.extend(["", "Outgoing-Requests:"])
+    for state in summary.outgoing_requests:
+        lines.append("\t".join([state.requester_identity_id, state.target_identity_id, state.latest_request_record_id]))
+    lines.extend(["", "Incoming-Requests:"])
+    for state in summary.incoming_requests:
+        lines.append("\t".join([state.requester_identity_id, state.target_identity_id, state.latest_request_record_id]))
+    lines.extend(["", "Dismissed-Requests:"])
+    for state in summary.dismissed_requests:
+        lines.append("\t".join([state.requester_identity_id, state.target_identity_id, state.latest_request_record_id]))
+    lines.extend(["", "Approved-Requests:"])
+    for state in summary.approved_requests:
+        lines.append("\t".join([state.requester_identity_id, state.target_identity_id, state.latest_request_record_id]))
+    return "\n".join(lines) + "\n"
 
 
 def render_post_block(post: Post, *, hidden: bool = False) -> str:

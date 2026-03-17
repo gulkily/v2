@@ -17,6 +17,14 @@ from forum_core.identity_links import (
     identity_link_records_dir,
     load_identity_link_records,
 )
+from forum_core.merge_requests import (
+    MergeRequestRecord,
+    MergeRequestState,
+    derive_approved_merge_links,
+    derive_merge_request_states,
+    load_merge_request_records,
+    merge_request_records_dir,
+)
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
     ResolvedDisplayName,
@@ -32,6 +40,8 @@ class IdentityContext:
     bootstraps_by_identity_id: dict[str, IdentityBootstrap]
     resolution: IdentityResolution
     profile_update_records: tuple[ProfileUpdateRecord, ...]
+    merge_request_records: tuple[MergeRequestRecord, ...]
+    merge_request_states: tuple[MergeRequestState, ...]
 
     def canonical_identity_id(self, identity_id: str | None) -> str | None:
         return self.resolution.canonical_identity_id(identity_id)
@@ -58,12 +68,15 @@ def identity_records_dir(repo_root: Path) -> Path:
 
 def load_identity_context(*, repo_root: Path, posts: list[Post]) -> IdentityContext:
     bootstraps = load_identity_bootstraps(identity_records_dir(repo_root))
+    merge_request_records = tuple(load_merge_request_records(merge_request_records_dir(repo_root)))
+    merge_request_states = derive_merge_request_states(list(merge_request_records))
+    link_records = load_identity_link_records(identity_link_records_dir(repo_root))
     resolution = derive_identity_resolution(
         visible_identity_ids=collect_visible_identity_ids(
             identity_bootstrap_ids=[bootstrap.identity_id for bootstrap in bootstraps],
             post_identity_ids=[post.identity_id or "" for post in posts],
         ),
-        link_records=load_identity_link_records(identity_link_records_dir(repo_root)),
+        link_records=link_records + list(derive_approved_merge_links(merge_request_states)),
     )
     return IdentityContext(
         bootstraps_by_identity_id=index_identity_bootstraps(bootstraps),
@@ -71,6 +84,8 @@ def load_identity_context(*, repo_root: Path, posts: list[Post]) -> IdentityCont
         profile_update_records=tuple(
             load_profile_update_records(profile_update_records_dir(repo_root))
         ),
+        merge_request_records=merge_request_records,
+        merge_request_states=merge_request_states,
     )
 
 

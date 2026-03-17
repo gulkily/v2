@@ -18,6 +18,7 @@ from forum_core.post_index import IndexedPostRow, ensure_post_index_current, loa
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
+from forum_core.merge_requests import derive_merge_management_summary
 from forum_core.moderation import (
     derive_moderation_state,
     load_moderation_records,
@@ -47,6 +48,7 @@ from forum_web.api_text import (
     render_bad_request_text,
     render_index_text,
     render_llm_result_text,
+    render_merge_management_text,
     render_moderation_log_text,
     render_not_found_text,
     render_post_text,
@@ -1566,6 +1568,23 @@ def render_api_get_profile(identity_id: str | None) -> tuple[str, str]:
     return "200 OK", render_profile_text(summary)
 
 
+def render_api_get_merge_management(identity_id: str | None) -> tuple[str, str]:
+    if not identity_id:
+        return "400 Bad Request", render_bad_request_text("missing required query parameter: identity_id")
+
+    _, _, _, _, _, identity_context = load_repository_state()
+    summary = derive_merge_management_summary(
+        identity_id=identity_id,
+        resolution=identity_context.resolution,
+        profile_updates=list(identity_context.profile_update_records),
+        states=identity_context.merge_request_states,
+    )
+    if summary is None:
+        return "404 Not Found", render_not_found_text("identity", identity_id)
+
+    return "200 OK", render_merge_management_text(summary)
+
+
 def render_api_get_moderation_log(limit: int, before: str | None) -> tuple[str, str]:
     _, _, _, moderation_records, _, _ = load_repository_state()
     try:
@@ -1979,6 +1998,14 @@ def application(environ, start_response):
         if path == "/api/get_profile":
             identity_id = query_params.get("identity_id", [""])[0].strip() or None
             status, body_text = render_api_get_profile(identity_id)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/get_merge_management":
+            identity_id = query_params.get("identity_id", [""])[0].strip() or None
+            status, body_text = render_api_get_merge_management(identity_id)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)

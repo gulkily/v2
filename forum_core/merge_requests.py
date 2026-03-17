@@ -61,6 +61,16 @@ class HistoricalUsernameMatch:
     shared_display_names: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class MergeManagementSummary:
+    identity_id: str
+    historical_matches: tuple[HistoricalUsernameMatch, ...]
+    outgoing_requests: tuple[MergeRequestState, ...]
+    incoming_requests: tuple[MergeRequestState, ...]
+    dismissed_requests: tuple[MergeRequestState, ...]
+    approved_requests: tuple[MergeRequestState, ...]
+
+
 def merge_request_sort_key(record: MergeRequestRecord) -> tuple[str, str]:
     return record.timestamp, record.record_id
 
@@ -357,3 +367,60 @@ def derive_historical_username_matches(
         )
 
     return tuple(matches)
+
+
+def derive_merge_management_summary(
+    *,
+    identity_id: str,
+    resolution: IdentityResolution,
+    profile_updates: list[ProfileUpdateRecord],
+    states: tuple[MergeRequestState, ...],
+) -> MergeManagementSummary | None:
+    canonical_identity_id = resolution.canonical_identity_id(identity_id)
+    if canonical_identity_id is None:
+        return None
+
+    outgoing_requests: list[MergeRequestState] = []
+    incoming_requests: list[MergeRequestState] = []
+    dismissed_requests: list[MergeRequestState] = []
+    approved_requests: list[MergeRequestState] = []
+
+    for state in states:
+        requester_canonical_identity_id = resolution.canonical_identity_id(state.requester_identity_id)
+        target_canonical_identity_id = resolution.canonical_identity_id(state.target_identity_id)
+
+        if state.active_merge and (
+            requester_canonical_identity_id == canonical_identity_id
+            or target_canonical_identity_id == canonical_identity_id
+        ):
+            approved_requests.append(state)
+            continue
+        if state.dismissed and target_canonical_identity_id == canonical_identity_id:
+            dismissed_requests.append(state)
+            continue
+        if state.pending and requester_canonical_identity_id == canonical_identity_id:
+            outgoing_requests.append(state)
+            continue
+        if state.pending and target_canonical_identity_id == canonical_identity_id:
+            incoming_requests.append(state)
+
+    return MergeManagementSummary(
+        identity_id=canonical_identity_id,
+        historical_matches=derive_historical_username_matches(
+            identity_id=canonical_identity_id,
+            resolution=resolution,
+            profile_updates=profile_updates,
+        ),
+        outgoing_requests=tuple(
+            sorted(outgoing_requests, key=lambda state: (state.latest_request_timestamp, state.latest_request_record_id))
+        ),
+        incoming_requests=tuple(
+            sorted(incoming_requests, key=lambda state: (state.latest_request_timestamp, state.latest_request_record_id))
+        ),
+        dismissed_requests=tuple(
+            sorted(dismissed_requests, key=lambda state: (state.latest_request_timestamp, state.latest_request_record_id))
+        ),
+        approved_requests=tuple(
+            sorted(approved_requests, key=lambda state: (state.latest_request_timestamp, state.latest_request_record_id))
+        ),
+    )
