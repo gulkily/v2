@@ -36,6 +36,7 @@ class IndexedPostRow:
     post_id: str
     created_at: str | None
     updated_at: str | None
+    author_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -513,7 +514,7 @@ def load_indexed_root_posts(repo_root: Path, *, board_tag: str | None = None) ->
     try:
         parameters: list[str] = []
         sql = """
-            SELECT posts.post_id, posts.created_at, posts.updated_at
+            SELECT posts.post_id, posts.created_at, posts.updated_at, posts.author_id
             FROM posts
             WHERE posts.is_root = 1
         """
@@ -533,6 +534,30 @@ def load_indexed_root_posts(repo_root: Path, *, board_tag: str | None = None) ->
                 post_id=row["post_id"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
+                author_id=row["author_id"],
+            )
+            for row in rows
+        }
+    finally:
+        index.connection.close()
+
+
+def load_indexed_authors(repo_root: Path) -> dict[str, IndexedAuthorRow]:
+    index = ensure_post_index_current(repo_root)
+    try:
+        rows = index.connection.execute(
+            """
+            SELECT author_id, canonical_identity_id, display_name, display_name_source, signer_fingerprint
+            FROM authors
+            """
+        ).fetchall()
+        return {
+            row["author_id"]: IndexedAuthorRow(
+                author_id=row["author_id"],
+                canonical_identity_id=row["canonical_identity_id"],
+                display_name=row["display_name"],
+                display_name_source=row["display_name_source"],
+                signer_fingerprint=row["signer_fingerprint"],
             )
             for row in rows
         }

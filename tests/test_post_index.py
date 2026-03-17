@@ -16,6 +16,8 @@ from forum_core.post_index import (
     author_id_for_post,
     author_row_for_post,
     current_post_index_schema_version,
+    load_indexed_authors,
+    load_indexed_root_posts,
     open_post_index,
     post_index_path,
     rebuild_post_index,
@@ -348,6 +350,52 @@ class PostIndexBuildTests(unittest.TestCase):
             self.assertEqual(post_row["author_id"], "openpgp:author")
         finally:
             index.connection.close()
+
+    def test_load_indexed_author_helpers_expose_normalized_author_data(self) -> None:
+        self.write_post(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Author row
+
+            Body.
+            """,
+        )
+        self.commit_all("Add root", "2026-03-17T09:00:00+00:00")
+
+        with mock.patch("forum_core.post_index.load_identity_context") as mock_context_loader:
+            mock_context = mock.Mock()
+            mock_context.canonical_identity_id.return_value = "openpgp:author"
+            mock_context.resolved_display_name.return_value = mock.Mock(display_name="Author Name")
+            mock_context_loader.return_value = mock_context
+            with mock.patch("forum_core.post_index.resolve_identity_display_name", return_value="Author Name"):
+                posts = load_posts(self.repo_root / "records" / "posts")
+                original_post = posts[0]
+                patched_post = original_post.__class__(
+                    **{
+                        **original_post.__dict__,
+                        "identity_id": "openpgp:author",
+                        "signer_fingerprint": "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+                    }
+                )
+                with mock.patch("forum_core.post_index.load_posts", return_value=[patched_post]):
+                    rebuild_post_index(self.repo_root)
+
+        authors = load_indexed_authors(self.repo_root)
+        root_posts = load_indexed_root_posts(self.repo_root)
+
+        self.assertEqual(
+            authors["openpgp:author"],
+            IndexedAuthorRow(
+                author_id="openpgp:author",
+                canonical_identity_id="openpgp:author",
+                display_name="Author Name",
+                display_name_source="profile_update",
+                signer_fingerprint="ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+            ),
+        )
+        self.assertEqual(root_posts["root-001"].author_id, "openpgp:author")
 
     def test_store_post_refreshes_index_after_successful_commit(self) -> None:
         payload_text = dedent(

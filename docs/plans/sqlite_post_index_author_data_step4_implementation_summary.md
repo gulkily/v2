@@ -17,3 +17,12 @@
   - Ran `python -m unittest tests.test_post_index`
 - Notes:
   - This stage keeps author data derived from canonical records and existing identity-resolution logic rather than introducing a new identity source.
+
+## Stage 3 - Expose indexed author data through focused read helpers
+- Changes:
+  - Extended `forum_core/post_index.py` with `load_indexed_authors(...)` and an `author_id` field on `IndexedPostRow` so normalized author data is reachable through one narrow read-side contract.
+  - Expanded `tests/test_post_index.py` so the indexed author helper and root-post author link are both covered without falling back to reparsing canonical files.
+- Verification:
+  - Ran `python -m unittest tests.test_post_index`
+- Notes:
+  - This stage keeps the read-side exposure intentionally small: one helper for normalized author rows and one stable link from indexed root posts.
