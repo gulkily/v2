@@ -231,15 +231,7 @@ def load_activity_events(repo_root: Path, *, mode: str, limit: int = 12) -> list
 
 
 def sort_activity_events(events: list[ActivityEvent], *, limit: int = 12) -> list[ActivityEvent]:
-    ordered = sorted(
-        events,
-        key=lambda event: (
-            event.sort_timestamp,
-            event.commit.commit_id if event.commit is not None else "",
-            event.moderation_record.record_id if event.moderation_record is not None else "",
-        ),
-        reverse=True,
-    )
+    ordered = sorted(events, key=lambda event: event.sort_timestamp, reverse=True)
     return ordered[:limit]
 
 
@@ -478,25 +470,58 @@ def render_commit_card(commit: GitCommitEntry, posts: list[Post], identity_conte
     )
 
 
-def render_site_activity_page() -> str:
+def render_activity_filter_nav(*, current_mode: str) -> str:
+    links = [
+        ("all", "/activity/", "all activity"),
+        ("content", "/activity/?view=content", "content activity"),
+        ("moderation", "/activity/?view=moderation", "moderation activity"),
+    ]
+    parts = []
+    for mode, href, label in links:
+        classes = "thread-chip"
+        if mode == current_mode:
+            classes += " thread-chip-active"
+        parts.append(f'<a class="{classes}" href="{href}">{html.escape(label)}</a>')
+    return "".join(parts)
+
+
+def render_activity_event_card(event: ActivityEvent, *, posts_index: dict[str, Post], identity_context) -> str:
+    if event.kind == "moderation" and event.moderation_record is not None:
+        return render_moderation_card(event.moderation_record, identity_context=identity_context)
+    assert event.commit is not None
+    return render_commit_card(
+        event.commit,
+        resolve_commit_posts(event.commit, posts_index),
+        identity_context,
+    )
+
+
+def render_site_activity_page(*, view_mode: str) -> str:
     repo_root = get_repo_root()
     posts, _, _, _, _, identity_context = load_repository_state()
     posts_index = build_posts_index(posts, repo_root)
-    commits = fetch_recent_commits(repo_root)
-    commit_cards = "".join(
-        render_commit_card(
-            commit,
-            resolve_commit_posts(commit, posts_index),
-            identity_context,
+    events = load_activity_events(repo_root, mode=view_mode)
+    event_cards = "".join(
+        render_activity_event_card(
+            event,
+            posts_index=posts_index,
+            identity_context=identity_context,
         )
-        for commit in commits
+        for event in events
     )
-    if not commit_cards:
-        commit_cards = '<article class="post-card"><p class="post-link">No recent git activity is available yet.</p></article>'
+    if not event_cards:
+        event_cards = '<article class="post-card"><p class="post-link">No activity matches this filter yet.</p></article>'
     git_summary = git_status_summary(repo_root)
     git_worktree_value = git_summary.get("git_worktree") or git_summary.get("worktree") or "git status unavailable"
+    intro_text = "Browse one combined reverse-chronological timeline of git-backed content changes and moderation events."
+    if view_mode == "content":
+        intro_text = "Browse only git-backed content activity for this instance."
+    elif view_mode == "moderation":
+        intro_text = "Browse only signed moderation actions for this instance."
     content = load_template("activity.html").substitute(
-        commit_cards_html=commit_cards,
+        filter_nav_html=render_activity_filter_nav(current_mode=view_mode),
+        activity_intro_text=html.escape(intro_text),
+        event_cards_html=event_cards,
         git_commit_id=html.escape(git_summary.get("commit_id") or "unknown"),
         git_commit_date=html.escape(git_summary.get("commit_date") or "unknown"),
         git_source_path=html.escape(git_summary.get("source_path") or "unknown"),
@@ -506,7 +531,7 @@ def render_site_activity_page() -> str:
         title="Site Activity",
         hero_kicker="Activity feed",
         hero_title="Site activity",
-        hero_text="The latest signed posts and replies together with the git commit that powers this instance.",
+        hero_text="One filtered timeline for git-backed content activity and signed moderation events on this instance.",
         content_html=content,
     )
 
@@ -1785,7 +1810,8 @@ def application(environ, start_response):
             return [body]
 
         if path == "/activity/":
-            body = render_site_activity_page().encode("utf-8")
+            view_mode = activity_filter_mode_from_request(query_params.get("view", [""])[0])
+            body = render_site_activity_page(view_mode=view_mode).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

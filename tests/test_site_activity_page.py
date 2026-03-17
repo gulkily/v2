@@ -40,6 +40,19 @@ class SiteActivityPageTests(unittest.TestCase):
             """,
         )
         self.commit_record("records/posts/reply-020.txt", "Add reply")
+        self.write_record(
+            "records/moderation/pin-root-010.txt",
+            """
+            Record-ID: pin-root-010
+            Action: pin
+            Target-Type: thread
+            Target-ID: root-010
+            Timestamp: 2026-03-17T23:00:00Z
+
+            Pinning the thread.
+            """,
+        )
+        self.commit_record("records/moderation/pin-root-010.txt", "Pin root")
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -68,12 +81,12 @@ class SiteActivityPageTests(unittest.TestCase):
             stdout=subprocess.PIPE,
             text=True,
         )
-        return result.stdout.strip()[:12]
+        return result.stdout.strip()[:7]
 
-    def get(self, path: str) -> tuple[str, dict[str, str], str]:
+    def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": "GET",
             "CONTENT_LENGTH": "0",
             "wsgi.input": BytesIO(b""),
@@ -98,16 +111,30 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn('class="site-footer"', body)
         self.assertNotIn('class="front-layout"', body)
         self.assertIn("Canonical activity stream", body)
+        self.assertIn("all activity", body)
+        self.assertIn("content activity", body)
+        self.assertIn("moderation activity", body)
         self.assertIn('class="post-card"', body)
         self.assertIn("First root", body)
         self.assertIn("root-010", body)
         self.assertIn("reply-020", body)
+        self.assertIn("pin thread", body)
         self.assertIn("Add reply", body)
         self.assertIn("Add root", body)
+        self.assertTrue(body.index("pin thread") < body.index("Add reply"))
         self.assertTrue(body.index("Add reply") < body.index("Add root"))
         self.assertIn(self.latest_commit_short(), body)
         self.assertIn("Working tree", body)
         self.assertIn("records/instance/public.txt", body)
+
+    def test_activity_page_filters_content_and_moderation(self) -> None:
+        _, _, content_body = self.get("/activity/", "view=content")
+        _, _, moderation_body = self.get("/activity/", "view=moderation")
+
+        self.assertIn("Add reply", content_body)
+        self.assertNotIn("pin thread", content_body)
+        self.assertIn("pin thread", moderation_body)
+        self.assertNotIn("Add reply", moderation_body)
 
 
 if __name__ == "__main__":
