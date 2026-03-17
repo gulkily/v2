@@ -128,11 +128,12 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('/compose/thread', body)
         self.assertIn('/instance/', body)
         self.assertIn('/activity/', body)
-        self.assertIn('view repository history', body)
-        self.assertIn('/activity/?view=moderation', body)
-        self.assertIn('moderation activity', body)
-        self.assertNotIn('/moderation/', body)
-        self.assertIn('/planning/task-priorities/', body)
+        self.assertIn('>Project info</a>', body)
+        self.assertIn('>Activity</a>', body)
+        self.assertNotIn('view repository history', body)
+        self.assertNotIn('/activity/?view=moderation', body)
+        self.assertNotIn('moderation activity', body)
+        self.assertNotIn('/planning/task-priorities/', body)
 
     def test_board_index_orders_threads_by_commit_recency_when_index_is_available(self) -> None:
         self.init_git_repo()

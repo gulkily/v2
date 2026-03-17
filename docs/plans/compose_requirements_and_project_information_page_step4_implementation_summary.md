@@ -17,3 +17,12 @@
   - Ran `python -m unittest tests.test_instance_info_page tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`
 - Notes:
   - The route remains `/instance/` in this stage. Only the page framing and content model changed.
+
+## Stage 3 - Align navigation and regression coverage
+- Changes:
+  - Updated `forum_web/templates.py` so the shared primary nav now labels `/instance/` as `Project info`, aligning the renamed page framing with the rest of the site.
+  - Expanded `tests/test_board_index_page.py` and `tests/test_instance_info_page.py` so the shared-nav label and the renamed project-information framing are both covered.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_instance_info_page tests.test_compose_thread_page tests.test_compose_reply_page tests.test_task_thread_pages`
+- Notes:
+  - The `/instance/` route remains intact in this stage; only the user-facing terminology changed.

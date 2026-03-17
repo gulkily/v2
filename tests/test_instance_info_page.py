@@ -71,12 +71,12 @@ class InstanceInfoPageTests(unittest.TestCase):
 
         return response["status"], dict(response["headers"]), body
 
-    def test_board_index_links_to_instance_info_page(self) -> None:
+    def test_board_index_links_to_project_information_page(self) -> None:
         status, _, body = self.get("/")
 
         self.assertEqual(status, "200 OK")
         self.assertIn('/instance/', body)
-        self.assertIn(">Instance</a>", body)
+        self.assertIn(">Project info</a>", body)
 
     def test_instance_info_page_renders_public_facts(self) -> None:
         status, headers, body = self.get("/instance/")

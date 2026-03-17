@@ -17,8 +17,8 @@ def render_primary_nav(*, aria_label: str = "Primary") -> str:
     links = [
         ("/", "Home"),
         ("/compose/thread", "Post"),
-        ("/instance/", "Instance"),
-        ("/planning/task-priorities/", "Planning"),
+        ("/instance/", "Project info"),
+        ("/activity/", "Activity"),
     ]
     items = "".join(
         f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
