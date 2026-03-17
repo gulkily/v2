@@ -339,11 +339,13 @@ def describe_git_worktree(repo_root: Path) -> str:
 
 def git_status_summary(repo_root: Path) -> dict[str, str]:
     info = load_instance_info(repo_root)
+    worktree_status = describe_git_worktree(repo_root)
     return {
         "commit_id": info.commit_id or "unknown",
         "commit_date": info.commit_date or "unknown",
         "source_path": str(info.source_path),
-        "worktree": describe_git_worktree(repo_root),
+        "worktree": worktree_status,
+        "git_worktree": worktree_status,
     }
 
 
@@ -443,12 +445,13 @@ def render_site_activity_page() -> str:
     if not commit_cards:
         commit_cards = '<article class="post-card"><p class="post-link">No recent git activity is available yet.</p></article>'
     git_summary = git_status_summary(repo_root)
+    git_worktree_value = git_summary.get("git_worktree") or git_summary.get("worktree") or "git status unavailable"
     content = load_template("activity.html").substitute(
         commit_cards_html=commit_cards,
-        git_commit_id=html.escape(git_summary["commit_id"]),
-        git_commit_date=html.escape(git_summary["commit_date"]),
-        git_source_path=html.escape(git_summary["source_path"]),
-        git_worktree=html.escape(git_summary["worktree"]),
+        git_commit_id=html.escape(git_summary.get("commit_id") or "unknown"),
+        git_commit_date=html.escape(git_summary.get("commit_date") or "unknown"),
+        git_source_path=html.escape(git_summary.get("source_path") or "unknown"),
+        git_worktree=html.escape(git_worktree_value),
     )
     return render_page(
         title="Site Activity",
