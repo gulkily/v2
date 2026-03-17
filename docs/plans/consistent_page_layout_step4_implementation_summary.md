@@ -20,3 +20,14 @@
   - Ran `python -m unittest tests.test_task_thread_pages tests.test_compose_thread_page tests.test_instance_info_page`
 - Notes:
   - Front-page-specific CSS and helper branches still exist in the codebase as dead or transitional paths; Stage 3 will remove stale layout branches and add broader regression coverage.
+
+## Stage 3 - Remove stale layout branches and lock coverage
+- Changes:
+  - Removed the dead `front-*` shell CSS and `page-shell-front` styling that no longer had active callers after the Stage 2 migration.
+  - Kept only the board-index-specific content styling needed for the unified shell.
+  - Added shared-shell assertions for the activity and task-priorities pages so representative routes now verify the canonical header/footer contract directly.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_site_activity_page tests.test_task_priorities_page`
+  - Ran `python -m unittest tests.test_compose_thread_page tests.test_profile_update_page tests.test_task_thread_pages tests.test_instance_info_page`
+- Notes:
+  - The verification intentionally checks representative route families rather than every single page-specific copy string, so future shell refactors should keep these tests stable as long as the shared layout contract remains intact.

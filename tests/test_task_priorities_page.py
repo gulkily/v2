@@ -123,6 +123,8 @@ class TaskPrioritiesPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn('class="site-header site-header--page"', body)
+        self.assertIn('class="site-footer"', body)
         self.assertIn("Development task priorities", body)
         self.assertIn("Open task table", body)
         self.assertIn('data-sortable-table', body)

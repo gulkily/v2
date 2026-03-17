@@ -94,6 +94,9 @@ class SiteActivityPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn('class="site-header site-header--page"', body)
+        self.assertIn('class="site-footer"', body)
+        self.assertNotIn('class="front-layout"', body)
         self.assertIn("Canonical activity stream", body)
         self.assertIn('class="post-card"', body)
         self.assertIn("First root", body)
