@@ -15,6 +15,9 @@ from forum_core.post_index import (
     post_index_path,
     rebuild_post_index,
 )
+from forum_cgi.posting import store_post
+from forum_cgi.task_status import submit_mark_task_done
+from forum_web.repository import parse_post_text
 
 
 class PostIndexSchemaTests(unittest.TestCase):
@@ -189,6 +192,67 @@ class PostIndexBuildTests(unittest.TestCase):
             self.assertEqual([row["board_tag"] for row in board_tags], ["alpha", "planning"])
             self.assertEqual([row["dependency_post_id"] for row in dependencies], ["T00", "T99"])
             self.assertEqual([row["source_name"] for row in sources], ["ideas.txt", "todo.txt"])
+        finally:
+            index.connection.close()
+
+    def test_store_post_refreshes_index_after_successful_commit(self) -> None:
+        payload_text = dedent(
+            """
+            Post-ID: root-200
+            Board-Tags: general
+            Subject: Stored post
+
+            Stored body.
+            """
+        ).lstrip()
+
+        post = parse_post_text(payload_text)
+        store_post("create_thread", post, self.repo_root, payload_text)
+
+        index = open_post_index(self.repo_root)
+        try:
+            row = index.connection.execute(
+                "SELECT subject FROM posts WHERE post_id = ?",
+                ("root-200",),
+            ).fetchone()
+            self.assertIsNotNone(row)
+            assert row is not None
+            self.assertEqual(row["subject"], "Stored post")
+        finally:
+            index.connection.close()
+
+    def test_commit_backed_task_update_refreshes_existing_index_row(self) -> None:
+        self.write_post(
+            "records/posts/T01.txt",
+            """
+            Post-ID: T01
+            Board-Tags: planning
+            Subject: Task root
+            Thread-Type: task
+            Task-Status: proposed
+            Task-Presentability-Impact: 0.50
+            Task-Implementation-Difficulty: 0.20
+
+            Initial task body.
+            """,
+        )
+        self.commit_all("Add task", "2026-03-17T09:00:00+00:00")
+        rebuild_post_index(self.repo_root)
+
+        submit_mark_task_done("T01", self.repo_root)
+
+        index = open_post_index(self.repo_root)
+        try:
+            row = index.connection.execute(
+                "SELECT task_status, created_at, updated_at FROM posts WHERE post_id = ?",
+                ("T01",),
+            ).fetchone()
+            self.assertIsNotNone(row)
+            assert row is not None
+            self.assertEqual(row["task_status"], "done")
+            self.assertEqual(row["created_at"], "2026-03-17T09:00:00+00:00")
+            self.assertIsNotNone(row["updated_at"])
+            self.assertNotEqual(row["updated_at"], row["created_at"])
         finally:
             index.connection.close()
 

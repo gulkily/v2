@@ -18,3 +18,14 @@
   - Ran `python -m unittest tests.test_board_index_page tests.test_task_thread_pages`
 - Notes:
   - The rebuild path now establishes the full derived model, but normal app writes still do not refresh the index automatically until Stage 3.
+
+## Stage 3 - Refresh the index after successful repo writes
+- Changes:
+  - Added `ensure_post_index_current(...)`, `refresh_post_index_after_commit(...)`, and indexed-root lookup helpers to `forum_core/post_index.py` so the derived database can stay current during normal operation and repair itself when metadata says it is stale.
+  - Hooked `forum_cgi/posting.py:commit_post(...)` into the shared post-index refresh path so successful commit-backed repo writes update the derived cache immediately.
+  - Extended `tests/test_post_index.py` with write-through coverage for stored thread creation and a commit-backed task-status update.
+- Verification:
+  - Ran `python -m unittest tests.test_post_index`
+  - Ran `python -m unittest tests.test_task_thread_pages tests.test_board_index_page`
+- Notes:
+  - Stage 3 keeps the SQLite layer current for normal commit-backed writes, but no read surface uses it for ordering until Stage 4.

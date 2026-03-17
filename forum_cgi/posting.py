@@ -8,6 +8,7 @@ from pathlib import Path
 
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
+from forum_core.post_index import refresh_post_index_after_commit
 from forum_web.repository import Post, index_posts, load_posts, parse_post_text
 
 
@@ -249,7 +250,7 @@ def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
         stderr=subprocess.PIPE,
         text=True,
     )
-    return subprocess.run(
+    commit_id = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
         check=True,
         env=env,
@@ -257,3 +258,9 @@ def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
         stderr=subprocess.PIPE,
         text=True,
     ).stdout.strip()
+    refresh_post_index_after_commit(
+        repo_root,
+        commit_id=commit_id,
+        touched_paths=tuple(relative_paths),
+    )
+    return commit_id

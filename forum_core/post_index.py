@@ -29,6 +29,13 @@ class IndexBuildResult:
     indexed_head: str | None
 
 
+@dataclass(frozen=True)
+class IndexedPostRow:
+    post_id: str
+    created_at: str | None
+    updated_at: str | None
+
+
 def post_index_path(repo_root: Path) -> Path:
     return repo_root / "state" / "cache" / "post_index.sqlite3"
 
@@ -308,3 +315,94 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
     if owned_index:
         active_index.connection.close()
     return IndexBuildResult(post_count=len(posts), indexed_head=indexed_head)
+
+
+def ensure_post_index_current(repo_root: Path) -> PostIndex:
+    index = open_post_index(repo_root)
+    expected_count = len(list(records_posts_dir(repo_root).glob("*.txt")))
+    indexed_head = get_index_metadata(index.connection, "indexed_head") or None
+    indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
+    try:
+        indexed_count = int(indexed_count_text)
+    except ValueError:
+        indexed_count = -1
+    current_head = current_repo_head(repo_root)
+    if indexed_count != expected_count or indexed_head != current_head:
+        rebuild_post_index(repo_root, index=index)
+    return index
+
+
+def refresh_post_index_after_commit(
+    repo_root: Path,
+    *,
+    commit_id: str,
+    touched_paths: tuple[str, ...],
+) -> None:
+    db_exists = post_index_path(repo_root).exists()
+    if not db_exists:
+        rebuild_post_index(repo_root)
+        return
+
+    index = open_post_index(repo_root)
+    try:
+        for touched_path in touched_paths:
+            path = repo_root / touched_path
+            if path.parent != records_posts_dir(repo_root) or path.suffix != ".txt":
+                continue
+            if not path.exists():
+                continue
+            post = load_posts(records_posts_dir(repo_root))
+            matching_post = next((candidate for candidate in post if candidate.path == path), None)
+            if matching_post is None:
+                continue
+            timestamps = post_commit_timestamps(repo_root).get(
+                matching_post.post_id,
+                PostCommitTimestamps(created_at=None, updated_at=None),
+            )
+            upsert_indexed_post(
+                index.connection,
+                post=matching_post,
+                repo_root=repo_root,
+                timestamps=timestamps,
+            )
+        set_index_metadata(index.connection, "indexed_head", commit_id)
+        set_index_metadata(
+            index.connection,
+            "indexed_post_count",
+            str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
+        )
+        index.connection.commit()
+    finally:
+        index.connection.close()
+
+
+def load_indexed_root_posts(repo_root: Path, *, board_tag: str | None = None) -> dict[str, IndexedPostRow]:
+    index = ensure_post_index_current(repo_root)
+    try:
+        parameters: list[str] = []
+        sql = """
+            SELECT posts.post_id, posts.created_at, posts.updated_at
+            FROM posts
+            WHERE posts.is_root = 1
+        """
+        if board_tag is not None:
+            sql += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM post_board_tags
+                    WHERE post_board_tags.post_id = posts.post_id
+                      AND post_board_tags.board_tag = ?
+                )
+            """
+            parameters.append(board_tag)
+        rows = index.connection.execute(sql, parameters).fetchall()
+        return {
+            row["post_id"]: IndexedPostRow(
+                post_id=row["post_id"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+            for row in rows
+        }
+    finally:
+        index.connection.close()
