@@ -24,6 +24,7 @@ def render_primary_nav(*, aria_label: str = "Primary") -> str:
         f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
         for path, label in links
     )
+    items += '<a href="" data-profile-nav-link hidden>My profile</a>'
     return f'<nav class="site-header-nav" aria-label="{html.escape(aria_label)}">{items}</nav>'
 
 
@@ -93,6 +94,7 @@ def render_page(
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()
+    page_script_html = render_profile_nav_script_tag() + page_script_html
     return base.substitute(
         title=html.escape(title),
         page_header_html=page_header_html,
