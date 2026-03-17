@@ -14,7 +14,7 @@ from wsgiref.util import setup_testing_defaults
 from forum_core.instance_info import load_instance_info, render_public_value
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
-from forum_core.post_index import IndexedPostRow, load_indexed_root_posts
+from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
@@ -72,6 +72,7 @@ from forum_web.templates import (
 
 load_repo_env()
 notify_missing_env_defaults()
+_INDEX_STARTUP_READY_ROOTS: set[Path] = set()
 
 
 def get_repo_root() -> Path:
@@ -79,6 +80,14 @@ def get_repo_root() -> Path:
     if env_root:
         return Path(env_root).resolve()
     return Path(__file__).resolve().parent.parent
+
+
+def ensure_runtime_post_index_startup(repo_root: Path) -> None:
+    resolved_root = repo_root.resolve()
+    if resolved_root in _INDEX_STARTUP_READY_ROOTS:
+        return
+    ensure_post_index_current(resolved_root)
+    _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
 
 
 def load_repository_state():
@@ -1820,6 +1829,7 @@ def application(environ, start_response):
     path = environ.get("PATH_INFO", "/")
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
     method = environ.get("REQUEST_METHOD", "GET").upper()
+    ensure_runtime_post_index_startup(get_repo_root())
 
     try:
         if path == "/api/create_thread":
