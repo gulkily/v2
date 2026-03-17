@@ -12,7 +12,9 @@ from forum_web.repository import load_posts
 from forum_web.web import (
     activity_filter_mode_from_request,
     build_posts_index,
+    classify_commit_activity,
     fetch_recent_commits,
+    fetch_recent_repository_commits,
     load_activity_events,
     resolve_commit_posts,
 )
@@ -128,7 +130,19 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         self.assertEqual(activity_filter_mode_from_request(""), "all")
         self.assertEqual(activity_filter_mode_from_request("content"), "content")
         self.assertEqual(activity_filter_mode_from_request("moderation"), "moderation")
+        self.assertEqual(activity_filter_mode_from_request("code"), "code")
         self.assertEqual(activity_filter_mode_from_request("unknown"), "all")
+
+    def test_classify_commit_activity_distinguishes_content_moderation_and_code(self) -> None:
+        content_commit = mock.Mock(files=("records/posts/root-001.txt",))
+        moderation_commit = mock.Mock(files=("records/moderation/pin-root-001.txt",))
+        code_commit = mock.Mock(files=("forum_web/web.py",))
+        mixed_commit = mock.Mock(files=("records/posts/root-001.txt", "forum_web/web.py"))
+
+        self.assertEqual(classify_commit_activity(content_commit), "content")
+        self.assertEqual(classify_commit_activity(moderation_commit), "moderation")
+        self.assertEqual(classify_commit_activity(code_commit), "code")
+        self.assertEqual(classify_commit_activity(mixed_commit), "code")
 
     def test_load_activity_events_merges_content_and_moderation_in_one_timeline(self) -> None:
         self.write_record(
@@ -155,9 +169,9 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         )
         self.commit_paths(["records/moderation/pin-root-001.txt"], "Pin root-001")
 
-        with mock.patch("forum_web.web.fetch_recent_commits") as mock_fetch:
+        with mock.patch("forum_web.web.fetch_recent_repository_commits") as mock_fetch:
             mock_fetch.return_value = [
-                fetch_recent_commits(self.repo_root, limit=1)[0],
+                fetch_recent_repository_commits(self.repo_root, limit=2)[1],
             ]
             events = load_activity_events(self.repo_root, mode="all", limit=5)
 
@@ -192,9 +206,32 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
 
         content_events = load_activity_events(self.repo_root, mode="content", limit=5)
         moderation_events = load_activity_events(self.repo_root, mode="moderation", limit=5)
+        code_events = load_activity_events(self.repo_root, mode="code", limit=5)
 
         self.assertTrue(all(event.kind == "content" for event in content_events))
         self.assertTrue(all(event.kind == "moderation" for event in moderation_events))
+        self.assertEqual(code_events, [])
+
+    def test_fetch_recent_repository_commits_includes_code_changes(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+
+            Body one.
+            """,
+        )
+        self.commit("Add root-001")
+        self.write_record("forum_web_stub.py", "print('hello')\n")
+        self.commit_paths(["forum_web_stub.py"], "Add code helper")
+
+        commits = fetch_recent_repository_commits(self.repo_root, limit=2)
+
+        self.assertEqual(len(commits), 2)
+        self.assertEqual(commits[0].subject, "Add code helper")
+        self.assertIn("forum_web_stub.py", commits[0].files)
+        self.assertEqual(classify_commit_activity(commits[0]), "code")
 
 
 if __name__ == "__main__":

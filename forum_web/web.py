@@ -110,7 +110,7 @@ class ActivityEvent:
 
 def activity_filter_mode_from_request(raw_mode: str | None) -> str:
     mode = (raw_mode or "").strip().lower()
-    if mode in {"content", "moderation"}:
+    if mode in {"content", "moderation", "code"}:
         return mode
     return "all"
 
@@ -122,7 +122,7 @@ def parse_activity_sort_timestamp(raw_value: str) -> datetime:
     return datetime.fromisoformat(normalized)
 
 
-def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitEntry]:
+def fetch_recent_repository_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitEntry]:
     if limit <= 0:
         return []
     field_sep = "\x1f"
@@ -136,8 +136,6 @@ def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitE
             f"--max-count={limit}",
             f"--pretty=format:{format_string}",
             "--name-only",
-            "--",
-            "records/posts",
         ],
         check=False,
         stdout=subprocess.PIPE,
@@ -185,6 +183,26 @@ def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitE
     return entries
 
 
+def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitEntry]:
+    return [
+        commit
+        for commit in fetch_recent_repository_commits(repo_root, limit=limit)
+        if classify_commit_activity(commit) == "content"
+    ][:limit]
+
+
+def classify_commit_activity(commit: GitCommitEntry) -> str:
+    normalized_files = tuple(Path(file_path).as_posix() for file_path in commit.files)
+    if any(
+        not path.startswith("records/posts/") and not path.startswith("records/moderation/")
+        for path in normalized_files
+    ):
+        return "code"
+    if any(path.startswith("records/moderation/") for path in normalized_files):
+        return "moderation"
+    return "content"
+
+
 def build_posts_index(posts: list[Post], repo_root: Path) -> dict[str, Post]:
     index: dict[str, object] = {}
     for post in posts:
@@ -207,14 +225,15 @@ def resolve_commit_posts(commit: GitCommitEntry, posts_index: dict[str, Post]) -
 
 def load_activity_events(repo_root: Path, *, mode: str, limit: int = 12) -> list[ActivityEvent]:
     events: list[ActivityEvent] = []
-    if mode in {"all", "content"}:
+    if mode in {"all", "content", "code"}:
         events.extend(
             ActivityEvent(
-                kind="content",
+                kind=classify_commit_activity(commit),
                 sort_timestamp=parse_activity_sort_timestamp(commit.commit_date),
                 commit=commit,
             )
-            for commit in fetch_recent_commits(repo_root, limit=limit)
+            for commit in fetch_recent_repository_commits(repo_root, limit=limit)
+            if mode == "all" or classify_commit_activity(commit) == mode
         )
     if mode in {"all", "moderation"}:
         moderation_records = load_moderation_records(moderation_records_dir(repo_root))

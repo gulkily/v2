@@ -1,29 +1,29 @@
 ## Stage 1
-- Goal: broaden the activity event model so git commits can be classified beyond content-only changes.
-- Dependencies: approved Step 2; existing `ActivityEvent` model; current `fetch_recent_commits(...)` helper limited to `records/posts`.
-- Expected changes: extend the git-activity helper layer so it can collect recent repository commits across content, moderation, and code paths, classify commits deterministically by touched files, and expose a new code-activity class while preserving the current merged event shape; planned contracts such as `fetch_recent_repository_commits(repo_root, *, limit: int) -> list[GitCommitEntry]`, `classify_commit_activity(commit) -> str`, and an expanded `activity_filter_mode_from_request(raw_mode) -> str`; no database changes.
-- Verification approach: build helper-level tests in a disposable repo with content, moderation, and code commits, then confirm the classification and filter subsets match the touched-file rules.
+- Goal: broaden git commit collection and classify repository commits into explicit activity types.
+- Dependencies: approved Step 2; current `ActivityEvent` model; existing git activity helpers in `forum_web/web.py`.
+- Expected changes: replace the current content-only commit collection with repository-wide commit loading, add deterministic commit classification rules for at least content, moderation, and code commits based on touched paths, and expand fixed filter parsing to include `code`; planned contracts such as `fetch_recent_repository_commits(repo_root, *, limit: int) -> list[GitCommitEntry]`, `classify_commit_activity(commit) -> str`, and `activity_filter_mode_from_request(raw_mode) -> str`; no database changes.
+- Verification approach: use helper-level tests with a disposable repo containing content, moderation, and code commits, then confirm commit classification and filter subsets match the touched-path rules.
 - Risks or open questions:
-  - deciding how to classify commits that touch multiple areas such as both code and `records/posts`
-  - keeping the classification deterministic without growing into a free-form tagging system
+  - deciding how commits that touch multiple areas should be classified in the first slice
+  - keeping the classification rules simple enough to stay predictable
 - Canonical components/API contracts touched: git-log commit helpers; merged `ActivityEvent` model; fixed activity filter parsing.
 
 ## Stage 2
-- Goal: render code commits on `/activity/` and expose a fixed code-activity filter.
-- Dependencies: Stage 1; current `/activity/` route and template; existing commit-card rendering.
-- Expected changes: extend the activity page rendering so the default timeline can include code commits, add a fixed `code` filter alongside the existing filter modes, and adapt commit-card rendering so code-only commits remain intelligible even without canonical post targets; planned contracts such as `render_activity_event_card(event, ...) -> str` with code-commit support and `render_activity_filter_nav(current_mode) -> str` including the new filter.
-- Verification approach: manually load `/activity/` in all and code-only modes, confirm code commits appear in the default timeline, and confirm the code filter isolates them without removing the existing repository snapshot panel.
+- Goal: render code commits on `/activity/` and expose the fixed code-activity filter.
+- Dependencies: Stage 1; current `/activity/` route, template, and mixed event-card rendering.
+- Expected changes: extend `/activity/` so the default repository-history timeline can include code commits, add the `code` filter to the existing filter nav, and adapt commit-card rendering so code-only commits remain understandable without canonical post targets; planned contracts such as `render_activity_event_card(event, ...) -> str` with code-commit support and an expanded `render_activity_filter_nav(current_mode) -> str`.
+- Verification approach: manually load `/activity/` in `all` and `code` modes, confirm code commits appear in the default timeline, and confirm the `code` filter isolates them while the snapshot panel remains intact.
 - Risks or open questions:
-  - deciding what minimal metadata a code commit card needs when there is no post permalink target
-  - avoiding a UI that feels like a raw git log instead of a curated repository-history page
-- Canonical components/API contracts touched: `/activity/`; `templates/activity.html`; commit-card rendering; merged filter navigation.
+  - deciding what minimal metadata a code commit card should show without turning into a diff browser
+  - preserving readability when code commits and content commits share the same timeline
+- Canonical components/API contracts touched: `/activity/`; `templates/activity.html`; commit-card rendering; filter navigation.
 
 ## Stage 3
-- Goal: align navigation and regression coverage with the broader repository-history surface.
-- Dependencies: Stages 1-2; existing activity and board-index tests.
-- Expected changes: update focused tests for mixed repository-history ordering and the new code filter, confirm compatibility paths such as `/moderation/` still land in the expected filtered view, and adjust any copy or navigation labels needed so `/activity/` clearly represents broader repository history rather than only content-plus-moderation activity; planned contracts such as test helpers for mixed commit classes and any small label-copy updates in the activity page/header.
-- Verification approach: request `/activity/` in all, content, moderation, and code modes; confirm the expected event classes appear; run targeted unittest coverage for helper classification and page filtering.
+- Goal: align labels, navigation expectations, and regression coverage with `/activity/` as a broader repository-history page.
+- Dependencies: Stages 1-2; current activity and board-index tests.
+- Expected changes: update page copy and any key navigation labels so `/activity/` clearly represents broader repository history, add focused regression tests for the new `code` filter and mixed-timeline behavior, and confirm compatibility routes such as `/moderation/` still land in the expected filtered experience; planned contracts such as expanded activity-page test fixtures and any small copy helpers needed for the broader page framing.
+- Verification approach: request `/activity/` in `all`, `content`, `moderation`, and `code` modes; confirm the expected commit/event classes appear; run targeted unittest coverage for helper classification and page filtering.
 - Risks or open questions:
-  - keeping tests stable when code commits do not have canonical post-card targets
-  - balancing broader repository-history language with existing activity-page expectations
-- Canonical components/API contracts touched: `/activity/` filter behavior; board-index navigation labels; helper and page-level activity tests.
+  - balancing broader repository-history language with the existing user-facing activity copy
+  - keeping tests stable when code commits do not have post-card targets
+- Canonical components/API contracts touched: `/activity/` filter behavior; board-index activity navigation; helper and page-level activity tests.
