@@ -5,10 +5,12 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from forum_core.identity import normalize_fingerprint, short_identity_label
 from forum_web.repository import Post, load_posts
+from forum_web.profiles import IdentityContext, resolve_identity_display_name
 
 
-POST_INDEX_SCHEMA_VERSION = 1
+POST_INDEX_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,15 @@ class IndexedPostRow:
     post_id: str
     created_at: str | None
     updated_at: str | None
+
+
+@dataclass(frozen=True)
+class IndexedAuthorRow:
+    author_id: str
+    canonical_identity_id: str | None
+    display_name: str
+    display_name_source: str
+    signer_fingerprint: str | None
 
 
 def post_index_path(repo_root: Path) -> Path:
@@ -74,7 +85,16 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
             task_presentability_impact REAL,
             task_implementation_difficulty REAL,
             created_at TEXT,
-            updated_at TEXT
+            updated_at TEXT,
+            author_id TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS authors (
+            author_id TEXT PRIMARY KEY,
+            canonical_identity_id TEXT,
+            display_name TEXT NOT NULL,
+            display_name_source TEXT NOT NULL,
+            signer_fingerprint TEXT
         );
 
         CREATE TABLE IF NOT EXISTS post_board_tags (
@@ -121,6 +141,7 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
         ("task_implementation_difficulty", "REAL"),
         ("created_at", "TEXT"),
         ("updated_at", "TEXT"),
+        ("author_id", "TEXT"),
     )
     for column_name, column_type in required_columns:
         if column_name in existing_columns:
@@ -129,6 +150,8 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
 
     connection.execute("CREATE INDEX IF NOT EXISTS posts_updated_at_idx ON posts(updated_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS posts_created_at_idx ON posts(created_at)")
+    connection.execute("CREATE INDEX IF NOT EXISTS posts_author_id_idx ON posts(author_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS authors_canonical_identity_idx ON authors(canonical_identity_id)")
     current_version = current_post_index_schema_version(connection)
     if current_version < POST_INDEX_SCHEMA_VERSION:
         connection.execute(f"PRAGMA user_version = {POST_INDEX_SCHEMA_VERSION}")
@@ -200,6 +223,87 @@ def clear_post_index(connection: sqlite3.Connection) -> None:
     connection.execute("DELETE FROM post_task_dependencies")
     connection.execute("DELETE FROM post_board_tags")
     connection.execute("DELETE FROM posts")
+    connection.execute("DELETE FROM authors")
+
+
+def author_id_for_post(post: Post, identity_context: IdentityContext | None) -> str | None:
+    canonical_identity_id = None
+    if identity_context is not None and post.identity_id is not None:
+        canonical_identity_id = identity_context.canonical_identity_id(post.identity_id) or post.identity_id
+    elif post.identity_id is not None:
+        canonical_identity_id = post.identity_id
+    if canonical_identity_id is not None:
+        return canonical_identity_id
+    if post.signer_fingerprint is not None:
+        return f"fingerprint:{normalize_fingerprint(post.signer_fingerprint).lower()}"
+    return None
+
+
+def author_row_for_post(post: Post, *, identity_context: IdentityContext | None) -> IndexedAuthorRow | None:
+    author_id = author_id_for_post(post, identity_context)
+    if author_id is None:
+        return None
+    canonical_identity_id = None
+    if identity_context is not None and post.identity_id is not None:
+        canonical_identity_id = identity_context.canonical_identity_id(post.identity_id) or post.identity_id
+    elif post.identity_id is not None:
+        canonical_identity_id = post.identity_id
+
+    if post.signer_fingerprint is not None:
+        fallback_display_name = short_identity_label(post.signer_fingerprint)
+    else:
+        fallback_display_name = "Unknown author"
+
+    display_name_source = "fingerprint_fallback"
+    display_name = fallback_display_name
+    if identity_context is not None and post.identity_id is not None:
+        display_name = resolve_identity_display_name(
+            identity_context=identity_context,
+            identity_id=post.identity_id,
+            fallback_display_name=fallback_display_name,
+        )
+        resolved_display_name = identity_context.resolved_display_name(post.identity_id)
+        if resolved_display_name is not None:
+            display_name_source = "profile_update"
+
+    signer_fingerprint = (
+        normalize_fingerprint(post.signer_fingerprint)
+        if post.signer_fingerprint is not None
+        else None
+    )
+    return IndexedAuthorRow(
+        author_id=author_id,
+        canonical_identity_id=canonical_identity_id,
+        display_name=display_name,
+        display_name_source=display_name_source,
+        signer_fingerprint=signer_fingerprint,
+    )
+
+
+def upsert_indexed_author(connection: sqlite3.Connection, *, author: IndexedAuthorRow) -> None:
+    connection.execute(
+        """
+        INSERT INTO authors (
+            author_id,
+            canonical_identity_id,
+            display_name,
+            display_name_source,
+            signer_fingerprint
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(author_id) DO UPDATE SET
+            canonical_identity_id = excluded.canonical_identity_id,
+            display_name = excluded.display_name,
+            display_name_source = excluded.display_name_source,
+            signer_fingerprint = excluded.signer_fingerprint
+        """,
+        (
+            author.author_id,
+            author.canonical_identity_id,
+            author.display_name,
+            author.display_name_source,
+            author.signer_fingerprint,
+        ),
+    )
 
 
 def upsert_indexed_post(
@@ -208,6 +312,7 @@ def upsert_indexed_post(
     post: Post,
     repo_root: Path,
     timestamps: PostCommitTimestamps,
+    identity_context: IdentityContext | None = None,
 ) -> None:
     relative_path = str(post.path.relative_to(repo_root))
     task_status = None
@@ -217,6 +322,9 @@ def upsert_indexed_post(
         task_status = post.task_metadata.status
         task_presentability_impact = post.task_metadata.presentability_impact
         task_implementation_difficulty = post.task_metadata.implementation_difficulty
+    author = author_row_for_post(post, identity_context=identity_context)
+    if author is not None:
+        upsert_indexed_author(connection, author=author)
 
     connection.execute(
         """
@@ -237,8 +345,9 @@ def upsert_indexed_post(
             task_presentability_impact,
             task_implementation_difficulty,
             created_at,
-            updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            updated_at,
+            author_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(post_id) DO UPDATE SET
             relative_path = excluded.relative_path,
             subject = excluded.subject,
@@ -255,7 +364,8 @@ def upsert_indexed_post(
             task_presentability_impact = excluded.task_presentability_impact,
             task_implementation_difficulty = excluded.task_implementation_difficulty,
             created_at = excluded.created_at,
-            updated_at = excluded.updated_at
+            updated_at = excluded.updated_at,
+            author_id = excluded.author_id
         """,
         (
             post.post_id,
@@ -275,6 +385,7 @@ def upsert_indexed_post(
             task_implementation_difficulty,
             timestamps.created_at,
             timestamps.updated_at,
+            author.author_id if author is not None else None,
         ),
     )
     connection.execute("DELETE FROM post_board_tags WHERE post_id = ?", (post.post_id,))

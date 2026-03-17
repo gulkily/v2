@@ -5,19 +5,26 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from textwrap import dedent
+from unittest import mock
 
 from forum_core.post_index import (
+    IndexedAuthorRow,
     POST_INDEX_SCHEMA_VERSION,
+    author_id_for_post,
+    author_row_for_post,
     current_post_index_schema_version,
     open_post_index,
     post_index_path,
     rebuild_post_index,
 )
+from forum_core.identity import build_identity_id
 from forum_cgi.posting import store_post
 from forum_cgi.task_status import submit_mark_task_done
-from forum_web.repository import parse_post_text
+from forum_web.profiles import IdentityContext
+from forum_web.repository import load_posts, parse_post_text
 
 
 class PostIndexSchemaTests(unittest.TestCase):
@@ -74,6 +81,96 @@ class PostIndexSchemaTests(unittest.TestCase):
             self.assertEqual(current_post_index_schema_version(index.connection), POST_INDEX_SCHEMA_VERSION)
         finally:
             index.connection.close()
+
+    def test_existing_database_adds_author_schema_idempotently(self) -> None:
+        db_path = post_index_path(self.repo_root)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(db_path)
+        connection.execute(
+            "CREATE TABLE posts (post_id TEXT PRIMARY KEY, relative_path TEXT NOT NULL UNIQUE, subject TEXT NOT NULL, thread_id TEXT, parent_id TEXT, root_thread_id TEXT NOT NULL, body TEXT NOT NULL, is_root INTEGER NOT NULL)"
+        )
+        connection.execute("PRAGMA user_version = 1")
+        connection.commit()
+        connection.close()
+
+        index = open_post_index(self.repo_root)
+        try:
+            post_columns = {
+                row["name"]
+                for row in index.connection.execute("PRAGMA table_info(posts)")
+            }
+            author_tables = index.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'authors'"
+            ).fetchone()
+            self.assertIn("author_id", post_columns)
+            self.assertIsNotNone(author_tables)
+            self.assertEqual(current_post_index_schema_version(index.connection), POST_INDEX_SCHEMA_VERSION)
+        finally:
+            index.connection.close()
+
+
+class PostIndexAuthorHelpersTests(unittest.TestCase):
+    def test_author_id_for_post_prefers_canonical_identity(self) -> None:
+        post = parse_post_text(
+            dedent(
+                """
+                Post-ID: root-001
+                Board-Tags: general
+                Subject: Hello
+
+                Body.
+                """
+            ).lstrip()
+        )
+        post = post.__class__(
+            **{
+                **post.__dict__,
+                "identity_id": build_identity_id("ABCDEF0123456789ABCDEF0123456789ABCDEF01"),
+                "signer_fingerprint": "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+            }
+        )
+        identity_context = IdentityContext(
+            bootstraps_by_identity_id={},
+            resolution=SimpleNamespace(
+                canonical_identity_id=lambda identity_id: "openpgp:canonical",
+                member_identity_ids=lambda identity_id: ("openpgp:canonical",),
+            ),
+            profile_update_records=(),
+        )
+
+        self.assertEqual(author_id_for_post(post, identity_context), "openpgp:canonical")
+
+    def test_author_row_for_post_falls_back_to_fingerprint_label(self) -> None:
+        post = parse_post_text(
+            dedent(
+                """
+                Post-ID: root-001
+                Board-Tags: general
+                Subject: Hello
+
+                Body.
+                """
+            ).lstrip()
+        )
+        post = post.__class__(
+            **{
+                **post.__dict__,
+                "signer_fingerprint": "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+            }
+        )
+
+        row = author_row_for_post(post, identity_context=None)
+
+        self.assertEqual(
+            row,
+            IndexedAuthorRow(
+                author_id="fingerprint:abcdef0123456789abcdef0123456789abcdef01",
+                canonical_identity_id=None,
+                display_name="ABCDEF0123456789..",
+                display_name_source="fingerprint_fallback",
+                signer_fingerprint="ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+            ),
+        )
 
 class PostIndexBuildTests(unittest.TestCase):
     def setUp(self) -> None:
