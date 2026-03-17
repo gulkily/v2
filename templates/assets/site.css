@@ -487,15 +487,19 @@ body {
   gap: 0.7rem;
 }
 
+.key-display,
 .key-block {
-  overflow-x: auto;
-  margin: 0;
-  padding: 1rem;
   border: 1px solid var(--accent-soft);
   border-radius: 0;
   background: rgba(255, 249, 240, 0.84);
   color: var(--ink);
   font: 0.82rem/1.45 "Courier New", Courier, monospace;
+}
+
+.key-block {
+  overflow-x: auto;
+  margin: 0;
+  padding: 1rem;
 }
 
 .moderation-card {
@@ -520,6 +524,10 @@ textarea {
 
 textarea {
   resize: vertical;
+}
+
+textarea.key-display {
+  min-height: 10rem;
 }
 
 button {

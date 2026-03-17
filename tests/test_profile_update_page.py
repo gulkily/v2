@@ -88,6 +88,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('data-dry-run="false"', body)
         self.assertIn('/assets/browser_signing.js', body)
         self.assertIn('id="private-key-input"', body)
+        self.assertIn('id="public-key-output" class="key-display"', body)
         self.assertIn('id="payload-output"', body)
         self.assertIn("Sign and submit", body)
         self.assertNotIn(">Technical details<", body)
