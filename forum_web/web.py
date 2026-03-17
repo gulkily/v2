@@ -1023,6 +1023,38 @@ def render_merge_management_page(identity_id: str) -> str:
         raise LookupError(f"unknown identity: {identity_id}")
 
     profile_slug = identity_slug(summary.identity_id)
+    profile_summaries_by_identity_id: dict[str, object | None] = {}
+
+    def profile_summary_for(candidate_identity_id: str):
+        if candidate_identity_id not in profile_summaries_by_identity_id:
+            profile_summaries_by_identity_id[candidate_identity_id] = find_profile_summary(
+                repo_root=get_repo_root(),
+                posts=posts,
+                identity_id=candidate_identity_id,
+                identity_context=identity_context,
+            )
+        return profile_summaries_by_identity_id[candidate_identity_id]
+
+    def render_identity_context_card(candidate_identity_id: str) -> str:
+        candidate_summary = profile_summary_for(candidate_identity_id)
+        if candidate_summary is None:
+            return f'<p><strong>Identity:</strong> <code>{html.escape(candidate_identity_id)}</code></p>'
+
+        last_activity_text = "No visible signed posts yet"
+        if candidate_summary.post_ids:
+            last_activity_text = format_post_timestamp(candidate_summary.post_ids[-1])
+
+        post_links_html = "".join(
+            f'<a class="thread-chip" href="/posts/{html.escape(post_id)}">{html.escape(post_id)}</a>'
+            for post_id in candidate_summary.post_ids
+        ) or "<span>None</span>"
+
+        return (
+            f'<p><strong>{html.escape(candidate_summary.display_name)}</strong> · '
+            f'<a href="/profiles/{html.escape(identity_slug(candidate_summary.identity_id))}">{html.escape(candidate_summary.identity_id)}</a></p>'
+            f'<p><strong>Last activity:</strong> <code>{html.escape(last_activity_text)}</code></p>'
+            f'<p><strong>Visible posts:</strong> {post_links_html}</p>'
+        )
 
     def render_match_rows() -> str:
         if not management_summary.historical_matches:
@@ -1036,8 +1068,7 @@ def render_merge_management_page(identity_id: str) -> str:
             )
             parts.append(
                 '<article class="panel page-section">'
-                f'<p><strong>{html.escape(match.candidate_display_name)}</strong> · '
-                f'<a href="/profiles/{html.escape(candidate_slug)}">{html.escape(match.candidate_identity_id)}</a></p>'
+                f"{render_identity_context_card(match.candidate_identity_id)}"
                 f'<p>Shared usernames: <code>{" ".join(html.escape(name) for name in match.shared_display_names)}</code></p>'
                 f'<div class="link-cluster"><a class="thread-chip" href="{request_link}">request merge</a></div>'
                 "</article>"
@@ -1076,7 +1107,11 @@ def render_merge_management_page(identity_id: str) -> str:
             response_label = state.latest_response_action or "pending"
             parts.append(
                 '<article class="panel page-section">'
-                f'<p><strong>{html.escape(state.requester_identity_id)}</strong> -> <strong>{html.escape(state.target_identity_id)}</strong></p>'
+                '<div class="detail-grid">'
+                f'<div>{render_identity_context_card(state.requester_identity_id)}</div>'
+                f'<div>{render_identity_context_card(state.target_identity_id)}</div>'
+                "</div>"
+                f'<p><strong>Request path:</strong> <code>{html.escape(state.requester_identity_id)}</code> -> <code>{html.escape(state.target_identity_id)}</code></p>'
                 f'<p>Latest request: <code>{html.escape(state.latest_request_record_id)}</code></p>'
                 f'<p>Status: <code>{html.escape(response_label)}</code></p>'
                 f"{actions_html}"
