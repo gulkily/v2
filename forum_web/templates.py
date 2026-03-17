@@ -106,3 +106,7 @@ def render_page(
 def load_asset_text(name: str) -> str:
     asset_path = TEMPLATE_DIR / "assets" / name
     return asset_path.read_text(encoding="utf-8")
+
+
+def render_profile_nav_script_tag() -> str:
+    return '<script type="module" src="/assets/profile_nav.js"></script>'

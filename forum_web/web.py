@@ -71,6 +71,7 @@ from forum_web.templates import (
     load_asset_text,
     load_template,
     render_page,
+    render_profile_nav_script_tag,
     render_site_header,
 )
 
@@ -2400,6 +2401,12 @@ def application(environ, start_response):
 
         if path == "/assets/browser_signing.js":
             body = load_asset_text("browser_signing.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/profile_nav.js":
+            body = load_asset_text("profile_nav.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
