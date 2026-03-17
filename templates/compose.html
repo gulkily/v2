@@ -1,6 +1,15 @@
 ${reply_target_html}
 
 <section id="compose-app" class="panel compose-panel page-section" data-command="${command_name}" data-endpoint="${endpoint_path}" data-dry-run="${dry_run_value}" data-board-tags="${board_tags_value}" data-thread-id="${thread_id_value}" data-parent-id="${parent_id_value}" data-thread-type="${thread_type_value}" data-pow-enabled="${pow_enabled_value}" data-pow-difficulty="${pow_difficulty_value}">
+  <div class="section-head page-lede">
+    <h2>Requirements and limitations</h2>
+    <p>Posts are submitted as ASCII-only canonical text records. Keep the body plain enough for humans to read and edit directly in ordinary text tools.</p>
+  </div>
+  <ul>
+    <li>ASCII is required so canonical records stay easier for humans to work with across shells, editors, patches, and git history.</li>
+    <li>The limitation also reduces Unicode obfuscation risks such as lookalike characters that are hard to spot during review.</li>
+    <li>The browser can normalize common punctuation to ASCII and can remove unsupported characters before you sign the payload.</li>
+  </ul>
   <form id="signed-post-form" class="field-stack">
     <label class="field-stack" for="body-input">
       <span>Body</span>

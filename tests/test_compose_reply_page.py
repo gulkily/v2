@@ -97,6 +97,9 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
+        self.assertIn("Requirements and limitations", body)
+        self.assertIn("ASCII-only canonical text records", body)
+        self.assertIn("reduces Unicode obfuscation risks", body)
 
     def test_compose_reply_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get(
