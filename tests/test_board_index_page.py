@@ -80,22 +80,20 @@ class BoardIndexPageTests(unittest.TestCase):
 
         return response["status"], dict(response["headers"]), body
 
-    def test_board_index_uses_front_page_layout(self) -> None:
+    def test_board_index_uses_shared_page_shell(self) -> None:
         status, headers, body = self.get("/")
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
-        self.assertIn('class="front-header"', body)
-        self.assertIn('class="front-layout"', body)
+        self.assertIn('class="site-header site-header--page"', body)
+        self.assertIn('class="site-footer"', body)
         self.assertIn("Threads worth opening", body)
+        self.assertIn("Visible threads", body)
         self.assertIn("/threads/root-001", body)
         self.assertIn("Hello world", body)
         self.assertIn("First line preview.", body)
-        self.assertNotIn('class="front-topic-strip"', body)
-        self.assertNotIn("What this view is", body)
-        self.assertNotIn("House style", body)
-        self.assertNotIn("Browse by board tag", body)
-        self.assertNotIn('class="front-board-directory"', body)
+        self.assertNotIn('class="front-header"', body)
+        self.assertNotIn('class="front-layout"', body)
 
     def test_board_index_preserves_key_destination_links(self) -> None:
         status, _, body = self.get("/")

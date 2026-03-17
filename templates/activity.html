@@ -1,18 +1,11 @@
-<section class="front-layout">
-  <section class="front-main-column" aria-labelledby="activity-heading">
-    <div class="front-stream-head">
-      <div>
-        <p class="front-kicker">Site activity</p>
-        <h1 id="activity-heading">Canonical activity stream</h1>
-      </div>
-      <p>Browse the freshest signed posts and replies alongside the git snapshot behind this instance.</p>
-    </div>
-    <section class="front-thread-stream">
-      <div class="commit-stack">
-        ${commit_cards_html}
-      </div>
-    </section>
-  </section>
+<section class="panel page-section" aria-labelledby="activity-heading">
+  <div class="section-head page-lede">
+    <h2 id="activity-heading">Canonical activity stream</h2>
+    <p>Browse the freshest signed posts and replies alongside the git snapshot behind this instance.</p>
+  </div>
+  <div class="commit-stack">
+    ${commit_cards_html}
+  </div>
 </section>
 
 <section class="panel page-section">

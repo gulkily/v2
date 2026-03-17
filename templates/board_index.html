@@ -1,17 +1,20 @@
-<section class="front-layout">
-  <section class="front-main-column" aria-labelledby="front-page-heading">
-    <div class="front-stream-head">
-      <div>
-        <p class="front-kicker">Quiet front page</p>
-        <h1 id="front-page-heading">Threads worth opening</h1>
-      </div>
-      <p>
-        Open a thread or jump straight to a core forum tool.
-      </p>
-    </div>
+<section class="panel page-section">
+  <div class="section-head page-lede">
+    <h2>Threads worth opening</h2>
+    <p>Open a thread or jump straight to a core forum tool.</p>
+  </div>
+  <div class="action-row link-cluster">
+    ${action_links_html}
+  </div>
+  ${stats_html}
+</section>
 
-    <section class="front-thread-stream" aria-label="Visible threads">
-      ${thread_rows_html}
-    </section>
+<section class="panel page-section" aria-labelledby="front-page-heading">
+  <div class="section-head page-lede">
+    <h2 id="front-page-heading">Visible threads</h2>
+    <p>Canonical thread roots stay readable here without introducing a second page shell.</p>
+  </div>
+  <section class="board-index-thread-list" aria-label="Visible threads">
+    ${thread_rows_html}
   </section>
 </section>

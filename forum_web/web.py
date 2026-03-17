@@ -253,9 +253,6 @@ def render_board_index() -> str:
         hero_title="Threads gathered straight from canonical text records",
         hero_text="This board view reads the git-tracked post files directly, groups thread roots by board tags, and keeps the dataset browsable without adding a database or durable index layer.",
         content_html=content,
-        page_header_html=render_board_index_header(context),
-        page_footer_html=render_board_index_footer(context["stats_html"]),
-        page_shell_class="page-shell-front",
     )
 
 
@@ -312,6 +309,7 @@ def render_board_index_action_links() -> str:
         ("/compose/thread", "compose a signed thread"),
         ("/instance/", "instance info"),
         ("/activity/", "view site activity"),
+        ("/moderation/", "moderation log"),
         ("/planning/task-priorities/", "task priorities"),
     ]
     return "".join(
@@ -352,50 +350,6 @@ def git_status_summary(repo_root: Path) -> dict[str, str]:
         "worktree": worktree_status,
         "git_worktree": worktree_status,
     }
-
-
-def render_board_index_header(context: dict[str, str]) -> str:
-    return (
-        '<header class="front-header">'
-        '<div class="front-ethos"><p>Kindness first. Clear words, useful threads, and no manipulative noise.</p></div>'
-        '<div class="front-branding">'
-        '<div class="front-brand-lockup">'
-        '<p class="front-mark">(*)</p>'
-        '<div>'
-        '<p class="front-site-title"><a href="/">Forum Reader</a></p>'
-        '<p class="front-site-tagline">calm threads from canonical text records</p>'
-        "</div>"
-        "</div>"
-        '<div class="front-brand-actions">'
-        '<a class="front-primary-link" href="/compose/thread">Post</a>'
-        '<p>share a signed thread or a useful update</p>'
-        "</div>"
-        "</div>"
-        '<div class="front-utility-row">'
-        '<nav class="front-nav" aria-label="Board actions">'
-        f'{context["action_links_html"]}'
-        "</nav>"
-        "</div>"
-        "</header>"
-    )
-
-def render_board_index_footer(stats_html: str) -> str:
-    return (
-        '<footer class="front-footer">'
-        '<div class="front-footer-inner">'
-        '<div class="front-footer-copy">'
-        "<p>Best read with a clear mind and a modest browser window.</p>"
-        "<p>[ slow web ]</p>"
-        "</div>"
-        f"{stats_html}"
-        '<div class="front-footer-actions">'
-        '<div class="link-cluster">'
-        '<a class="thread-chip" href="/moderation/">moderation log</a>'
-        "</div>"
-        "</div>"
-        "</div>"
-        "</footer>"
-    )
 
 
 def format_commit_date(commit_date: str) -> str:
@@ -464,7 +418,6 @@ def render_site_activity_page() -> str:
         hero_title="Site activity",
         hero_text="The latest signed posts and replies together with the git commit that powers this instance.",
         content_html=content,
-        page_shell_class="page-shell-front",
     )
 
 

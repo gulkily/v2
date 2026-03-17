@@ -8,3 +8,15 @@
   - Ran `python -m unittest tests.test_instance_info_page tests.test_board_index_page`
 - Notes:
   - The board index and activity pages still use the separate front-page shell path at this stage; Stage 2 will migrate those outliers onto the canonical shell.
+
+## Stage 2 - Migrate homepage and activity to the canonical shell
+- Changes:
+  - Moved the board index and activity pages off the separate front-page shell path so they now render through the shared header/footer flow.
+  - Reworked `templates/board_index.html` and `templates/activity.html` into the same panel-based content framing used by interior pages while preserving their route-specific content.
+  - Restored the moderation destination in the homepage action row and added the minimal board-index content styling needed after removing the old front-page wrapper.
+  - Updated the board-index route test to assert the shared shell instead of the retired front-header path.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_site_activity_page`
+  - Ran `python -m unittest tests.test_task_thread_pages tests.test_compose_thread_page tests.test_instance_info_page`
+- Notes:
+  - Front-page-specific CSS and helper branches still exist in the codebase as dead or transitional paths; Stage 3 will remove stale layout branches and add broader regression coverage.

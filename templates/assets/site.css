@@ -949,6 +949,11 @@ button:disabled {
   padding: 0.25rem 0;
 }
 
+.board-index-thread-list {
+  margin: 0 -1.35rem -1.35rem;
+  border-top: 1px solid #cfd7d1;
+}
+
 .board-index-thread-row {
   display: grid;
   grid-template-columns: 2.75rem minmax(0, 1fr);
