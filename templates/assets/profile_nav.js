@@ -31,7 +31,10 @@ export function storedPublicKey(storage = globalThis.localStorage) {
   return storage.getItem(STORAGE_PUBLIC) || "";
 }
 
-export async function enhanceProfileNav(doc = document, storage = globalThis.localStorage) {
+export async function enhanceProfileNav(doc = globalThis.document, storage = globalThis.localStorage) {
+  if (!doc || typeof doc.querySelector !== "function") {
+    return;
+  }
   const navLink = doc.querySelector("[data-profile-nav-link]");
   if (!navLink) {
     return;
@@ -52,4 +55,6 @@ export async function enhanceProfileNav(doc = document, storage = globalThis.loc
   }
 }
 
-void enhanceProfileNav();
+if (typeof document !== "undefined") {
+  void enhanceProfileNav();
+}

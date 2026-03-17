@@ -19,3 +19,14 @@
   - Ran `python -c "from forum_web.templates import render_page; html = render_page(title='x', hero_kicker='k', hero_title='t', hero_text='z', content_html='body'); print('/assets/profile_nav.js' in html and 'data-profile-nav-link' in html)"` and confirmed rendered pages include both the nav placeholder and the new shared module script.
 - Notes:
   - This remains a browser-side enhancement: the link is only exposed when the browser already has the stored signing public key, which matches the product’s existing local-key model.
+
+## Stage 3 - regression coverage and browser-safe asset behavior
+- Changes:
+  - Extended [test_board_index_page.py](/home/wsl/v2/tests/test_board_index_page.py) to verify the shared header now renders the hidden `My profile` placeholder and loads `/assets/profile_nav.js`.
+  - Added [test_profile_nav_asset.py](/home/wsl/v2/tests/test_profile_nav_asset.py) to verify the asset can derive the canonical `/profiles/openpgp-<fingerprint>` href from a generated OpenPGP public key.
+  - Hardened [profile_nav.js](/home/wsl/v2/templates/assets/profile_nav.js) so it no-ops cleanly when `document` is unavailable instead of throwing during module import outside a browser.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_profile_nav_asset tests.test_profile_update_page tests.test_merge_management_page`.
+  - Result: `Ran 9 tests ... OK`.
+- Notes:
+  - The coverage is intentionally targeted: it proves the shared nav markup, the public-key-to-profile-href derivation, and that existing profile update plus merge-management pages still render successfully alongside the new shared asset.
