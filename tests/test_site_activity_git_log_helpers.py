@@ -13,10 +13,13 @@ from forum_web.web import (
     activity_filter_mode_from_request,
     build_posts_index,
     classify_commit_activity,
+    classify_commit_area,
     fetch_recent_commits,
     fetch_recent_repository_commits,
+    github_commit_url_for,
     load_activity_events,
     resolve_commit_posts,
+    summarize_commit_files,
 )
 
 
@@ -27,6 +30,7 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         self.run_git("init")
         self.run_git("config", "user.name", "Test User")
         self.run_git("config", "user.email", "test@example.com")
+        self.run_git("remote", "add", "origin", "https://github.com/example/forum.git")
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -144,6 +148,37 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         self.assertEqual(classify_commit_activity(code_commit), "code")
         self.assertEqual(classify_commit_activity(mixed_commit), "code")
 
+    def test_classify_commit_area_distinguishes_content_moderation_docs_and_code(self) -> None:
+        self.assertEqual(classify_commit_area("records/posts/root-001.txt"), "content")
+        self.assertEqual(classify_commit_area("records/moderation/pin-root-001.txt"), "moderation")
+        self.assertEqual(classify_commit_area("docs/plans/feature.md"), "docs")
+        self.assertEqual(classify_commit_area("forum_web/web.py"), "code")
+
+    def test_summarize_commit_files_extracts_markdown_targets_and_area_counts(self) -> None:
+        summary = summarize_commit_files(
+            (
+                "records/posts/root-001.txt",
+                "records/moderation/pin-root-001.txt",
+                "docs/plans/feature.md",
+                "forum_web/web.py",
+            )
+        )
+
+        self.assertEqual(summary.total_files, 4)
+        self.assertEqual(summary.markdown_files, ("docs/plans/feature.md",))
+        self.assertEqual(summary.post_ids, ("root-001",))
+        self.assertEqual(summary.moderation_record_ids, ("pin-root-001",))
+        self.assertEqual(
+            dict(summary.area_counts),
+            {"content": 1, "moderation": 1, "docs": 1, "code": 1},
+        )
+
+    def test_github_commit_url_for_uses_origin_remote(self) -> None:
+        self.assertEqual(
+            github_commit_url_for(self.repo_root, "abc123"),
+            "https://github.com/example/forum/commit/abc123",
+        )
+
     def test_load_activity_events_merges_content_and_moderation_in_one_timeline(self) -> None:
         self.write_record(
             "records/posts/root-001.txt",
@@ -230,7 +265,16 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
 
         self.assertEqual(len(commits), 2)
         self.assertEqual(commits[0].subject, "Add code helper")
+        self.assertEqual(commits[0].author_name, "Test User")
+        self.assertEqual(commits[0].author_email, "test@example.com")
+        self.assertEqual(commits[0].short_id, commits[0].commit_id[:7])
         self.assertIn("forum_web_stub.py", commits[0].files)
+        self.assertEqual(commits[0].file_summary.total_files, 1)
+        self.assertEqual(dict(commits[0].file_summary.area_counts)["code"], 1)
+        self.assertEqual(
+            commits[0].github_url,
+            f"https://github.com/example/forum/commit/{commits[0].commit_id}",
+        )
         self.assertEqual(classify_commit_activity(commits[0]), "code")
 
 

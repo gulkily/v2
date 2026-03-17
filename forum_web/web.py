@@ -93,11 +93,25 @@ def load_repository_state():
 
 
 @dataclass(frozen=True)
+class CommitFileSummary:
+    total_files: int
+    markdown_files: tuple[str, ...]
+    post_ids: tuple[str, ...]
+    moderation_record_ids: tuple[str, ...]
+    area_counts: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
 class GitCommitEntry:
     commit_id: str
+    short_id: str
     commit_date: str
+    author_name: str
+    author_email: str
     subject: str
     files: tuple[str, ...]
+    file_summary: CommitFileSummary
+    github_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -122,11 +136,74 @@ def parse_activity_sort_timestamp(raw_value: str) -> datetime:
     return datetime.fromisoformat(normalized)
 
 
+def classify_commit_area(path_text: str) -> str:
+    normalized = Path(path_text).as_posix()
+    if normalized.startswith("records/posts/"):
+        return "content"
+    if normalized.startswith("records/moderation/"):
+        return "moderation"
+    if normalized.lower().endswith(".md"):
+        return "docs"
+    return "code"
+
+
+def summarize_commit_files(files: tuple[str, ...]) -> CommitFileSummary:
+    markdown_files: list[str] = []
+    post_ids: list[str] = []
+    moderation_record_ids: list[str] = []
+    area_counts = {"content": 0, "moderation": 0, "docs": 0, "code": 0}
+    for file_path in files:
+        normalized = Path(file_path).as_posix()
+        area_counts[classify_commit_area(normalized)] += 1
+        if normalized.lower().endswith(".md"):
+            markdown_files.append(normalized)
+        path = Path(normalized)
+        if normalized.startswith("records/posts/"):
+            post_ids.append(path.stem)
+        elif normalized.startswith("records/moderation/"):
+            moderation_record_ids.append(path.stem)
+    return CommitFileSummary(
+        total_files=len(files),
+        markdown_files=tuple(markdown_files),
+        post_ids=tuple(post_ids),
+        moderation_record_ids=tuple(moderation_record_ids),
+        area_counts=tuple((name, count) for name, count in area_counts.items()),
+    )
+
+
+def github_repo_web_url(repo_root: Path) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "remote", "get-url", "origin"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    remote_url = result.stdout.strip()
+    if not remote_url:
+        return None
+    normalized = remote_url.removesuffix(".git")
+    if normalized.startswith("git@github.com:"):
+        return "https://github.com/" + normalized.removeprefix("git@github.com:")
+    if normalized.startswith("https://github.com/"):
+        return normalized
+    return None
+
+
+def github_commit_url_for(repo_root: Path, commit_id: str) -> str | None:
+    repo_url = github_repo_web_url(repo_root)
+    if repo_url is None:
+        return None
+    return f"{repo_url}/commit/{commit_id}"
+
+
 def fetch_recent_repository_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitEntry]:
     if limit <= 0:
         return []
     field_sep = "\x1f"
-    format_string = f"%H{field_sep}%cI{field_sep}%s"
+    format_string = f"%H{field_sep}%h{field_sep}%cI{field_sep}%an{field_sep}%ae{field_sep}%s"
     result = subprocess.run(
         [
             "git",
@@ -144,8 +221,9 @@ def fetch_recent_repository_commits(repo_root: Path, *, limit: int = 12) -> list
     )
     if result.returncode != 0:
         return []
+    github_repo_url = github_repo_web_url(repo_root)
     entries: list[GitCommitEntry] = []
-    current_base: tuple[str, str, str] | None = None
+    current_base: tuple[str, str, str, str, str, str] | None = None
     current_files: list[str] = []
     for line in result.stdout.splitlines():
         if not line:
@@ -155,17 +233,22 @@ def fetch_recent_repository_commits(repo_root: Path, *, limit: int = 12) -> list
                 entries.append(
                     GitCommitEntry(
                         commit_id=current_base[0],
-                        commit_date=current_base[1],
-                        subject=current_base[2],
+                        short_id=current_base[1],
+                        commit_date=current_base[2],
+                        author_name=current_base[3],
+                        author_email=current_base[4],
+                        subject=current_base[5],
                         files=tuple(current_files),
+                        file_summary=summarize_commit_files(tuple(current_files)),
+                        github_url=f"{github_repo_url}/commit/{current_base[0]}" if github_repo_url else None,
                     )
                 )
-            parts = line.split(field_sep, 2)
-            if len(parts) != 3:
+            parts = line.split(field_sep, 5)
+            if len(parts) != 6:
                 current_base = None
                 current_files = []
                 continue
-            current_base = (parts[0], parts[1], parts[2])
+            current_base = (parts[0], parts[1], parts[2], parts[3], parts[4], parts[5])
             current_files = []
         elif current_base is not None:
             normalized = line.strip()
@@ -175,9 +258,14 @@ def fetch_recent_repository_commits(repo_root: Path, *, limit: int = 12) -> list
         entries.append(
             GitCommitEntry(
                 commit_id=current_base[0],
-                commit_date=current_base[1],
-                subject=current_base[2],
+                short_id=current_base[1],
+                commit_date=current_base[2],
+                author_name=current_base[3],
+                author_email=current_base[4],
+                subject=current_base[5],
                 files=tuple(current_files),
+                file_summary=summarize_commit_files(tuple(current_files)),
+                github_url=f"{github_repo_url}/commit/{current_base[0]}" if github_repo_url else None,
             )
         )
     return entries
