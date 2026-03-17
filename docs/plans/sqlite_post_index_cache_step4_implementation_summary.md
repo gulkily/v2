@@ -29,3 +29,14 @@
   - Ran `python -m unittest tests.test_task_thread_pages tests.test_board_index_page`
 - Notes:
   - Stage 3 keeps the SQLite layer current for normal commit-backed writes, but no read surface uses it for ordering until Stage 4.
+
+## Stage 4 - Use the index for homepage ordering
+- Changes:
+  - Updated `forum_web/web.py` so `visible_threads(...)` can sort root threads with SQLite-derived `updated_at` and `created_at` timestamps when a repo root is available, while preserving the existing pinned-first rule and falling back safely when the index has no useful timestamp data.
+  - Switched the board index and API list-index routes onto the index-aware `visible_threads(...)` call path.
+  - Extended `tests/test_board_index_page.py` with a git-backed recency-ordering case that proves the homepage stops relying on raw `post_id` order once the derived index is available.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_post_index`
+  - Ran `python -m unittest tests.test_task_thread_pages tests.test_site_activity_page tests.test_instance_info_page`
+- Notes:
+  - The first read-surface migration is intentionally narrow: the homepage and shared list-index ordering now use the derived timestamps, while the broader thread/post rendering model still comes from canonical parsed files.

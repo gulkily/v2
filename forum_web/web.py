@@ -14,6 +14,7 @@ from wsgiref.util import setup_testing_defaults
 from forum_core.instance_info import load_instance_info, render_public_value
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
+from forum_core.post_index import IndexedPostRow, load_indexed_root_posts
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
@@ -182,7 +183,28 @@ def resolve_commit_posts(commit: GitCommitEntry, posts_index: dict[str, Post]) -
     return touched
 
 
-def visible_threads(threads, moderation_state, *, board_tag: str | None = None):
+def indexed_timestamp_value(timestamp_text: str | None) -> float:
+    if not timestamp_text:
+        return float("-inf")
+    try:
+        return datetime.fromisoformat(timestamp_text).timestamp()
+    except ValueError:
+        return float("-inf")
+
+
+def indexed_thread_sort_key(thread, moderation_state, *, indexed_roots: dict[str, IndexedPostRow]):
+    indexed_root = indexed_roots.get(thread.root.post_id)
+    updated_at = indexed_timestamp_value(indexed_root.updated_at if indexed_root is not None else None)
+    created_at = indexed_timestamp_value(indexed_root.created_at if indexed_root is not None else None)
+    return (
+        0 if moderation_state.pins_thread(thread.root.post_id) else 1,
+        -updated_at,
+        -created_at,
+        thread.root.post_id,
+    )
+
+
+def visible_threads(threads, moderation_state, *, board_tag: str | None = None, repo_root: Path | None = None):
     filtered = [
         thread
         for thread in threads
@@ -190,11 +212,18 @@ def visible_threads(threads, moderation_state, *, board_tag: str | None = None):
     ]
     if board_tag:
         filtered = [thread for thread in filtered if board_tag in thread.root.board_tags]
+    indexed_roots: dict[str, IndexedPostRow] = {}
+    if repo_root is not None:
+        try:
+            indexed_roots = load_indexed_root_posts(repo_root, board_tag=board_tag)
+        except Exception:
+            indexed_roots = {}
     return sorted(
         filtered,
-        key=lambda thread: (
-            0 if moderation_state.pins_thread(thread.root.post_id) else 1,
-            thread.root.post_id,
+        key=lambda thread: indexed_thread_sort_key(
+            thread,
+            moderation_state,
+            indexed_roots=indexed_roots,
         ),
     )
 
@@ -244,8 +273,9 @@ def resolved_profile_identity_id(identity_context, identity_id: str | None) -> s
 
 
 def render_board_index() -> str:
+    repo_root = get_repo_root()
     posts, threads, _, _, moderation_state, _ = load_repository_state()
-    context = build_board_index_page_context(posts, threads, moderation_state)
+    context = build_board_index_page_context(posts, threads, moderation_state, repo_root=repo_root)
     content = load_template("board_index.html").substitute(context)
     return render_page(
         title="Forum Reader",
@@ -256,8 +286,8 @@ def render_board_index() -> str:
     )
 
 
-def build_board_index_page_context(posts, threads, moderation_state) -> dict[str, str]:
-    public_threads = visible_threads(threads, moderation_state)
+def build_board_index_page_context(posts, threads, moderation_state, *, repo_root: Path) -> dict[str, str]:
+    public_threads = visible_threads(threads, moderation_state, repo_root=repo_root)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
     return {
         "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
@@ -1192,20 +1222,22 @@ def render_task_detail_discussion(thread, *, moderation_state) -> str:
 
 
 def render_api_home() -> str:
+    repo_root = get_repo_root()
     posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
     return render_api_home_text(
         post_count=len(posts),
-        thread_count=len(visible_threads(threads, moderation_state)),
+        thread_count=len(visible_threads(threads, moderation_state, repo_root=repo_root)),
         board_tags=board_tags,
     )
 
 
 def render_api_list_index(board_tag: str | None) -> str:
+    repo_root = get_repo_root()
     _, threads, board_tags, _, moderation_state, _ = load_repository_state()
     if board_tag and board_tag not in board_tags:
         return render_bad_request_text(f"unknown board_tag: {board_tag}")
 
-    public_threads = visible_threads(threads, moderation_state, board_tag=board_tag)
+    public_threads = visible_threads(threads, moderation_state, board_tag=board_tag, repo_root=repo_root)
     reply_counts = {
         thread.root.post_id: visible_reply_count(thread, moderation_state)
         for thread in public_threads

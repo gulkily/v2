@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import tempfile
 import unittest
 from io import BytesIO
@@ -61,6 +62,31 @@ class BoardIndexPageTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
+    def run_git(self, *args: str, env: dict[str, str] | None = None) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(self.repo_root), *args],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+        return result.stdout.strip()
+
+    def init_git_repo(self) -> None:
+        self.run_git("init")
+        self.run_git("config", "user.name", "Test User")
+        self.run_git("config", "user.email", "test@example.com")
+
+    def commit_posts(self, message: str, timestamp: str) -> None:
+        env = {
+            "PATH": os.environ["PATH"],
+            "GIT_AUTHOR_DATE": timestamp,
+            "GIT_COMMITTER_DATE": timestamp,
+        }
+        self.run_git("add", "records/posts", env=env)
+        self.run_git("commit", "-m", message, env=env)
+
     def get(self, path: str) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
@@ -106,6 +132,27 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertNotIn('view moderation log', body)
         self.assertIn('/moderation/', body)
         self.assertIn('/planning/task-priorities/', body)
+
+    def test_board_index_orders_threads_by_commit_recency_when_index_is_available(self) -> None:
+        self.init_git_repo()
+        self.commit_posts("Add roots", "2026-03-17T09:00:00+00:00")
+
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general meta
+            Subject: Hello world
+
+            Freshly updated body.
+            """,
+        )
+        self.commit_posts("Update root-001", "2026-03-17T12:00:00+00:00")
+
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertTrue(body.index("/threads/root-001") < body.index("/threads/root-002"))
 
 
 if __name__ == "__main__":
