@@ -101,6 +101,15 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn("ASCII-only canonical text records", body)
         self.assertIn("reduces Unicode obfuscation risks", body)
 
+        reference_index = body.index("Replying to")
+        textarea_index = body.index('id="body-input"')
+        draft_status_index = body.index('id="draft-status"')
+        requirements_index = body.index("Requirements and limitations")
+
+        self.assertLess(reference_index, textarea_index)
+        self.assertLess(textarea_index, draft_status_index)
+        self.assertLess(draft_status_index, requirements_index)
+
     def test_compose_reply_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get(
             "/compose/reply",

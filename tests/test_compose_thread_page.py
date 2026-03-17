@@ -73,6 +73,13 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertNotIn(">Technical details<", body)
         self.assertIn(">Advanced<", body)
 
+        textarea_index = body.index('id="body-input"')
+        draft_status_index = body.index('id="draft-status"')
+        requirements_index = body.index("Requirements and limitations")
+
+        self.assertLess(textarea_index, draft_status_index)
+        self.assertLess(draft_status_index, requirements_index)
+
     def test_compose_thread_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get_with_env(
             "/compose/thread",
