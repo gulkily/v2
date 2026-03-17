@@ -136,6 +136,13 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("pin thread", moderation_body)
         self.assertNotIn("Add reply", moderation_body)
 
+    def test_moderation_route_redirects_to_filtered_activity_view(self) -> None:
+        status, headers, body = self.get("/moderation/")
+
+        self.assertEqual(status, "302 Found")
+        self.assertEqual(headers["Location"], "/activity/?view=moderation")
+        self.assertEqual(body, "")
+
 
 if __name__ == "__main__":
     unittest.main()

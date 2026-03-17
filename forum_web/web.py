@@ -391,7 +391,7 @@ def render_board_index_action_links() -> str:
         ("/compose/thread", "compose a signed thread"),
         ("/instance/", "instance info"),
         ("/activity/", "view site activity"),
-        ("/moderation/", "moderation log"),
+        ("/activity/?view=moderation", "moderation activity"),
         ("/planning/task-priorities/", "task priorities"),
     ]
     return "".join(
@@ -1816,6 +1816,14 @@ def application(environ, start_response):
             start_response("200 OK", headers)
             return [body]
 
+        if path == "/moderation/":
+            headers = [
+                ("Content-Type", "text/plain; charset=utf-8"),
+                ("Location", "/activity/?view=moderation"),
+            ]
+            start_response("302 Found", headers)
+            return [b""]
+
         if path in {"/planning/task-priorities", "/planning/task-priorities/"}:
             view_mode = task_filter_mode_from_request(query_params.get("view", [""])[0])
             body = render_task_priorities_page(view_mode=view_mode).encode("utf-8")
@@ -1985,14 +1993,6 @@ def application(environ, start_response):
         if path == "/assets/vendor/openpgp.min.mjs":
             body = load_asset_text("vendor/openpgp.min.mjs").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/moderation/":
-            limit = parse_limit_value(query_params.get("limit", [""])[0] if "limit" in query_params else None)
-            before = query_params.get("before", [""])[0].strip() or None
-            body = render_moderation_log_page(limit=limit, before=before).encode("utf-8")
-            headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
 

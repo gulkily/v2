@@ -19,3 +19,14 @@
   - Ran `python -m unittest tests.test_board_index_page tests.test_instance_info_page`
 - Notes:
   - `/activity/` is now the merged timeline, but `/moderation/` still exists as a separate page until Stage 3.
+
+## Stage 3 - Consolidate moderation navigation into the merged page
+- Changes:
+  - Redirected `/moderation/` to `/activity/?view=moderation` so the filtered activity page is now the compatibility path for moderation history.
+  - Updated board-index navigation to point moderation users at the filtered merged activity view instead of the retired standalone moderation page.
+  - Extended route tests to cover the redirect and the new activity-navigation target.
+- Verification:
+  - Ran `python -m unittest tests.test_site_activity_page tests.test_site_activity_git_log_helpers tests.test_board_index_page`
+  - Ran `python -m unittest tests.test_instance_info_page tests.test_task_thread_pages`
+- Notes:
+  - The plain-text moderation API remains unchanged; this stage only consolidates the web UI history surfaces around `/activity/`.

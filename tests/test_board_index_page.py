@@ -129,8 +129,9 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('/instance/', body)
         self.assertIn('/activity/', body)
         self.assertIn('view site activity', body)
-        self.assertNotIn('view moderation log', body)
-        self.assertIn('/moderation/', body)
+        self.assertIn('/activity/?view=moderation', body)
+        self.assertIn('moderation activity', body)
+        self.assertNotIn('/moderation/', body)
         self.assertIn('/planning/task-priorities/', body)
 
     def test_board_index_orders_threads_by_commit_recency_when_index_is_available(self) -> None:
