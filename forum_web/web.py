@@ -921,6 +921,9 @@ def render_profile(identity_id: str) -> str:
             f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
             "update username"
             "</a>"
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
+            "manage merges"
+            "</a>"
         ),
         stat_html=(
             '<div class="stat-grid">'
@@ -996,6 +999,176 @@ def render_profile_update_page(identity_id: str) -> str:
         hero_text="Use the existing browser signing flow to prepare one signed username/display-name update for the resolved profile you are viewing.",
         content_html=content,
         page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
+    )
+
+
+def render_merge_management_page(identity_id: str) -> str:
+    posts, _, _, _, _, identity_context = load_repository_state()
+    summary = find_profile_summary(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    if summary is None:
+        raise LookupError(f"unknown identity: {identity_id}")
+
+    management_summary = derive_merge_management_summary(
+        identity_id=summary.identity_id,
+        resolution=identity_context.resolution,
+        profile_updates=list(identity_context.profile_update_records),
+        states=identity_context.merge_request_states,
+    )
+    if management_summary is None:
+        raise LookupError(f"unknown identity: {identity_id}")
+
+    profile_slug = identity_slug(summary.identity_id)
+
+    def render_match_rows() -> str:
+        if not management_summary.historical_matches:
+            return "<p>No visible historical username overlaps are currently available for this identity.</p>"
+        parts = []
+        for match in management_summary.historical_matches:
+            candidate_slug = identity_slug(match.candidate_identity_id)
+            request_link = (
+                f'/profiles/{html.escape(profile_slug)}/merge/action?action=request_merge'
+                f'&other_identity_id={html.escape(match.candidate_identity_id)}'
+            )
+            parts.append(
+                '<article class="panel page-section">'
+                f'<p><strong>{html.escape(match.candidate_display_name)}</strong> · '
+                f'<a href="/profiles/{html.escape(candidate_slug)}">{html.escape(match.candidate_identity_id)}</a></p>'
+                f'<p>Shared usernames: <code>{" ".join(html.escape(name) for name in match.shared_display_names)}</code></p>'
+                f'<div class="link-cluster"><a class="thread-chip" href="{request_link}">request merge</a></div>'
+                "</article>"
+            )
+        return "".join(parts)
+
+    def render_state_rows(states, *, show_actions: bool) -> str:
+        if not states:
+            return "<p>None.</p>"
+        parts = []
+        for state in states:
+            actions_html = ""
+            if show_actions:
+                approve_link = (
+                    f'/profiles/{html.escape(profile_slug)}/merge/action?action=approve_merge'
+                    f'&requester_identity_id={html.escape(state.requester_identity_id)}'
+                    f'&target_identity_id={html.escape(state.target_identity_id)}'
+                )
+                dismiss_link = (
+                    f'/profiles/{html.escape(profile_slug)}/merge/action?action=dismiss_merge'
+                    f'&requester_identity_id={html.escape(state.requester_identity_id)}'
+                    f'&target_identity_id={html.escape(state.target_identity_id)}'
+                )
+                moderator_link = (
+                    f'/profiles/{html.escape(profile_slug)}/merge/action?action=moderator_approve_merge'
+                    f'&requester_identity_id={html.escape(state.requester_identity_id)}'
+                    f'&target_identity_id={html.escape(state.target_identity_id)}'
+                )
+                actions_html = (
+                    f'<div class="link-cluster">'
+                    f'<a class="thread-chip" href="{approve_link}">approve</a>'
+                    f'<a class="thread-chip" href="{dismiss_link}">dismiss</a>'
+                    f'<a class="thread-chip" href="{moderator_link}">moderator approve</a>'
+                    "</div>"
+                )
+            response_label = state.latest_response_action or "pending"
+            parts.append(
+                '<article class="panel page-section">'
+                f'<p><strong>{html.escape(state.requester_identity_id)}</strong> -> <strong>{html.escape(state.target_identity_id)}</strong></p>'
+                f'<p>Latest request: <code>{html.escape(state.latest_request_record_id)}</code></p>'
+                f'<p>Status: <code>{html.escape(response_label)}</code></p>'
+                f"{actions_html}"
+                "</article>"
+            )
+        return "".join(parts)
+
+    content = load_template("merge_management.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ("/", "board index"),
+                (f"/profiles/{profile_slug}", summary.display_name),
+                (f"/profiles/{profile_slug}/merge", "manage merges"),
+            ]
+        ),
+        profile_slug=html.escape(profile_slug),
+        identity_id=html.escape(summary.identity_id),
+        display_name=html.escape(summary.display_name),
+        historical_match_html=render_match_rows(),
+        outgoing_request_html=render_state_rows(management_summary.outgoing_requests, show_actions=False),
+        incoming_request_html=render_state_rows(management_summary.incoming_requests, show_actions=True),
+        dismissed_request_html=render_state_rows(management_summary.dismissed_requests, show_actions=False),
+        approved_request_html=render_state_rows(management_summary.approved_requests, show_actions=False),
+    )
+    return render_page(
+        title=f"Manage merges · {summary.display_name}",
+        hero_kicker="Merge Management",
+        hero_title="Manage identity merges",
+        hero_text="Review same-name identity matches, send merge requests, and respond to incoming approvals from one focused management page.",
+        content_html=content,
+    )
+
+
+def render_merge_request_action_page(
+    identity_id: str,
+    *,
+    action: str,
+    requester_identity_id: str,
+    target_identity_id: str,
+) -> str:
+    posts, _, _, _, _, identity_context = load_repository_state()
+    summary = find_profile_summary(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    if summary is None:
+        raise LookupError(f"unknown identity: {identity_id}")
+
+    profile_slug = identity_slug(summary.identity_id)
+    action_labels = {
+        "request_merge": "Request merge",
+        "approve_merge": "Approve merge",
+        "dismiss_merge": "Dismiss merge request",
+        "moderator_approve_merge": "Moderator approve merge",
+    }
+    if action not in action_labels:
+        raise LookupError(f"unknown merge action: {action}")
+    if action == "request_merge" and summary.identity_id != requester_identity_id:
+        raise LookupError("request merge page must be anchored on the requester identity")
+    if action in {"approve_merge", "dismiss_merge", "moderator_approve_merge"} and summary.identity_id != target_identity_id:
+        raise LookupError("response page must be anchored on the target identity")
+
+    content = load_template("merge_request_action.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ("/", "board index"),
+                (f"/profiles/{profile_slug}", summary.display_name),
+                (f"/profiles/{profile_slug}/merge", "manage merges"),
+                (f"/profiles/{profile_slug}/merge/action", action_labels[action].lower()),
+            ]
+        ),
+        action_heading=html.escape(action_labels[action]),
+        action_description=html.escape(
+            "This page prepares one signed merge-request action using your local key. "
+            "The server verifies the signer against the chosen action when you submit."
+        ),
+        action_name=html.escape(action),
+        requester_identity_id=html.escape(requester_identity_id),
+        target_identity_id=html.escape(target_identity_id),
+        redirect_path=html.escape(f"/profiles/{profile_slug}/merge"),
+        profile_slug=html.escape(profile_slug),
+        submit_label=html.escape(action_labels[action]),
+    )
+    return render_page(
+        title=f"{action_labels[action]} · {summary.display_name}",
+        hero_kicker="Merge Action",
+        hero_title=action_labels[action],
+        hero_text="Prepare a signed merge workflow action in the browser and submit it through the canonical merge-request API.",
+        content_html=content,
+        page_script_html='<script type="module" src="/assets/merge_request_signing.js"></script>',
     )
 
 
@@ -2213,6 +2386,12 @@ def application(environ, start_response):
             start_response("200 OK", headers)
             return [body]
 
+        if path == "/assets/merge_request_signing.js":
+            body = load_asset_text("merge_request_signing.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
         if path == "/assets/task_priorities.js":
             body = load_asset_text("task_priorities.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
@@ -2257,6 +2436,48 @@ def application(environ, start_response):
             try:
                 identity_id = identity_id_from_slug(slug)
                 body = render_profile_update_page(identity_id).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except (LookupError, ValueError):
+                body = render_missing_resource("profile").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+        if path.startswith("/profiles/") and path.endswith("/merge/action"):
+            slug = unquote(path.removeprefix("/profiles/").removesuffix("/merge/action"))
+            slug = slug.rstrip("/")
+            action = query_params.get("action", [""])[0].strip()
+            requester_identity_id = query_params.get("requester_identity_id", [""])[0].strip()
+            target_identity_id = query_params.get("target_identity_id", [""])[0].strip()
+            other_identity_id = query_params.get("other_identity_id", [""])[0].strip()
+            try:
+                identity_id = identity_id_from_slug(slug)
+                if action == "request_merge":
+                    requester_identity_id = identity_id
+                    target_identity_id = other_identity_id
+                body = render_merge_request_action_page(
+                    identity_id,
+                    action=action,
+                    requester_identity_id=requester_identity_id,
+                    target_identity_id=target_identity_id,
+                ).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except (LookupError, ValueError):
+                body = render_missing_resource("profile").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+        if path.startswith("/profiles/") and path.endswith("/merge"):
+            slug = unquote(path.removeprefix("/profiles/").removesuffix("/merge"))
+            slug = slug.rstrip("/")
+            try:
+                identity_id = identity_id_from_slug(slug)
+                body = render_merge_management_page(identity_id).encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
                 start_response("200 OK", headers)
                 return [body]

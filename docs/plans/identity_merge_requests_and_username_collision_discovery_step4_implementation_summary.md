@@ -31,3 +31,15 @@
   - Ran `python3 -m py_compile forum_core/merge_requests.py forum_web/profiles.py forum_web/api_text.py forum_web/web.py`.
 - Notes:
   - Approved merge requests now affect the same canonical identity-resolution path used by profile reads, while pending and dismissed requests remain read-only workflow state.
+
+## Stage 4 - merge-management web flow and signer-facing actions
+- Changes:
+  - Extended [forum_web/web.py](/home/wsl/v2/forum_web/web.py) so profile pages link to a dedicated merge-management page, and added web routes for `/profiles/<identity-slug>/merge` plus `/profiles/<identity-slug>/merge/action`.
+  - Added [templates/merge_management.html](/home/wsl/v2/templates/merge_management.html), [templates/merge_request_action.html](/home/wsl/v2/templates/merge_request_action.html), and [templates/assets/merge_request_signing.js](/home/wsl/v2/templates/assets/merge_request_signing.js) for candidate discovery, incoming-request review, and signed request/approve/dismiss/moderator-approve submissions through the browser.
+  - Added [tests/test_merge_management_page.py](/home/wsl/v2/tests/test_merge_management_page.py) covering the profile linkout, merge-management page rendering, and merge-action signing page.
+- Verification:
+  - Ran `python3 -m unittest tests.test_merge_management_page tests.test_merge_management_api tests.test_merge_request_submission tests.test_merge_requests`.
+  - Re-ran `python3 -m unittest tests.test_profile_update_page`.
+  - Ran `python3 -m py_compile forum_web/web.py`.
+- Notes:
+  - The browser action page derives `Actor-Identity-ID` from the imported signing key at submit time, which keeps moderator approvals possible without pretending the moderator is the target identity being viewed.

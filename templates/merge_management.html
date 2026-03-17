@@ -1,0 +1,47 @@
+<section class="panel page-section">
+  ${breadcrumb_html}
+  <div class="detail-grid">
+    <p><strong>Current display name:</strong> <code>${display_name}</code></p>
+    <p><strong>Resolved Identity-ID:</strong> <code>${identity_id}</code></p>
+  </div>
+  <div class="link-cluster">
+    <a class="thread-chip" href="/profiles/${profile_slug}">back to profile</a>
+    <a class="thread-chip" href="/profiles/${profile_slug}/update">update username</a>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="section-head page-lede">
+    <h2>Same-name identities</h2>
+    <p>Visible username history overlaps are suggestions only. They do not merge accounts by themselves.</p>
+  </div>
+  ${historical_match_html}
+</section>
+
+<section class="page-section">
+  <div class="section-head page-lede">
+    <h2>Outgoing requests</h2>
+  </div>
+  ${outgoing_request_html}
+</section>
+
+<section class="page-section">
+  <div class="section-head page-lede">
+    <h2>Incoming requests</h2>
+  </div>
+  ${incoming_request_html}
+</section>
+
+<section class="page-section">
+  <div class="section-head page-lede">
+    <h2>Dismissed requests</h2>
+  </div>
+  ${dismissed_request_html}
+</section>
+
+<section class="page-section">
+  <div class="section-head page-lede">
+    <h2>Approved requests</h2>
+  </div>
+  ${approved_request_html}
+</section>
