@@ -672,7 +672,10 @@ def render_site_activity_page(*, view_mode: str) -> str:
         event_cards = '<article class="post-card"><p class="post-link">No activity matches this filter yet.</p></article>'
     git_summary = git_status_summary(repo_root)
     git_worktree_value = git_summary.get("git_worktree") or git_summary.get("worktree") or "git status unavailable"
-    intro_text = "Browse one combined reverse-chronological timeline of content, moderation, and code changes."
+    intro_text = (
+        "Browse one combined reverse-chronological timeline of content, moderation, and code changes. "
+        "Commit cards highlight touched files and outbound GitHub links when available."
+    )
     if view_mode == "content":
         intro_text = "Browse only git-backed content activity for this instance."
     elif view_mode == "moderation":

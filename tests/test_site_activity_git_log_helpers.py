@@ -179,6 +179,11 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
             "https://github.com/example/forum/commit/abc123",
         )
 
+    def test_github_commit_url_for_returns_none_for_non_github_remote(self) -> None:
+        self.run_git("remote", "set-url", "origin", "https://gitlab.example.com/example/forum.git")
+
+        self.assertIsNone(github_commit_url_for(self.repo_root, "abc123"))
+
     def test_load_activity_events_merges_content_and_moderation_in_one_timeline(self) -> None:
         self.write_record(
             "records/posts/root-001.txt",

@@ -120,6 +120,7 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertNotIn('class="front-layout"', body)
         self.assertIn("Repository history", body)
         self.assertIn("Repository activity stream", body)
+        self.assertIn("Commit cards highlight touched files and outbound GitHub links when available.", body)
         self.assertIn("all activity", body)
         self.assertIn("content activity", body)
         self.assertIn("moderation activity", body)

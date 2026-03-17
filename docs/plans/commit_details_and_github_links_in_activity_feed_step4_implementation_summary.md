@@ -16,3 +16,13 @@
   - Ran `python -m unittest tests.test_site_activity_page tests.test_site_activity_git_log_helpers`
 - Notes:
   - The card stays summary-oriented in this stage: it shows what changed and where to go next, but it still does not embed diffs or any full commit-browser behavior.
+
+## Stage 3 - Align copy and coverage around outbound commit links
+- Changes:
+  - Updated `forum_web/web.py` so the activity-page intro copy explains that commit cards surface touched files and outbound GitHub links when available.
+  - Expanded `tests/test_site_activity_git_log_helpers.py` with a non-GitHub remote regression to lock down the deterministic outbound-link behavior.
+  - Expanded `tests/test_site_activity_page.py` so the richer page framing is covered alongside the existing commit-card assertions.
+- Verification:
+  - Ran `python -m unittest tests.test_board_index_page tests.test_site_activity_page tests.test_site_activity_git_log_helpers tests.test_instance_info_page tests.test_task_thread_pages`
+- Notes:
+  - This stage tightened the user-facing framing and remote-link assumptions without changing the route structure or turning `/activity/` into a remote-availability checker.
