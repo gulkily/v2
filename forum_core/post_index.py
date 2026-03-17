@@ -7,7 +7,7 @@ from pathlib import Path
 
 from forum_core.identity import normalize_fingerprint, short_identity_label
 from forum_web.repository import Post, load_posts
-from forum_web.profiles import IdentityContext, resolve_identity_display_name
+from forum_web.profiles import IdentityContext, load_identity_context, resolve_identity_display_name
 
 
 POST_INDEX_SCHEMA_VERSION = 2
@@ -410,6 +410,7 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
     owned_index = index is None
     active_index = index or open_post_index(repo_root)
     posts = load_posts(records_posts_dir(repo_root))
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
     timestamps_by_post_id = post_commit_timestamps(repo_root)
     clear_post_index(active_index.connection)
     for post in posts:
@@ -418,6 +419,7 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
             post=post,
             repo_root=repo_root,
             timestamps=timestamps_by_post_id.get(post.post_id, PostCommitTimestamps(created_at=None, updated_at=None)),
+            identity_context=identity_context,
         )
     indexed_head = current_repo_head(repo_root)
     set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
@@ -456,17 +458,35 @@ def refresh_post_index_after_commit(
 
     index = open_post_index(repo_root)
     try:
+        if any(
+            touched_path.startswith("records/profile-updates/")
+            or touched_path.startswith("records/identity/")
+            or touched_path.startswith("records/identity-links/")
+            for touched_path in touched_paths
+        ):
+            rebuild_post_index(repo_root, index=index)
+            set_index_metadata(index.connection, "indexed_head", commit_id)
+            set_index_metadata(
+                index.connection,
+                "indexed_post_count",
+                str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
+            )
+            index.connection.commit()
+            return
+        posts = load_posts(records_posts_dir(repo_root))
+        identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+        posts_by_path = {candidate.path: candidate for candidate in posts}
+        timestamps_by_post_id = post_commit_timestamps(repo_root)
         for touched_path in touched_paths:
             path = repo_root / touched_path
             if path.parent != records_posts_dir(repo_root) or path.suffix != ".txt":
                 continue
             if not path.exists():
                 continue
-            post = load_posts(records_posts_dir(repo_root))
-            matching_post = next((candidate for candidate in post if candidate.path == path), None)
+            matching_post = posts_by_path.get(path)
             if matching_post is None:
                 continue
-            timestamps = post_commit_timestamps(repo_root).get(
+            timestamps = timestamps_by_post_id.get(
                 matching_post.post_id,
                 PostCommitTimestamps(created_at=None, updated_at=None),
             )
@@ -475,6 +495,7 @@ def refresh_post_index_after_commit(
                 post=matching_post,
                 repo_root=repo_root,
                 timestamps=timestamps,
+                identity_context=identity_context,
             )
         set_index_metadata(index.connection, "indexed_head", commit_id)
         set_index_metadata(

@@ -292,6 +292,63 @@ class PostIndexBuildTests(unittest.TestCase):
         finally:
             index.connection.close()
 
+    def test_rebuild_post_index_populates_normalized_author_rows(self) -> None:
+        self.write_post(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Author row
+
+            Body.
+            """,
+        )
+        self.commit_all("Add root", "2026-03-17T09:00:00+00:00")
+
+        with mock.patch("forum_core.post_index.load_identity_context") as mock_context_loader:
+            mock_context = mock.Mock()
+            mock_context.canonical_identity_id.return_value = "openpgp:author"
+            mock_context.resolved_display_name.return_value = mock.Mock(display_name="Author Name")
+            mock_context_loader.return_value = mock_context
+            with mock.patch("forum_core.post_index.resolve_identity_display_name", return_value="Author Name"):
+                posts = load_posts(self.repo_root / "records" / "posts")
+                original_post = posts[0]
+                patched_post = original_post.__class__(
+                    **{
+                        **original_post.__dict__,
+                        "identity_id": "openpgp:author",
+                        "signer_fingerprint": "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+                    }
+                )
+                with mock.patch("forum_core.post_index.load_posts", return_value=[patched_post]):
+                    rebuild_post_index(self.repo_root)
+
+        index = open_post_index(self.repo_root)
+        try:
+            author_row = index.connection.execute(
+                """
+                SELECT author_id, canonical_identity_id, display_name, display_name_source, signer_fingerprint
+                FROM authors
+                WHERE author_id = ?
+                """,
+                ("openpgp:author",),
+            ).fetchone()
+            post_row = index.connection.execute(
+                "SELECT author_id FROM posts WHERE post_id = ?",
+                ("root-001",),
+            ).fetchone()
+            self.assertIsNotNone(author_row)
+            self.assertIsNotNone(post_row)
+            assert author_row is not None
+            assert post_row is not None
+            self.assertEqual(author_row["canonical_identity_id"], "openpgp:author")
+            self.assertEqual(author_row["display_name"], "Author Name")
+            self.assertEqual(author_row["display_name_source"], "profile_update")
+            self.assertEqual(author_row["signer_fingerprint"], "ABCDEF0123456789ABCDEF0123456789ABCDEF01")
+            self.assertEqual(post_row["author_id"], "openpgp:author")
+        finally:
+            index.connection.close()
+
     def test_store_post_refreshes_index_after_successful_commit(self) -> None:
         payload_text = dedent(
             """
