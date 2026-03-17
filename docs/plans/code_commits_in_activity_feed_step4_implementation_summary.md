@@ -9,3 +9,14 @@
   - Ran `python -m unittest tests.test_site_activity_page`
 - Notes:
   - This stage changes only the helper/model layer. `/activity/` still renders the existing content-plus-moderation UI until Stage 2 adds code commits to the page itself.
+
+## Stage 2 - Render code commits on `/activity/`
+- Changes:
+  - Extended `forum_web/web.py` so `/activity/` exposes a fixed `code` filter, passes commit activity type into the shared commit-card rendering, and uses code-specific fallback copy when a commit has no canonical post targets.
+  - Updated `templates/activity.html` and the activity page framing so the page reads as a broader repository activity stream rather than only content-plus-moderation history.
+  - Expanded `tests/test_site_activity_page.py` with a code-commit fixture and assertions covering default timeline ordering plus the new `code` filter behavior.
+- Verification:
+  - Ran `python -m unittest tests.test_site_activity_page`
+  - Ran `python -m unittest tests.test_site_activity_git_log_helpers`
+- Notes:
+  - Code commits still render as concise commit cards rather than diff views; this stage keeps `/activity/` out of git-browser territory.

@@ -463,7 +463,13 @@ def format_commit_date(commit_date: str) -> str:
     return timestamp.strftime("%b %d, %Y · %H:%M:%S %z")
 
 
-def render_commit_card(commit: GitCommitEntry, posts: list[Post], identity_context) -> str:
+def render_commit_card(
+    commit: GitCommitEntry,
+    posts: list[Post],
+    identity_context,
+    *,
+    activity_kind: str = "content",
+) -> str:
     post_cards = "".join(
         render_post_card(
             post,
@@ -474,10 +480,17 @@ def render_commit_card(commit: GitCommitEntry, posts: list[Post], identity_conte
         for post in posts
     )
     if not post_cards:
-        post_cards = '<p class="post-link">No canonical records were touched by this commit.</p>'
+        if activity_kind == "code":
+            post_cards = '<p class="post-link">This code commit did not touch canonical post records.</p>'
+        else:
+            post_cards = '<p class="post-link">No canonical records were touched by this commit.</p>'
+    activity_label = "Content commit"
+    if activity_kind == "code":
+        activity_label = "Code commit"
     return (
         '<article class="commit-card">'
         '<div class="commit-card-meta">'
+        f'<p class="post-link">{html.escape(activity_label)}</p>'
         f'<p class="commit-id">Commit {html.escape(commit.commit_id[:12])}</p>'
         f'<p class="commit-date">{html.escape(format_commit_date(commit.commit_date))}</p>'
         f'<p class="commit-subject">{html.escape(commit.subject or "No message")}</p>'
@@ -494,6 +507,7 @@ def render_activity_filter_nav(*, current_mode: str) -> str:
         ("all", "/activity/", "all activity"),
         ("content", "/activity/?view=content", "content activity"),
         ("moderation", "/activity/?view=moderation", "moderation activity"),
+        ("code", "/activity/?view=code", "code activity"),
     ]
     parts = []
     for mode, href, label in links:
@@ -512,6 +526,7 @@ def render_activity_event_card(event: ActivityEvent, *, posts_index: dict[str, P
         event.commit,
         resolve_commit_posts(event.commit, posts_index),
         identity_context,
+        activity_kind=event.kind,
     )
 
 
@@ -532,11 +547,13 @@ def render_site_activity_page(*, view_mode: str) -> str:
         event_cards = '<article class="post-card"><p class="post-link">No activity matches this filter yet.</p></article>'
     git_summary = git_status_summary(repo_root)
     git_worktree_value = git_summary.get("git_worktree") or git_summary.get("worktree") or "git status unavailable"
-    intro_text = "Browse one combined reverse-chronological timeline of git-backed content changes and moderation events."
+    intro_text = "Browse one combined reverse-chronological timeline of content, moderation, and code changes."
     if view_mode == "content":
         intro_text = "Browse only git-backed content activity for this instance."
     elif view_mode == "moderation":
         intro_text = "Browse only signed moderation actions for this instance."
+    elif view_mode == "code":
+        intro_text = "Browse only repository code changes for this instance."
     content = load_template("activity.html").substitute(
         filter_nav_html=render_activity_filter_nav(current_mode=view_mode),
         activity_intro_text=html.escape(intro_text),
@@ -550,7 +567,7 @@ def render_site_activity_page(*, view_mode: str) -> str:
         title="Site Activity",
         hero_kicker="Activity feed",
         hero_title="Site activity",
-        hero_text="One filtered timeline for git-backed content activity and signed moderation events on this instance.",
+        hero_text="One filtered timeline for repository content, moderation, and code activity on this instance.",
         content_html=content,
     )
 

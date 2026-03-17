@@ -53,6 +53,8 @@ class SiteActivityPageTests(unittest.TestCase):
             """,
         )
         self.commit_record("records/moderation/pin-root-010.txt", "Pin root")
+        self.write_record("forum_web_stub.py", "print('helper')\n")
+        self.commit_record("forum_web_stub.py", "Add ui helper")
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -110,31 +112,43 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertNotIn('class="front-layout"', body)
-        self.assertIn("Canonical activity stream", body)
+        self.assertIn("Repository activity stream", body)
         self.assertIn("all activity", body)
         self.assertIn("content activity", body)
         self.assertIn("moderation activity", body)
+        self.assertIn("code activity", body)
         self.assertIn('class="post-card"', body)
         self.assertIn("First root", body)
         self.assertIn("root-010", body)
         self.assertIn("reply-020", body)
         self.assertIn("pin thread", body)
+        self.assertIn("Code commit", body)
+        self.assertIn("Add ui helper", body)
         self.assertIn("Add reply", body)
         self.assertIn("Add root", body)
-        self.assertTrue(body.index("pin thread") < body.index("Add reply"))
+        self.assertIn("Pin root", body)
+        self.assertTrue(body.index("Add ui helper") < body.index("Pin root"))
+        self.assertTrue(body.index("Pin root") < body.index("Add reply"))
         self.assertTrue(body.index("Add reply") < body.index("Add root"))
         self.assertIn(self.latest_commit_short(), body)
         self.assertIn("Working tree", body)
         self.assertIn("records/instance/public.txt", body)
 
-    def test_activity_page_filters_content_and_moderation(self) -> None:
+    def test_activity_page_filters_content_moderation_and_code(self) -> None:
         _, _, content_body = self.get("/activity/", "view=content")
         _, _, moderation_body = self.get("/activity/", "view=moderation")
+        _, _, code_body = self.get("/activity/", "view=code")
 
         self.assertIn("Add reply", content_body)
         self.assertNotIn("pin thread", content_body)
+        self.assertNotIn("Add ui helper", content_body)
         self.assertIn("pin thread", moderation_body)
         self.assertNotIn("Add reply", moderation_body)
+        self.assertNotIn("Add ui helper", moderation_body)
+        self.assertIn("Add ui helper", code_body)
+        self.assertIn("Code commit", code_body)
+        self.assertNotIn("pin thread", code_body)
+        self.assertNotIn("Add reply", code_body)
 
     def test_moderation_route_redirects_to_filtered_activity_view(self) -> None:
         status, headers, body = self.get("/moderation/")
