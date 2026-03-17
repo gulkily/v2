@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+from forum_web.repository import Post, load_posts
 
 
 POST_INDEX_SCHEMA_VERSION = 1
@@ -12,6 +15,18 @@ POST_INDEX_SCHEMA_VERSION = 1
 class PostIndex:
     path: Path
     connection: sqlite3.Connection
+
+
+@dataclass(frozen=True)
+class PostCommitTimestamps:
+    created_at: str | None
+    updated_at: str | None
+
+
+@dataclass(frozen=True)
+class IndexBuildResult:
+    post_count: int
+    indexed_head: str | None
 
 
 def post_index_path(repo_root: Path) -> Path:
@@ -76,6 +91,11 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS post_index_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS posts_root_thread_id_idx ON posts(root_thread_id);
         CREATE INDEX IF NOT EXISTS posts_is_root_idx ON posts(is_root);
         CREATE INDEX IF NOT EXISTS post_board_tags_tag_idx ON post_board_tags(board_tag);
@@ -106,3 +126,185 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
     if current_version < POST_INDEX_SCHEMA_VERSION:
         connection.execute(f"PRAGMA user_version = {POST_INDEX_SCHEMA_VERSION}")
     connection.commit()
+
+
+def records_posts_dir(repo_root: Path) -> Path:
+    return repo_root / "records" / "posts"
+
+
+def get_index_metadata(connection: sqlite3.Connection, key: str) -> str | None:
+    row = connection.execute(
+        "SELECT value FROM post_index_metadata WHERE key = ?",
+        (key,),
+    ).fetchone()
+    if row is None:
+        return None
+    return str(row["value"])
+
+
+def set_index_metadata(connection: sqlite3.Connection, key: str, value: str) -> None:
+    connection.execute(
+        """
+        INSERT INTO post_index_metadata (key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (key, value),
+    )
+
+
+def current_repo_head(repo_root: Path) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def post_commit_timestamps(repo_root: Path) -> dict[str, PostCommitTimestamps]:
+    timestamps: dict[str, PostCommitTimestamps] = {}
+    for path in sorted(records_posts_dir(repo_root).glob("*.txt")):
+        relative_path = str(path.relative_to(repo_root))
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "log", "--follow", "--format=%cI", "--", relative_path],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        commit_times = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if not commit_times:
+            timestamps[path.stem] = PostCommitTimestamps(created_at=None, updated_at=None)
+            continue
+        timestamps[path.stem] = PostCommitTimestamps(
+            created_at=commit_times[-1],
+            updated_at=commit_times[0],
+        )
+    return timestamps
+
+
+def clear_post_index(connection: sqlite3.Connection) -> None:
+    connection.execute("DELETE FROM post_task_sources")
+    connection.execute("DELETE FROM post_task_dependencies")
+    connection.execute("DELETE FROM post_board_tags")
+    connection.execute("DELETE FROM posts")
+
+
+def upsert_indexed_post(
+    connection: sqlite3.Connection,
+    *,
+    post: Post,
+    repo_root: Path,
+    timestamps: PostCommitTimestamps,
+) -> None:
+    relative_path = str(post.path.relative_to(repo_root))
+    task_status = None
+    task_presentability_impact = None
+    task_implementation_difficulty = None
+    if post.task_metadata is not None:
+        task_status = post.task_metadata.status
+        task_presentability_impact = post.task_metadata.presentability_impact
+        task_implementation_difficulty = post.task_metadata.implementation_difficulty
+
+    connection.execute(
+        """
+        INSERT INTO posts (
+            post_id,
+            relative_path,
+            subject,
+            thread_id,
+            parent_id,
+            root_thread_id,
+            body,
+            is_root,
+            thread_type,
+            signer_fingerprint,
+            identity_id,
+            proof_of_work,
+            task_status,
+            task_presentability_impact,
+            task_implementation_difficulty,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(post_id) DO UPDATE SET
+            relative_path = excluded.relative_path,
+            subject = excluded.subject,
+            thread_id = excluded.thread_id,
+            parent_id = excluded.parent_id,
+            root_thread_id = excluded.root_thread_id,
+            body = excluded.body,
+            is_root = excluded.is_root,
+            thread_type = excluded.thread_type,
+            signer_fingerprint = excluded.signer_fingerprint,
+            identity_id = excluded.identity_id,
+            proof_of_work = excluded.proof_of_work,
+            task_status = excluded.task_status,
+            task_presentability_impact = excluded.task_presentability_impact,
+            task_implementation_difficulty = excluded.task_implementation_difficulty,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at
+        """,
+        (
+            post.post_id,
+            relative_path,
+            post.subject,
+            post.thread_id,
+            post.parent_id,
+            post.root_thread_id,
+            post.body,
+            1 if post.is_root else 0,
+            post.thread_type,
+            post.signer_fingerprint,
+            post.identity_id,
+            post.proof_of_work,
+            task_status,
+            task_presentability_impact,
+            task_implementation_difficulty,
+            timestamps.created_at,
+            timestamps.updated_at,
+        ),
+    )
+    connection.execute("DELETE FROM post_board_tags WHERE post_id = ?", (post.post_id,))
+    connection.execute("DELETE FROM post_task_dependencies WHERE post_id = ?", (post.post_id,))
+    connection.execute("DELETE FROM post_task_sources WHERE post_id = ?", (post.post_id,))
+    connection.executemany(
+        "INSERT INTO post_board_tags (post_id, board_tag) VALUES (?, ?)",
+        [(post.post_id, tag) for tag in post.board_tags],
+    )
+    if post.task_metadata is not None:
+        connection.executemany(
+            "INSERT INTO post_task_dependencies (post_id, dependency_post_id) VALUES (?, ?)",
+            [(post.post_id, dependency_post_id) for dependency_post_id in post.task_metadata.dependencies],
+        )
+        connection.executemany(
+            "INSERT INTO post_task_sources (post_id, source_name) VALUES (?, ?)",
+            [(post.post_id, source_name) for source_name in post.task_metadata.sources],
+        )
+
+
+def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> IndexBuildResult:
+    owned_index = index is None
+    active_index = index or open_post_index(repo_root)
+    posts = load_posts(records_posts_dir(repo_root))
+    timestamps_by_post_id = post_commit_timestamps(repo_root)
+    clear_post_index(active_index.connection)
+    for post in posts:
+        upsert_indexed_post(
+            active_index.connection,
+            post=post,
+            repo_root=repo_root,
+            timestamps=timestamps_by_post_id.get(post.post_id, PostCommitTimestamps(created_at=None, updated_at=None)),
+        )
+    indexed_head = current_repo_head(repo_root)
+    set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
+    set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
+    active_index.connection.commit()
+    if owned_index:
+        active_index.connection.close()
+    return IndexBuildResult(post_count=len(posts), indexed_head=indexed_head)
