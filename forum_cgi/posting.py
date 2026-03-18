@@ -9,6 +9,7 @@ from pathlib import Path
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
 from forum_core.post_index import refresh_post_index_after_commit
+from forum_core.public_keys import store_or_reuse_public_key
 from forum_web.repository import Post, index_posts, load_posts, parse_post_text
 
 
@@ -188,11 +189,13 @@ def store_post(
         )
         paths.append(signature_path)
     if public_key_text is not None:
-        public_key_path = write_ascii_file(
-            resolve_public_key_path(repo_root, post.post_id),
-            ensure_ascii_text(public_key_text, field_name="public_key"),
+        stored_public_key = store_or_reuse_public_key(
+            repo_root=repo_root,
+            public_key_text=ensure_ascii_text(public_key_text, field_name="public_key"),
         )
-        paths.append(public_key_path)
+        public_key_path = stored_public_key.path
+        if stored_public_key.created:
+            paths.append(public_key_path)
     if identity_bootstrap_path is not None and identity_bootstrap_text is not None:
         identity_bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
         stored_identity_bootstrap_path = write_ascii_file(

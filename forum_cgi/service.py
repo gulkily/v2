@@ -7,6 +7,7 @@ from pathlib import Path
 from forum_cgi.auto_reply import AutoReplyError, generate_thread_auto_reply, thread_auto_reply_enabled
 from forum_core.identity import build_bootstrap_payload, build_identity_id
 from forum_core.llm_provider import LLMProviderError
+from forum_core.public_keys import resolve_canonical_public_key_path
 from forum_core.proof_of_work import (
     first_post_pow_difficulty,
     first_post_pow_enabled,
@@ -21,7 +22,6 @@ from forum_cgi.posting import (
     ensure_post_id_available,
     parse_payload,
     resolve_identity_bootstrap_path,
-    resolve_public_key_path,
     resolve_signature_path,
     store_post,
     validate_create_reply,
@@ -131,7 +131,7 @@ def _submit_post(
         )
         identity_id = build_identity_id(signer_fingerprint)
         signature_path = str(resolve_signature_path(repo_root, post.post_id).relative_to(repo_root))
-        public_key_path = str(resolve_public_key_path(repo_root, post.post_id).relative_to(repo_root))
+        public_key_path = str(resolve_canonical_public_key_path(repo_root, signer_fingerprint).relative_to(repo_root))
         bootstrap_path = resolve_identity_bootstrap_path(repo_root, identity_id)
         identity_bootstrap_path = str(bootstrap_path.relative_to(repo_root))
         identity_bootstrap_created = not bootstrap_path.exists()

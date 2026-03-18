@@ -13,6 +13,7 @@ from unittest import mock
 
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text
 from forum_core.proof_of_work import build_pow_message, count_leading_zero_bits
+from forum_core.public_keys import resolve_canonical_public_key_path
 from forum_web.web import application
 
 
@@ -222,6 +223,34 @@ process.stdout.write(signature);
         self.assertEqual(status, "400 Bad Request")
         self.assertIn("Error-Code: bad_request", body)
         self.assertIn("Message: payload is missing Proof-Of-Work", body)
+
+    def test_repeated_signed_threads_reuse_one_canonical_public_key_file(self) -> None:
+        first_payload = self.build_thread_payload(post_id="thread-key-reuse-001")
+        second_payload = self.build_thread_payload(post_id="thread-key-reuse-002")
+
+        first_status, _, first_body = self.request(
+            "/api/create_thread",
+            method="POST",
+            body=self.create_request_body(first_payload, dry_run=False),
+            extra_env={"FORUM_ENABLE_FIRST_POST_POW": "0", "FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
+        )
+        second_status, _, second_body = self.request(
+            "/api/create_thread",
+            method="POST",
+            body=self.create_request_body(second_payload, dry_run=False),
+            extra_env={"FORUM_ENABLE_FIRST_POST_POW": "0", "FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
+        )
+
+        canonical_path = resolve_canonical_public_key_path(self.repo_root, self.fingerprint)
+        relative_canonical_path = canonical_path.relative_to(self.repo_root)
+
+        self.assertEqual(first_status, "200 OK")
+        self.assertEqual(second_status, "200 OK")
+        self.assertIn(f"Public-Key-Path: {relative_canonical_path}", first_body)
+        self.assertIn(f"Public-Key-Path: {relative_canonical_path}", second_body)
+        self.assertTrue(canonical_path.exists())
+        self.assertFalse((self.repo_root / "records" / "posts" / "thread-key-reuse-001.txt.pub.asc").exists())
+        self.assertFalse((self.repo_root / "records" / "posts" / "thread-key-reuse-002.txt.pub.asc").exists())
 
     def test_unsigned_post_rejected_when_fallback_flag_is_off(self) -> None:
         payload_text = self.build_thread_payload(post_id="thread-unsigned-disabled-001")

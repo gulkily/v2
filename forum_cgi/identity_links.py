@@ -11,6 +11,7 @@ from forum_core.identity_links import (
     load_identity_link_records,
     parse_identity_link_text,
 )
+from forum_core.public_keys import resolve_canonical_public_key_path, store_or_reuse_public_key
 from forum_cgi.posting import (
     PostingError,
     build_commit_message,
@@ -50,10 +51,6 @@ def resolve_identity_link_path(repo_root: Path, record_id: str) -> Path:
 
 def resolve_identity_link_signature_path(repo_root: Path, record_id: str) -> Path:
     return identity_link_records_dir(repo_root) / f"{record_id}.txt.asc"
-
-
-def resolve_identity_link_public_key_path(repo_root: Path, record_id: str) -> Path:
-    return identity_link_records_dir(repo_root) / f"{record_id}.txt.pub.asc"
 
 
 def parse_identity_link_payload(payload_text: str) -> IdentityLinkRecord:
@@ -141,13 +138,14 @@ def store_identity_link_record(
         resolve_identity_link_signature_path(repo_root, record.record_id),
         ensure_ascii_text(signature_text, field_name="signature"),
     )
-    public_key_path = write_ascii_file(
-        resolve_identity_link_public_key_path(repo_root, record.record_id),
-        ensure_ascii_text(public_key_text, field_name="public_key"),
+    stored_public_key = store_or_reuse_public_key(
+        repo_root=repo_root,
+        public_key_text=ensure_ascii_text(public_key_text, field_name="public_key"),
     )
+    public_key_path = stored_public_key.path
     commit_id = commit_post(
         repo_root,
-        [record_path, signature_path, public_key_path],
+        [record_path, signature_path, *([public_key_path] if stored_public_key.created else [])],
         message=build_commit_message("link_identity", record.record_id),
     )
     return (
@@ -186,7 +184,7 @@ def submit_identity_link(
     ensure_identity_link_record_id_available(record, repo_root)
 
     signature_path = str(resolve_identity_link_signature_path(repo_root, record.record_id).relative_to(repo_root))
-    public_key_path = str(resolve_identity_link_public_key_path(repo_root, record.record_id).relative_to(repo_root))
+    public_key_path = str(resolve_canonical_public_key_path(repo_root, signer_fingerprint).relative_to(repo_root))
 
     if dry_run:
         preview = build_identity_link_preview(record, repo_root)

@@ -11,6 +11,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text, identity_slug
+from forum_core.public_keys import resolve_canonical_public_key_path
 from forum_web.web import application
 
 
@@ -179,6 +180,37 @@ process.stdout.write(signature);
 
         log_result = self.run_command(["git", "log", "--oneline", "--max-count", "1"], cwd=self.repo_root)
         self.assertIn("update_profile: profile-update-test-001", log_result.stdout)
+
+    def test_api_update_profile_reuses_canonical_public_key_storage(self) -> None:
+        payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-003
+            Action: set_display_name
+            Source-Identity-ID: {self.identity_id}
+            Timestamp: 2026-03-14T12:02:00Z
+
+            ReusedName
+            """
+        ).lstrip()
+        signature_text = self.sign_payload(payload_text)
+        request_body = json.dumps(
+            {
+                "payload": payload_text,
+                "signature": signature_text,
+                "public_key": self.public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        status, _, body = self.request("/api/update_profile", method="POST", body=request_body)
+
+        canonical_path = resolve_canonical_public_key_path(self.repo_root, self.fingerprint)
+        relative_canonical_path = canonical_path.relative_to(self.repo_root)
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(f"Public-Key-Path: {relative_canonical_path}", body)
+        self.assertTrue(canonical_path.exists())
+        self.assertFalse((self.repo_root / "records" / "profile-updates" / "profile-update-test-003.txt.pub.asc").exists())
 
     def test_profile_page_escapes_script_shaped_display_name(self) -> None:
         payload_text = dedent(
