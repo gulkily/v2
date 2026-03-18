@@ -39,3 +39,13 @@
     - the existing `./forum php-host-setup /absolute/path/to/public-web-root` recovery command
 - Notes:
   - The docs reference is textual rather than an external link so it still works in broken local deployments without depending on public documentation hosting.
+
+## Stage 4 - regression coverage for missing-config rendering
+- Changes:
+  - Added focused PHP-host coverage in [test_php_host_missing_config_page.py](/home/wsl/v2/tests/test_php_host_missing_config_page.py) for the missing `forum_host_config.php` case.
+  - The test exercises a temp-copy PHP CGI request with no config present and asserts the stable operator-facing contract: HTTP `500`, HTML content type, page title, missing include name, expected path, primary recovery command, and docs reference.
+- Verification:
+  - Ran `python3 -m unittest tests.test_php_host_missing_config_page`.
+  - Ran `php -l php_host/public/index.php`.
+- Notes:
+  - The assertions target durable operator-facing cues rather than the entire HTML body so future copy/layout adjustments remain possible without losing coverage for the recovery contract.
