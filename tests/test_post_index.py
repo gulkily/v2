@@ -20,12 +20,16 @@ from forum_core.post_index import (
     get_index_metadata,
     index_schema_is_current,
     load_indexed_authors,
+    load_indexed_identity_members,
     load_indexed_root_posts,
+    load_indexed_username_roots,
     open_post_index,
     post_index_path,
     rebuild_post_index,
 )
 from forum_core.identity import build_identity_id
+from forum_core.merge_requests import MergeRequestState
+from forum_core.profile_updates import parse_profile_update_text
 from forum_cgi.posting import store_post
 from forum_cgi.task_status import submit_mark_task_done
 from forum_web.profiles import IdentityContext
@@ -197,8 +201,11 @@ class PostIndexAuthorHelpersTests(unittest.TestCase):
             resolution=SimpleNamespace(
                 canonical_identity_id=lambda identity_id: "openpgp:canonical",
                 member_identity_ids=lambda identity_id: ("openpgp:canonical",),
+                members_by_canonical_identity_id={"openpgp:canonical": ("openpgp:canonical",)},
             ),
             profile_update_records=(),
+            merge_request_records=(),
+            merge_request_states=(),
         )
 
         self.assertEqual(author_id_for_post(post, identity_context), "openpgp:canonical")
@@ -273,6 +280,15 @@ class PostIndexBuildTests(unittest.TestCase):
             "PATH": os.environ["PATH"],
         }
         self.run_git("add", "records/posts", env=env)
+        self.run_git("commit", "-m", message, env=env)
+
+    def commit_paths(self, message: str, timestamp: str, *paths: str) -> None:
+        env = {
+            "GIT_AUTHOR_DATE": timestamp,
+            "GIT_COMMITTER_DATE": timestamp,
+            "PATH": os.environ["PATH"],
+        }
+        self.run_git("add", *paths, env=env)
         self.run_git("commit", "-m", message, env=env)
 
     def test_rebuild_post_index_stores_commit_derived_timestamps(self) -> None:
@@ -372,6 +388,9 @@ class PostIndexBuildTests(unittest.TestCase):
             mock_context = mock.Mock()
             mock_context.canonical_identity_id.return_value = "openpgp:author"
             mock_context.resolved_display_name.return_value = mock.Mock(display_name="Author Name")
+            mock_context.resolution.members_by_canonical_identity_id = {}
+            mock_context.merge_request_states = ()
+            mock_context.profile_update_records = ()
             mock_context_loader.return_value = mock_context
             with mock.patch("forum_core.post_index.resolve_identity_display_name", return_value="Author Name"):
                 posts = load_posts(self.repo_root / "records" / "posts")
@@ -429,6 +448,9 @@ class PostIndexBuildTests(unittest.TestCase):
             mock_context = mock.Mock()
             mock_context.canonical_identity_id.return_value = "openpgp:author"
             mock_context.resolved_display_name.return_value = mock.Mock(display_name="Author Name")
+            mock_context.resolution.members_by_canonical_identity_id = {}
+            mock_context.merge_request_states = ()
+            mock_context.profile_update_records = ()
             mock_context_loader.return_value = mock_context
             with mock.patch("forum_core.post_index.resolve_identity_display_name", return_value="Author Name"):
                 posts = load_posts(self.repo_root / "records" / "posts")
@@ -516,6 +538,134 @@ class PostIndexBuildTests(unittest.TestCase):
             self.assertEqual(row["created_at"], "2026-03-17T09:00:00+00:00")
             self.assertIsNotNone(row["updated_at"])
             self.assertNotEqual(row["updated_at"], row["created_at"])
+        finally:
+            index.connection.close()
+
+    def test_rebuild_post_index_caches_identity_members_username_claims_and_roots(self) -> None:
+        first_path = self.repo_root / "records" / "profile-updates" / "profile-update-alpha.txt"
+        second_path = self.repo_root / "records" / "profile-updates" / "profile-update-beta.txt"
+        first_path.parent.mkdir(parents=True, exist_ok=True)
+        first_path.write_text(
+            dedent(
+                """
+                Record-ID: profile-update-alpha
+                Action: set_display_name
+                Source-Identity-ID: openpgp:alpha
+                Timestamp: 2026-03-17T09:00:00Z
+
+                shared-name
+                """
+            ).lstrip(),
+            encoding="ascii",
+        )
+        self.commit_paths(
+            "Add alpha profile update",
+            "2026-03-17T09:00:00+00:00",
+            "records/profile-updates/profile-update-alpha.txt",
+        )
+
+        second_path.write_text(
+            dedent(
+                """
+                Record-ID: profile-update-beta
+                Action: set_display_name
+                Source-Identity-ID: openpgp:beta
+                Timestamp: 2026-03-17T10:00:00Z
+
+                shared-name
+                """
+            ).lstrip(),
+            encoding="ascii",
+        )
+        self.commit_paths(
+            "Add beta profile update",
+            "2026-03-17T10:00:00+00:00",
+            "records/profile-updates/profile-update-beta.txt",
+        )
+
+        alpha_record = parse_profile_update_text(first_path.read_text(encoding="ascii"), source_path=first_path)
+        beta_record = parse_profile_update_text(second_path.read_text(encoding="ascii"), source_path=second_path)
+        identity_context = IdentityContext(
+            bootstraps_by_identity_id={},
+            resolution=SimpleNamespace(
+                canonical_identity_id=lambda identity_id: {
+                    "openpgp:alpha": "openpgp:alpha",
+                    "openpgp:beta": "openpgp:beta",
+                }.get(identity_id),
+                member_identity_ids=lambda identity_id: {
+                    "openpgp:alpha": ("openpgp:alpha",),
+                    "openpgp:beta": ("openpgp:beta",),
+                }.get(identity_id, ()),
+                members_by_canonical_identity_id={
+                    "openpgp:alpha": ("openpgp:alpha",),
+                    "openpgp:beta": ("openpgp:beta",),
+                },
+            ),
+            profile_update_records=(alpha_record, beta_record),
+            merge_request_records=(),
+            merge_request_states=(
+                MergeRequestState(
+                    requester_identity_id="openpgp:alpha",
+                    target_identity_id="openpgp:beta",
+                    latest_request_record_id="merge-request-001",
+                    latest_request_timestamp="2026-03-17T11:00:00Z",
+                    latest_request_note="merge",
+                    latest_response_action="approve_merge",
+                    latest_response_record_id="merge-request-002",
+                    latest_response_timestamp="2026-03-17T11:05:00Z",
+                    approved_by_target=True,
+                    approved_by_moderator=False,
+                    dismissed=False,
+                    active_merge=True,
+                    pending=False,
+                ),
+            ),
+        )
+
+        with mock.patch("forum_core.post_index.load_posts", return_value=[]):
+            with mock.patch("forum_core.post_index.load_identity_context", return_value=identity_context):
+                rebuild_post_index(self.repo_root)
+
+        members = load_indexed_identity_members(self.repo_root)
+        roots = load_indexed_username_roots(self.repo_root)
+        index = open_post_index(self.repo_root)
+        try:
+            edges = index.connection.execute(
+                """
+                SELECT source_identity_id, target_identity_id, edge_kind
+                FROM active_merge_edges
+                ORDER BY source_identity_id, target_identity_id
+                """
+            ).fetchall()
+            claims = index.connection.execute(
+                """
+                SELECT canonical_identity_id, username_token, claim_record_id, claim_commit_rank
+                FROM current_username_claims
+                ORDER BY canonical_identity_id
+                """
+            ).fetchall()
+            self.assertEqual(members["openpgp:alpha"], ("openpgp:alpha",))
+            self.assertEqual(members["openpgp:beta"], ("openpgp:beta",))
+            self.assertEqual(
+                [(row["source_identity_id"], row["target_identity_id"], row["edge_kind"]) for row in edges],
+                [
+                    ("openpgp:alpha", "openpgp:beta", "approved_merge_request"),
+                    ("openpgp:beta", "openpgp:alpha", "approved_merge_request"),
+                ],
+            )
+            self.assertEqual(
+                [(row["canonical_identity_id"], row["username_token"], row["claim_record_id"]) for row in claims],
+                [
+                    ("openpgp:alpha", "shared-name", "profile-update-alpha"),
+                    ("openpgp:beta", "shared-name", "profile-update-beta"),
+                ],
+            )
+            self.assertEqual(roots["shared-name"].canonical_identity_id, "openpgp:alpha")
+            self.assertEqual(roots["shared-name"].claim_record_id, "profile-update-alpha")
+            self.assertLess(
+                roots["shared-name"].claim_commit_rank,
+                next(row["claim_commit_rank"] for row in claims if row["canonical_identity_id"] == "openpgp:beta"),
+            )
         finally:
             index.connection.close()
 

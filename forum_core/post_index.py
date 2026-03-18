@@ -6,11 +6,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forum_core.identity import normalize_fingerprint, short_identity_label
+from forum_core.merge_requests import derive_approved_merge_links
 from forum_web.repository import Post, load_posts
-from forum_web.profiles import IdentityContext, load_identity_context, resolve_identity_display_name
+from forum_web.profiles import (
+    IdentityContext,
+    load_identity_context,
+    resolve_identity_display_name,
+    username_route_token,
+)
 
 
-POST_INDEX_SCHEMA_VERSION = 2
+POST_INDEX_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -46,6 +52,43 @@ class IndexedAuthorRow:
     display_name: str
     display_name_source: str
     signer_fingerprint: str | None
+
+
+@dataclass(frozen=True)
+class IndexedIdentityMemberRow:
+    canonical_identity_id: str
+    member_identity_id: str
+
+
+@dataclass(frozen=True)
+class IndexedMergeEdgeRow:
+    source_identity_id: str
+    target_identity_id: str
+    record_id: str
+    timestamp: str
+    edge_kind: str
+
+
+@dataclass(frozen=True)
+class IndexedUsernameClaimRow:
+    canonical_identity_id: str
+    source_identity_id: str
+    display_name: str
+    username_token: str
+    claim_record_id: str
+    claim_commit_id: str | None
+    claim_commit_rank: int | None
+
+
+@dataclass(frozen=True)
+class IndexedUsernameRootRow:
+    username_token: str
+    canonical_identity_id: str
+    display_name: str
+    claim_record_id: str
+    source_identity_id: str
+    claim_commit_id: str | None
+    claim_commit_rank: int | None
 
 
 def post_index_path(repo_root: Path) -> Path:
@@ -124,6 +167,40 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
             value TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS identity_members (
+            canonical_identity_id TEXT NOT NULL,
+            member_identity_id TEXT NOT NULL PRIMARY KEY
+        );
+
+        CREATE TABLE IF NOT EXISTS active_merge_edges (
+            source_identity_id TEXT NOT NULL,
+            target_identity_id TEXT NOT NULL,
+            record_id TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            edge_kind TEXT NOT NULL,
+            PRIMARY KEY (source_identity_id, target_identity_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS current_username_claims (
+            canonical_identity_id TEXT PRIMARY KEY,
+            source_identity_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            username_token TEXT NOT NULL,
+            claim_record_id TEXT NOT NULL,
+            claim_commit_id TEXT,
+            claim_commit_rank INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS username_roots (
+            username_token TEXT PRIMARY KEY,
+            canonical_identity_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            claim_record_id TEXT NOT NULL,
+            source_identity_id TEXT NOT NULL,
+            claim_commit_id TEXT,
+            claim_commit_rank INTEGER
+        );
+
         CREATE INDEX IF NOT EXISTS posts_root_thread_id_idx ON posts(root_thread_id);
         CREATE INDEX IF NOT EXISTS posts_is_root_idx ON posts(is_root);
         CREATE INDEX IF NOT EXISTS post_board_tags_tag_idx ON post_board_tags(board_tag);
@@ -153,6 +230,15 @@ def ensure_post_index_schema(connection: sqlite3.Connection) -> None:
     connection.execute("CREATE INDEX IF NOT EXISTS posts_created_at_idx ON posts(created_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS posts_author_id_idx ON posts(author_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS authors_canonical_identity_idx ON authors(canonical_identity_id)")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS identity_members_canonical_idx ON identity_members(canonical_identity_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS active_merge_edges_target_idx ON active_merge_edges(target_identity_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS current_username_claims_token_idx ON current_username_claims(username_token)"
+    )
     current_version = current_post_index_schema_version(connection)
     if current_version < POST_INDEX_SCHEMA_VERSION:
         connection.execute(f"PRAGMA user_version = {POST_INDEX_SCHEMA_VERSION}")
@@ -230,6 +316,229 @@ def clear_post_index(connection: sqlite3.Connection) -> None:
     connection.execute("DELETE FROM post_board_tags")
     connection.execute("DELETE FROM posts")
     connection.execute("DELETE FROM authors")
+    connection.execute("DELETE FROM identity_members")
+    connection.execute("DELETE FROM active_merge_edges")
+    connection.execute("DELETE FROM current_username_claims")
+    connection.execute("DELETE FROM username_roots")
+
+
+def repo_commit_order(repo_root: Path) -> dict[str, int]:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-list", "--topo-order", "--reverse", "HEAD"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return {}
+    return {
+        commit_id: index
+        for index, commit_id in enumerate(line.strip() for line in result.stdout.splitlines() if line.strip())
+    }
+
+
+def first_commit_for_path(repo_root: Path, relative_path: str) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "log", "--diff-filter=A", "--format=%H", "--", relative_path],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    commit_ids = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if not commit_ids:
+        return None
+    return commit_ids[0]
+
+
+def upsert_identity_members(
+    connection: sqlite3.Connection,
+    *,
+    identity_context: IdentityContext,
+) -> None:
+    for canonical_identity_id, member_identity_ids in identity_context.resolution.members_by_canonical_identity_id.items():
+        connection.executemany(
+            """
+            INSERT INTO identity_members (canonical_identity_id, member_identity_id)
+            VALUES (?, ?)
+            ON CONFLICT(member_identity_id) DO UPDATE SET
+                canonical_identity_id = excluded.canonical_identity_id
+            """,
+            [(canonical_identity_id, member_identity_id) for member_identity_id in member_identity_ids],
+        )
+
+
+def upsert_active_merge_edges(
+    connection: sqlite3.Connection,
+    *,
+    identity_context: IdentityContext,
+) -> None:
+    for record in derive_approved_merge_links(identity_context.merge_request_states):
+        connection.execute(
+            """
+            INSERT INTO active_merge_edges (
+                source_identity_id,
+                target_identity_id,
+                record_id,
+                timestamp,
+                edge_kind
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(source_identity_id, target_identity_id) DO UPDATE SET
+                record_id = excluded.record_id,
+                timestamp = excluded.timestamp,
+                edge_kind = excluded.edge_kind
+            """,
+            (
+                record.source_identity_id,
+                record.target_identity_id,
+                record.record_id,
+                record.timestamp,
+                "approved_merge_request",
+            ),
+        )
+
+
+def current_username_claim_rows(
+    *,
+    repo_root: Path,
+    identity_context: IdentityContext,
+    commit_order: dict[str, int],
+) -> list[IndexedUsernameClaimRow]:
+    claim_rows: list[IndexedUsernameClaimRow] = []
+    for canonical_identity_id, member_identity_ids in identity_context.resolution.members_by_canonical_identity_id.items():
+        resolved = identity_context.resolved_display_name(canonical_identity_id)
+        if resolved is None:
+            continue
+        username_token = username_route_token(resolved.display_name)
+        if not username_token:
+            continue
+        record_path = next(
+            (
+                record.path
+                for record in identity_context.profile_update_records
+                if record.record_id == resolved.record_id
+            ),
+            None,
+        )
+        relative_path = (
+            str(record_path.relative_to(repo_root))
+            if record_path is not None and record_path.is_absolute()
+            else None
+        )
+        claim_commit_id = first_commit_for_path(repo_root, relative_path) if relative_path is not None else None
+        claim_rows.append(
+            IndexedUsernameClaimRow(
+                canonical_identity_id=canonical_identity_id,
+                source_identity_id=resolved.source_identity_id,
+                display_name=resolved.display_name,
+                username_token=username_token,
+                claim_record_id=resolved.record_id,
+                claim_commit_id=claim_commit_id,
+                claim_commit_rank=commit_order.get(claim_commit_id) if claim_commit_id is not None else None,
+            )
+        )
+    return sorted(
+        claim_rows,
+        key=lambda row: (
+            row.username_token,
+            row.claim_commit_rank if row.claim_commit_rank is not None else 10**12,
+            row.claim_record_id,
+        ),
+    )
+
+
+def upsert_current_username_claims(
+    connection: sqlite3.Connection,
+    *,
+    claim_rows: list[IndexedUsernameClaimRow],
+) -> None:
+    for row in claim_rows:
+        connection.execute(
+            """
+            INSERT INTO current_username_claims (
+                canonical_identity_id,
+                source_identity_id,
+                display_name,
+                username_token,
+                claim_record_id,
+                claim_commit_id,
+                claim_commit_rank
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(canonical_identity_id) DO UPDATE SET
+                source_identity_id = excluded.source_identity_id,
+                display_name = excluded.display_name,
+                username_token = excluded.username_token,
+                claim_record_id = excluded.claim_record_id,
+                claim_commit_id = excluded.claim_commit_id,
+                claim_commit_rank = excluded.claim_commit_rank
+            """,
+            (
+                row.canonical_identity_id,
+                row.source_identity_id,
+                row.display_name,
+                row.username_token,
+                row.claim_record_id,
+                row.claim_commit_id,
+                row.claim_commit_rank,
+            ),
+        )
+
+
+def upsert_username_roots(
+    connection: sqlite3.Connection,
+    *,
+    claim_rows: list[IndexedUsernameClaimRow],
+) -> None:
+    best_by_token: dict[str, IndexedUsernameClaimRow] = {}
+    for row in claim_rows:
+        previous = best_by_token.get(row.username_token)
+        if previous is None:
+            best_by_token[row.username_token] = row
+            continue
+        row_key = (
+            row.claim_commit_rank if row.claim_commit_rank is not None else 10**12,
+            row.claim_record_id,
+        )
+        previous_key = (
+            previous.claim_commit_rank if previous.claim_commit_rank is not None else 10**12,
+            previous.claim_record_id,
+        )
+        if row_key < previous_key:
+            best_by_token[row.username_token] = row
+
+    for username_token, row in sorted(best_by_token.items()):
+        connection.execute(
+            """
+            INSERT INTO username_roots (
+                username_token,
+                canonical_identity_id,
+                display_name,
+                claim_record_id,
+                source_identity_id,
+                claim_commit_id,
+                claim_commit_rank
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(username_token) DO UPDATE SET
+                canonical_identity_id = excluded.canonical_identity_id,
+                display_name = excluded.display_name,
+                claim_record_id = excluded.claim_record_id,
+                source_identity_id = excluded.source_identity_id,
+                claim_commit_id = excluded.claim_commit_id,
+                claim_commit_rank = excluded.claim_commit_rank
+            """,
+            (
+                username_token,
+                row.canonical_identity_id,
+                row.display_name,
+                row.claim_record_id,
+                row.source_identity_id,
+                row.claim_commit_id,
+                row.claim_commit_rank,
+            ),
+        )
 
 
 def author_id_for_post(post: Post, identity_context: IdentityContext | None) -> str | None:
@@ -418,6 +727,7 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
     posts = load_posts(records_posts_dir(repo_root))
     identity_context = load_identity_context(repo_root=repo_root, posts=posts)
     timestamps_by_post_id = post_commit_timestamps(repo_root)
+    commit_order = repo_commit_order(repo_root)
     clear_post_index(active_index.connection)
     for post in posts:
         upsert_indexed_post(
@@ -427,6 +737,15 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
             timestamps=timestamps_by_post_id.get(post.post_id, PostCommitTimestamps(created_at=None, updated_at=None)),
             identity_context=identity_context,
         )
+    upsert_identity_members(active_index.connection, identity_context=identity_context)
+    upsert_active_merge_edges(active_index.connection, identity_context=identity_context)
+    claim_rows = current_username_claim_rows(
+        repo_root=repo_root,
+        identity_context=identity_context,
+        commit_order=commit_order,
+    )
+    upsert_current_username_claims(active_index.connection, claim_rows=claim_rows)
+    upsert_username_roots(active_index.connection, claim_rows=claim_rows)
     indexed_head = current_repo_head(repo_root)
     set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
     set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
@@ -570,6 +889,53 @@ def load_indexed_authors(repo_root: Path) -> dict[str, IndexedAuthorRow]:
                 display_name=row["display_name"],
                 display_name_source=row["display_name_source"],
                 signer_fingerprint=row["signer_fingerprint"],
+            )
+            for row in rows
+        }
+    finally:
+        index.connection.close()
+
+
+def load_indexed_identity_members(repo_root: Path) -> dict[str, tuple[str, ...]]:
+    index = ensure_post_index_current(repo_root)
+    try:
+        rows = index.connection.execute(
+            """
+            SELECT canonical_identity_id, member_identity_id
+            FROM identity_members
+            ORDER BY canonical_identity_id, member_identity_id
+            """
+        ).fetchall()
+        members_by_canonical_identity_id: dict[str, list[str]] = {}
+        for row in rows:
+            members_by_canonical_identity_id.setdefault(row["canonical_identity_id"], []).append(row["member_identity_id"])
+        return {
+            canonical_identity_id: tuple(member_identity_ids)
+            for canonical_identity_id, member_identity_ids in members_by_canonical_identity_id.items()
+        }
+    finally:
+        index.connection.close()
+
+
+def load_indexed_username_roots(repo_root: Path) -> dict[str, IndexedUsernameRootRow]:
+    index = ensure_post_index_current(repo_root)
+    try:
+        rows = index.connection.execute(
+            """
+            SELECT username_token, canonical_identity_id, display_name, claim_record_id,
+                   source_identity_id, claim_commit_id, claim_commit_rank
+            FROM username_roots
+            """
+        ).fetchall()
+        return {
+            row["username_token"]: IndexedUsernameRootRow(
+                username_token=row["username_token"],
+                canonical_identity_id=row["canonical_identity_id"],
+                display_name=row["display_name"],
+                claim_record_id=row["claim_record_id"],
+                source_identity_id=row["source_identity_id"],
+                claim_commit_id=row["claim_commit_id"],
+                claim_commit_rank=row["claim_commit_rank"],
             )
             for row in rows
         }
