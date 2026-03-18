@@ -8,3 +8,14 @@
   - Ran `python3 -m unittest tests.test_post_index.PostIndexBuildTests.test_store_post_refreshes_index_after_successful_commit`.
 - Notes:
   - The first create-thread against a repo without an existing index now reports rebuild-phase timings as part of the same create-thread timing log.
+
+## Stage 2 - Reduce synchronous refresh cost for the common new-thread write path
+- Changes:
+  - Narrowed the incremental post-index refresh path so it derives commit timestamps only for the touched post paths instead of rescanning git history for every post in the repository after each successful write.
+  - Added focused regression coverage that proves the incremental refresh path uses the touched-path timestamp helper and still writes the expected timestamp data into the SQLite index.
+- Verification:
+  - Ran `python3 -m unittest tests.test_post_index.PostIndexBuildTests.test_incremental_refresh_uses_touched_path_timestamps_only`.
+  - Ran `python3 -m unittest tests.test_post_index.PostIndexBuildTests.test_store_post_refreshes_index_after_successful_commit`.
+  - Ran `python3 -m unittest tests.test_thread_auto_reply.ThreadAutoReplyTests.test_api_create_thread_reports_disabled_when_feature_flag_is_off`.
+- Notes:
+  - This stage preserves the current immediate read-after-write behavior and limits the optimization to the existing incremental refresh path for committed writes.

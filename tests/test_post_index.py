@@ -13,6 +13,7 @@ from unittest import mock
 from forum_core.post_index import (
     IndexedAuthorRow,
     POST_INDEX_SCHEMA_VERSION,
+    PostCommitTimestamps,
     author_id_for_post,
     author_row_for_post,
     current_post_index_schema_version,
@@ -503,6 +504,61 @@ class PostIndexBuildTests(unittest.TestCase):
             self.assertIsNotNone(row)
             assert row is not None
             self.assertEqual(row["subject"], "Stored post")
+        finally:
+            index.connection.close()
+
+    def test_incremental_refresh_uses_touched_path_timestamps_only(self) -> None:
+        first_payload_text = dedent(
+            """
+            Post-ID: root-200
+            Board-Tags: general
+            Subject: Stored post
+
+            Stored body.
+            """
+        ).lstrip()
+        first_post = parse_post_text(first_payload_text)
+        store_post("create_thread", first_post, self.repo_root, first_payload_text)
+
+        second_payload_text = dedent(
+            """
+            Post-ID: root-201
+            Board-Tags: general
+            Subject: Incremental stored post
+
+            Stored body.
+            """
+        ).lstrip()
+        second_post = parse_post_text(second_payload_text)
+
+        with mock.patch(
+            "forum_core.post_index.post_commit_timestamps",
+            side_effect=AssertionError("full timestamp scan should not run during incremental refresh"),
+        ), mock.patch(
+            "forum_core.post_index.post_commit_timestamps_for_paths",
+            return_value={
+                "root-201": PostCommitTimestamps(
+                    created_at="2026-03-18T12:00:00+00:00",
+                    updated_at="2026-03-18T12:00:00+00:00",
+                )
+            },
+        ) as mock_timestamps:
+            store_post("create_thread", second_post, self.repo_root, second_payload_text)
+
+        mock_timestamps.assert_called_once_with(
+            self.repo_root,
+            relative_paths=("records/posts/root-201.txt",),
+        )
+        index = open_post_index(self.repo_root)
+        try:
+            row = index.connection.execute(
+                "SELECT created_at, updated_at FROM posts WHERE post_id = ?",
+                ("root-201",),
+            ).fetchone()
+            self.assertIsNotNone(row)
+            assert row is not None
+            self.assertEqual(row["created_at"], "2026-03-18T12:00:00+00:00")
+            self.assertEqual(row["updated_at"], "2026-03-18T12:00:00+00:00")
         finally:
             index.connection.close()
 

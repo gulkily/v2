@@ -871,7 +871,10 @@ def refresh_post_index_after_commit(
         record_timing("post_index_load_identity_context", started_at)
         posts_by_path = {candidate.path: candidate for candidate in posts}
         started_at = time.perf_counter()
-        timestamps_by_post_id = post_commit_timestamps(repo_root)
+        timestamps_by_post_id = post_commit_timestamps_for_paths(
+            repo_root,
+            relative_paths=touched_paths,
+        )
         record_timing("post_index_commit_timestamps", started_at)
         started_at = time.perf_counter()
         for touched_path in touched_paths:
