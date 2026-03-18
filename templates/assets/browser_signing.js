@@ -27,6 +27,16 @@ function setButtonLabel(button, label) {
   }
 }
 
+function requiresSigningSubmitLabel(commandName, { dryRun = false } = {}) {
+  if (dryRun) {
+    return "Signing required for preview";
+  }
+  if (commandName === "update_profile") {
+    return "Signing required for update";
+  }
+  return "Signing required to submit";
+}
+
 function normalizeNewlines(text) {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
@@ -658,12 +668,15 @@ async function fetchPowRequirement(publicKey) {
   };
 }
 
-function formatSigningStatus(commandName, error) {
+function formatSigningStatus(commandName, error, { allowUnsignedFallback = false } = {}) {
   const baseMessage = describeOpenPgpFailure(error);
+  if (allowUnsignedFallback) {
+    return `${baseMessage} Posting can still continue unsigned.`;
+  }
   if (commandName === "update_profile") {
     return `${baseMessage} Profile updates still require a working signing key.`;
   }
-  return `${baseMessage} Posting can still continue unsigned.`;
+  return `${baseMessage} Unsigned fallback is disabled here, so signing is still required.`;
 }
 
 function formatFallbackSubmitStatus(error) {
@@ -750,6 +763,10 @@ async function main() {
     }
     if (mode === "unsigned") {
       setButtonLabel(signSubmitButton, unsignedSubmitLabel());
+      return;
+    }
+    if (mode === "requires-signing") {
+      setButtonLabel(signSubmitButton, requiresSigningSubmitLabel(commandName, { dryRun }));
       return;
     }
     setButtonLabel(signSubmitButton, defaultSubmitLabel());
@@ -967,7 +984,11 @@ async function main() {
     try {
       await prepareKeys({ forceGenerate: true }, "Generated and stored a fresh local signing key.");
     } catch (error) {
-      setStatus("key-status", formatSigningStatus(commandName, classifyOpenPgpError(error)));
+      const classified = classifyOpenPgpError(error);
+      setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
+      if (!allowUnsignedFallback) {
+        applySubmitLabel("requires-signing");
+      }
     }
   });
 
@@ -981,7 +1002,11 @@ async function main() {
       );
       applyKeys(keys);
     } catch (error) {
-      setStatus("key-status", formatSigningStatus(commandName, classifyOpenPgpError(error)));
+      const classified = classifyOpenPgpError(error);
+      setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
+      if (!allowUnsignedFallback) {
+        applySubmitLabel("requires-signing");
+      }
     }
   });
 
@@ -1090,7 +1115,7 @@ async function main() {
             setDraftStatus("Saved the current submission locally until the server confirms it.");
           }
           signatureOutput.value = "";
-          setStatus("key-status", formatSigningStatus(commandName, classified));
+          setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
           setStatus("submit-status", formatFallbackSubmitStatus(classified));
         }
       }
@@ -1141,9 +1166,11 @@ async function main() {
   setStatus("key-status", "Checking browser signing support...");
   void prepareInitialKeys().catch((error) => {
     const classified = classifyOpenPgpError(error);
-    setStatus("key-status", formatSigningStatus(commandName, classified));
+    setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
     if (allowUnsignedFallback) {
       applySubmitLabel("unsigned");
+    } else {
+      applySubmitLabel("requires-signing");
     }
   });
 }
@@ -1152,4 +1179,4 @@ if (typeof document !== "undefined") {
   main();
 }
 
-export { normalizeComposeAscii };
+export { formatSigningStatus, normalizeComposeAscii, requiresSigningSubmitLabel };

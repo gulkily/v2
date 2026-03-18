@@ -51,6 +51,21 @@ process.stdout.write(JSON.stringify(result));
         )
         return json.loads(result.stdout)
 
+    def run_expression(self, expression: str) -> dict[str, object]:
+        script = f"""
+const mod = await import({json.dumps((self.assets_root / "browser_signing.mjs").as_uri())});
+const result = {expression};
+process.stdout.write(JSON.stringify(result));
+"""
+        result = subprocess.run(
+            ["node", "--input-type=module", "--eval", script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        return json.loads(result.stdout)
+
     def test_normalize_compose_ascii_rewrites_common_punctuation(self) -> None:
         result = self.run_helper('“hello”… — test')
 
@@ -74,6 +89,34 @@ process.stdout.write(JSON.stringify(result));
         self.assertFalse(result["hadCorrections"])
         self.assertEqual(result["unsupportedCount"], 0)
         self.assertEqual(result["removedUnsupportedCount"], 1)
+
+    def test_format_signing_status_mentions_unsigned_fallback_when_enabled(self) -> None:
+        result = self.run_expression(
+            """{
+  message: mod.formatSigningStatus(
+    "create_thread",
+    { code: "missing_bigint", message: "no bigint" },
+    { allowUnsignedFallback: true },
+  ),
+}"""
+        )
+
+        self.assertIn("Posting can still continue unsigned.", result["message"])
+
+    def test_format_signing_status_mentions_required_signing_when_fallback_disabled(self) -> None:
+        result = self.run_expression(
+            """{
+  message: mod.formatSigningStatus(
+    "create_thread",
+    { code: "missing_bigint", message: "no bigint" },
+    { allowUnsignedFallback: false },
+  ),
+  label: mod.requiresSigningSubmitLabel("create_thread", { dryRun: false }),
+}"""
+        )
+
+        self.assertIn("Unsigned fallback is disabled here, so signing is still required.", result["message"])
+        self.assertEqual(result["label"], "Signing required to submit")
 
 
 if __name__ == "__main__":
