@@ -22,7 +22,9 @@ from forum_core.runtime_env import (
 )
 from forum_core.php_host_setup import (
     PhpHostSetupRequest,
+    confirm_php_host_setup,
     publish_php_host_public_files,
+    resolve_public_web_root,
     resolve_php_host_setup_config,
     write_php_host_config,
 )
@@ -52,7 +54,11 @@ def build_parser() -> argparse.ArgumentParser:
         "php-host-setup",
         help="Generate PHP-host config and publish public files into a web root.",
     )
-    php_host_parser.add_argument("public_web_root", help="Target public web root for PHP-host files.")
+    php_host_parser.add_argument(
+        "public_web_root",
+        nargs="?",
+        help="Target public web root for PHP-host files. Omit to be prompted interactively.",
+    )
     php_host_parser.add_argument("--app-root", help="Override the deployed application checkout path.")
     php_host_parser.add_argument("--repo-root", help="Override the forum data repository path.")
     php_host_parser.add_argument("--cache-dir", help="Override the PHP cache directory path.")
@@ -141,10 +147,6 @@ def run_start() -> int:
 
 
 def run_php_host_setup(request: TaskRequest) -> int:
-    if not request.public_web_root:
-        print("Missing public web root path for php-host-setup.", file=sys.stderr)
-        return 1
-
     setup_request = PhpHostSetupRequest(
         public_web_root=request.public_web_root,
         app_root=request.app_root,
@@ -153,13 +155,21 @@ def run_php_host_setup(request: TaskRequest) -> int:
         non_interactive=request.non_interactive,
     )
     try:
+        public_web_root = resolve_public_web_root(
+            request.public_web_root,
+            non_interactive=request.non_interactive,
+        )
         config = resolve_php_host_setup_config(setup_request, repo_root=REPO_ROOT)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
+    interactive = not request.non_interactive and sys.stdin.isatty()
+    if interactive and not confirm_php_host_setup(public_web_root, config):
+        print("Cancelled php-host-setup.")
+        return 1
+
     config_path = write_php_host_config(REPO_ROOT, config)
-    public_web_root = Path(request.public_web_root).expanduser().resolve()
     linked, notes = publish_php_host_public_files(REPO_ROOT, public_web_root)
 
     print(f"Wrote PHP host config: {config_path}")

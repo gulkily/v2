@@ -3,4 +3,5 @@ __pycache__/
 .idea/
 .env
 state/cache/
+state/php_host_cache/
 php_host/public/forum_host_config.php
