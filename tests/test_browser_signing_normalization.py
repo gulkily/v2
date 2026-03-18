@@ -118,6 +118,26 @@ process.stdout.write(JSON.stringify(result));
         self.assertIn("Unsigned fallback is disabled here, so signing is still required.", result["message"])
         self.assertEqual(result["label"], "Signing required to submit")
 
+    def test_pending_submission_storage_key_separates_preview_from_publish(self) -> None:
+        result = self.run_expression(
+            """{
+  publishKey: mod.pendingSubmissionStorageKey(
+    "create_thread",
+    { threadType: "", boardTags: "general", threadId: "", parentId: "" },
+    { dryRun: false },
+  ),
+  previewKey: mod.pendingSubmissionStorageKey(
+    "create_thread",
+    { threadType: "", boardTags: "general", threadId: "", parentId: "" },
+    { dryRun: true },
+  ),
+}"""
+        )
+
+        self.assertNotEqual(result["publishKey"], result["previewKey"])
+        self.assertIn("publish", result["publishKey"])
+        self.assertIn("dry-run", result["previewKey"])
+
 
 if __name__ == "__main__":
     unittest.main()

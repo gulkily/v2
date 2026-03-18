@@ -490,8 +490,8 @@ function setDraftStatus(message) {
   setStatus("draft-status", message);
 }
 
-function pendingSubmissionStorageKey(commandName, defaults) {
-  const scopeParts = [commandName];
+function pendingSubmissionStorageKey(commandName, defaults, { dryRun = false } = {}) {
+  const scopeParts = [commandName, dryRun ? "dry-run" : "publish"];
   if (commandName === "update_profile") {
     scopeParts.push(defaults.sourceIdentityId || "");
     scopeParts.push(defaults.profileSlug || "");
@@ -721,8 +721,8 @@ async function main() {
   const removeUnsupportedButton = $("remove-unsupported-button");
   const draftContext = composeDraftContext(commandName, defaults);
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
-  const pendingSubmissionKey = pendingSubmissionStorageKey(commandName, defaults);
-  const canStorePendingSubmission = draftStorageAvailable();
+  const pendingSubmissionKey = pendingSubmissionStorageKey(commandName, defaults, { dryRun });
+  const canStorePendingSubmission = draftStorageAvailable() && !dryRun;
   const allowUnsignedFallback = root.dataset.unsignedFallbackEnabled === "true";
   let currentKeys = null;
   let pendingDraftTimer = 0;
@@ -1210,4 +1210,9 @@ if (typeof document !== "undefined") {
   main();
 }
 
-export { formatSigningStatus, normalizeComposeAscii, requiresSigningSubmitLabel };
+export {
+  formatSigningStatus,
+  normalizeComposeAscii,
+  pendingSubmissionStorageKey,
+  requiresSigningSubmitLabel,
+};
