@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from forum_core.identity_links import derive_identity_resolution
 from forum_core.merge_requests import (
@@ -99,6 +100,55 @@ class MergeRequestTests(unittest.TestCase):
         self.assertTrue(states[0].approved_by_moderator)
         self.assertTrue(states[0].active_merge)
         self.assertFalse(states[0].pending)
+
+    def test_approved_merge_links_expand_to_target_resolved_set(self) -> None:
+        states = derive_merge_request_states(
+            [
+                parse_merge_request_text(
+                    (
+                        "Record-ID: merge-request-101\n"
+                        "Action: request_merge\n"
+                        "Requester-Identity-ID: openpgp:alpha\n"
+                        "Target-Identity-ID: openpgp:beta\n"
+                        "Actor-Identity-ID: openpgp:alpha\n"
+                        "Timestamp: 2026-03-17T23:00:00Z\n\n"
+                    )
+                ),
+                parse_merge_request_text(
+                    (
+                        "Record-ID: merge-request-102\n"
+                        "Action: approve_merge\n"
+                        "Requester-Identity-ID: openpgp:alpha\n"
+                        "Target-Identity-ID: openpgp:beta\n"
+                        "Actor-Identity-ID: openpgp:beta\n"
+                        "Timestamp: 2026-03-17T23:05:00Z\n\n"
+                    )
+                ),
+            ]
+        )
+        base_resolution = derive_identity_resolution(
+            visible_identity_ids=frozenset({"openpgp:alpha", "openpgp:beta", "openpgp:gamma"}),
+            link_records=[
+                SimpleNamespace(
+                    action="merge_identity",
+                    source_identity_id="openpgp:beta",
+                    target_identity_id="openpgp:gamma",
+                ),
+                SimpleNamespace(
+                    action="merge_identity",
+                    source_identity_id="openpgp:gamma",
+                    target_identity_id="openpgp:beta",
+                ),
+            ],
+        )
+
+        links = derive_approved_merge_links(states, resolution=base_resolution)
+
+        pairs = {(link.source_identity_id, link.target_identity_id) for link in links}
+        self.assertIn(("openpgp:alpha", "openpgp:beta"), pairs)
+        self.assertIn(("openpgp:alpha", "openpgp:gamma"), pairs)
+        self.assertIn(("openpgp:beta", "openpgp:alpha"), pairs)
+        self.assertIn(("openpgp:gamma", "openpgp:alpha"), pairs)
 
     def test_dismiss_clears_pending_until_new_request(self) -> None:
         states = derive_merge_request_states(

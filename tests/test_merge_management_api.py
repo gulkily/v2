@@ -17,6 +17,7 @@ class MergeManagementApiTests(unittest.TestCase):
         self.repo_root = Path(self.tempdir.name)
         self.alpha = "openpgp:alpha"
         self.beta = "openpgp:beta"
+        self.gamma = "openpgp:gamma"
         self.write_record(
             "records/identity/identity-openpgp-alpha.txt",
             f"""
@@ -46,6 +47,22 @@ class MergeManagementApiTests(unittest.TestCase):
 
             -----BEGIN PGP PUBLIC KEY BLOCK-----
             beta
+            -----END PGP PUBLIC KEY BLOCK-----
+            """,
+        )
+        self.write_record(
+            "records/identity/identity-openpgp-gamma.txt",
+            f"""
+            Post-ID: identity-openpgp-gamma
+            Board-Tags: identity
+            Subject: identity bootstrap
+            Identity-ID: {self.gamma}
+            Signer-Fingerprint: CCCCCCCCCCCCCCCC
+            Bootstrap-By-Post: gamma-post
+            Bootstrap-By-Thread: gamma-post
+
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            gamma
             -----END PGP PUBLIC KEY BLOCK-----
             """,
         )
@@ -124,6 +141,30 @@ class MergeManagementApiTests(unittest.TestCase):
 
     def test_approved_merge_request_changes_profile_resolution(self) -> None:
         self.write_record(
+            "records/identity-links/link-beta-gamma.txt",
+            f"""
+            Record-ID: link-beta-gamma
+            Action: merge_identity
+            Source-Identity-ID: {self.beta}
+            Target-Identity-ID: {self.gamma}
+            Timestamp: 2026-03-17T21:30:00Z
+
+            merge
+            """,
+        )
+        self.write_record(
+            "records/identity-links/link-gamma-beta.txt",
+            f"""
+            Record-ID: link-gamma-beta
+            Action: merge_identity
+            Source-Identity-ID: {self.gamma}
+            Target-Identity-ID: {self.beta}
+            Timestamp: 2026-03-17T21:31:00Z
+
+            merge
+            """,
+        )
+        self.write_record(
             "records/merge-requests/merge-request-010.txt",
             f"""
             Record-ID: merge-request-010
@@ -152,7 +193,7 @@ class MergeManagementApiTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn(f"Identity-ID: {self.alpha}", body)
-        self.assertIn("Member-Identity-Count: 2", body)
+        self.assertIn("Member-Identity-Count: 3", body)
 
 
 if __name__ == "__main__":

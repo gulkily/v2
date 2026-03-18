@@ -43,7 +43,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: nav-attached notification state, pending merge approvals, and other username/account actions that need attention.
   - Why here: auto-issued merge requests need a visible place to show up.
 
-- [ ] Loop 6: One-approval-to-whole-set merge activation
+- [x] Loop 6: One-approval-to-whole-set merge activation
   - Goal: make merge approval semantics match the working policy.
   - Includes: approval by one member of the resolved set activates the merge for the whole set, plus regression coverage for set-wide graph updates.
   - Why here: notification and auto-request flows should feed into the final merge semantics users actually experience.

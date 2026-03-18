@@ -376,7 +376,10 @@ def upsert_active_merge_edges(
     *,
     identity_context: IdentityContext,
 ) -> None:
-    for record in derive_approved_merge_links(identity_context.merge_request_states):
+    for record in derive_approved_merge_links(
+        identity_context.merge_request_states,
+        resolution=identity_context.resolution,
+    ):
         connection.execute(
             """
             INSERT INTO active_merge_edges (

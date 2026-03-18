@@ -29,8 +29,9 @@ class MergeRequestSubmissionTests(unittest.TestCase):
 
         self.alpha = self.generate_signing_keypair("Alpha")
         self.beta = self.generate_signing_keypair("Beta")
+        self.gamma = self.generate_signing_keypair("Gamma")
         self.moderator = self.generate_signing_keypair("Moderator")
-        for entry in (self.alpha, self.beta):
+        for entry in (self.alpha, self.beta, self.gamma):
             record_id, payload = build_bootstrap_payload(
                 identity_id=entry["identity_id"],
                 signer_fingerprint=entry["fingerprint"],
@@ -258,6 +259,91 @@ process.stdout.write(signature);
         states = derive_merge_request_states(load_merge_request_records(merge_request_records_dir(self.repo_root)))
         self.assertTrue(states[0].approved_by_moderator)
         self.assertTrue(states[0].active_merge)
+
+    def test_api_merge_request_allows_approval_by_member_of_target_resolved_set(self) -> None:
+        self.write_record(
+            "records/identity-links/link-beta-gamma.txt",
+            dedent(
+                f"""
+                Record-ID: link-beta-gamma
+                Action: merge_identity
+                Source-Identity-ID: {self.beta['identity_id']}
+                Target-Identity-ID: {self.gamma['identity_id']}
+                Timestamp: 2026-03-17T22:00:00Z
+
+                merge
+                """
+            ).lstrip(),
+        )
+        self.write_record(
+            "records/identity-links/link-gamma-beta.txt",
+            dedent(
+                f"""
+                Record-ID: link-gamma-beta
+                Action: merge_identity
+                Source-Identity-ID: {self.gamma['identity_id']}
+                Target-Identity-ID: {self.beta['identity_id']}
+                Timestamp: 2026-03-17T22:01:00Z
+
+                merge
+                """
+            ).lstrip(),
+        )
+
+        request_payload = dedent(
+            f"""
+            Record-ID: merge-request-020
+            Action: request_merge
+            Requester-Identity-ID: {self.alpha['identity_id']}
+            Target-Identity-ID: {self.beta['identity_id']}
+            Actor-Identity-ID: {self.alpha['identity_id']}
+            Timestamp: 2026-03-17T23:00:00Z
+
+            please merge
+            """
+        ).lstrip()
+        request_signature = self.sign_payload(request_payload, self.alpha["private_key"])
+        request_body = json.dumps(
+            {
+                "payload": request_payload,
+                "signature": request_signature,
+                "public_key": self.alpha["public_key"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        request_status, _, _ = self.request("/api/merge_request", method="POST", body=request_body)
+        self.assertEqual(request_status, "200 OK")
+
+        approve_payload = dedent(
+            f"""
+            Record-ID: merge-request-021
+            Action: approve_merge
+            Requester-Identity-ID: {self.alpha['identity_id']}
+            Target-Identity-ID: {self.beta['identity_id']}
+            Actor-Identity-ID: {self.gamma['identity_id']}
+            Timestamp: 2026-03-17T23:05:00Z
+
+            """
+        ).lstrip()
+        approve_signature = self.sign_payload(approve_payload, self.gamma["private_key"])
+        approve_body = json.dumps(
+            {
+                "payload": approve_payload,
+                "signature": approve_signature,
+                "public_key": self.gamma["public_key"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        approve_status, _, approve_response = self.request("/api/merge_request", method="POST", body=approve_body)
+
+        self.assertEqual(approve_status, "200 OK")
+        self.assertIn("Action: approve_merge", approve_response)
+
+        states = derive_merge_request_states(load_merge_request_records(merge_request_records_dir(self.repo_root)))
+        self.assertEqual(len(states), 1)
+        self.assertTrue(states[0].active_merge)
+        self.assertTrue(states[0].approved_by_target)
 
 
 if __name__ == "__main__":

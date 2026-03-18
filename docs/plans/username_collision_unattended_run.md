@@ -108,7 +108,7 @@ Uses:
   - Notes:
     - keep the UX attached to `My profile`, not a new inbox route
 
-- [ ] Loop 6: One-approval-to-whole-set merge activation
+- [x] Loop 6: One-approval-to-whole-set merge activation
   - Goal: make merge approval semantics match the working policy.
   - Smallest intended visible result: one approval merges the incoming identity with the whole resolved set.
   - Controlling docs:
@@ -248,7 +248,7 @@ Use one short entry per completed loop.
 - Visible result:
   - the shared nav now surfaces username and merge attention directly on `My profile` without adding a full inbox
 - Commits:
-  - pending
+  - `a7429d0` `username-collision loop 5: add profile nav merge notifications`
 - Tests or verification:
   - `python -m unittest tests.test_profile_nav_asset`
   - result: `Ran 3 tests ... OK`
@@ -256,6 +256,26 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 5 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 6
+
+- Status: completed
+- What landed:
+  - expanded approved merge links across the requester and target resolved sets instead of only the directly approved pair
+  - made target-side approval valid from any member of the target's current resolved set
+  - iterated identity resolution so approved merge requests can attach an incoming identity to the whole resolved set
+  - added unit and API coverage for set-wide merge activation
+- Visible result:
+  - one approved merge now joins the incoming identity to the whole currently resolved target set rather than only the directly named target identity
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_merge_requests tests.test_merge_management_api tests.test_merge_request_submission`
+  - result: `Ran 11 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 6 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -271,10 +291,11 @@ Leave empty if none.
   - Loop 3
   - Loop 4
   - Loop 5
+  - Loop 6
 - Deferred loops:
-  - Loops 6-10
+  - Loops 7-10
 - New unresolved questions:
-  - none from Loops 1-5
+  - none from Loops 1-6
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -284,6 +305,7 @@ Leave empty if none.
   - `python -m unittest tests.test_username_profile_route`
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
   - `python -m unittest tests.test_profile_nav_asset`
+  - `python -m unittest tests.test_merge_requests tests.test_merge_management_api tests.test_merge_request_submission`
 
 ## Handoff Summary
 

@@ -86,13 +86,25 @@ def load_identity_context(*, repo_root: Path, posts: list[Post]) -> IdentityCont
     merge_request_records = tuple(load_merge_request_records(merge_request_records_dir(repo_root)))
     merge_request_states = derive_merge_request_states(list(merge_request_records))
     link_records = load_identity_link_records(identity_link_records_dir(repo_root))
-    resolution = derive_identity_resolution(
-        visible_identity_ids=collect_visible_identity_ids(
-            identity_bootstrap_ids=[bootstrap.identity_id for bootstrap in bootstraps],
-            post_identity_ids=[post.identity_id or "" for post in posts],
-        ),
-        link_records=link_records + list(derive_approved_merge_links(merge_request_states)),
+    visible_identity_ids = collect_visible_identity_ids(
+        identity_bootstrap_ids=[bootstrap.identity_id for bootstrap in bootstraps],
+        post_identity_ids=[post.identity_id or "" for post in posts],
     )
+    resolution = derive_identity_resolution(
+        visible_identity_ids=visible_identity_ids,
+        link_records=link_records,
+    )
+    while True:
+        derived_merge_links = list(
+            derive_approved_merge_links(merge_request_states, resolution=resolution)
+        )
+        next_resolution = derive_identity_resolution(
+            visible_identity_ids=visible_identity_ids,
+            link_records=link_records + derived_merge_links,
+        )
+        if next_resolution == resolution:
+            break
+        resolution = next_resolution
     return IdentityContext(
         bootstraps_by_identity_id=index_identity_bootstraps(bootstraps),
         resolution=resolution,

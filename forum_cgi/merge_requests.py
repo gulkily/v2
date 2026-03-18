@@ -123,8 +123,17 @@ def validate_merge_request_record(
         raise PostingError("conflict", "no pending merge request exists for this identity pair", status="409 Conflict")
 
     if record.action in {"approve_merge", "dismiss_merge"}:
-        if signer_identity_id != record.target_identity_id or record.actor_identity_id != signer_identity_id:
-            raise PostingError("forbidden", "response signer must match Target-Identity-ID and Actor-Identity-ID", status="403 Forbidden")
+        target_canonical_identity_id = identity_context.canonical_identity_id(record.target_identity_id)
+        signer_canonical_identity_id = identity_context.canonical_identity_id(signer_identity_id)
+        if (
+            signer_canonical_identity_id != target_canonical_identity_id
+            or record.actor_identity_id != signer_identity_id
+        ):
+            raise PostingError(
+                "forbidden",
+                "response signer must belong to the Target-Identity-ID resolved set and match Actor-Identity-ID",
+                status="403 Forbidden",
+            )
         return
 
     if not is_authorized_moderator(signer_fingerprint):

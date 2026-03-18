@@ -262,16 +262,41 @@ def derive_merge_request_states(records: list[MergeRequestRecord]) -> tuple[Merg
     return tuple(states)
 
 
-def derive_approved_merge_links(states: tuple[MergeRequestState, ...]) -> tuple[IdentityLinkRecord, ...]:
+def derive_approved_merge_links(
+    states: tuple[MergeRequestState, ...],
+    *,
+    resolution: IdentityResolution | None = None,
+) -> tuple[IdentityLinkRecord, ...]:
     links: list[IdentityLinkRecord] = []
     for state in states:
         if not state.active_merge:
             continue
         pair_label = state.latest_response_record_id or state.latest_request_record_id
-        for source_identity_id, target_identity_id in (
-            (state.requester_identity_id, state.target_identity_id),
-            (state.target_identity_id, state.requester_identity_id),
-        ):
+        requester_identity_ids = (
+            resolution.member_identity_ids(state.requester_identity_id)
+            if resolution is not None
+            else ()
+        ) or (state.requester_identity_id,)
+        target_identity_ids = (
+            resolution.member_identity_ids(state.target_identity_id)
+            if resolution is not None
+            else ()
+        ) or (state.target_identity_id,)
+        derived_pairs = sorted(
+            {
+                (source_identity_id, target_identity_id)
+                for source_identity_id in requester_identity_ids
+                for target_identity_id in target_identity_ids
+                if source_identity_id != target_identity_id
+            }
+            | {
+                (source_identity_id, target_identity_id)
+                for source_identity_id in target_identity_ids
+                for target_identity_id in requester_identity_ids
+                if source_identity_id != target_identity_id
+            }
+        )
+        for source_identity_id, target_identity_id in derived_pairs:
             links.append(
                 IdentityLinkRecord(
                     record_id=f"derived-merge-{pair_label}-{source_identity_id.replace(':', '-')}",
