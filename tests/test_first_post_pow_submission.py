@@ -160,6 +160,14 @@ process.stdout.write(signature);
         }
         return json.dumps(request_payload).encode("utf-8")
 
+    def create_unsigned_request_body(self, payload_text: str, *, dry_run: bool) -> bytes:
+        return json.dumps(
+            {
+                "payload": payload_text,
+                "dry_run": dry_run,
+            }
+        ).encode("utf-8")
+
     def write_identity_bootstrap(self) -> None:
         identity_id = build_identity_id(self.fingerprint)
         record_id, payload = build_bootstrap_payload(
@@ -190,6 +198,36 @@ process.stdout.write(signature);
         self.assertEqual(status, "400 Bad Request")
         self.assertIn("Error-Code: bad_request", body)
         self.assertIn("Message: payload is missing Proof-Of-Work", body)
+
+    def test_unsigned_post_rejected_when_fallback_flag_is_off(self) -> None:
+        payload_text = self.build_thread_payload(post_id="thread-unsigned-disabled-001")
+
+        status, _, body = self.request(
+            "/api/create_thread",
+            method="POST",
+            body=self.create_unsigned_request_body(payload_text, dry_run=False),
+            extra_env={"FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
+        )
+
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Error-Code: bad_request", body)
+        self.assertIn("Message: signature and public_key are required", body)
+
+    def test_unsigned_post_accepted_when_fallback_flag_is_on(self) -> None:
+        payload_text = self.build_thread_payload(post_id="thread-unsigned-enabled-001")
+
+        status, _, body = self.request(
+            "/api/create_thread",
+            method="POST",
+            body=self.create_unsigned_request_body(payload_text, dry_run=False),
+            extra_env={
+                "FORUM_ENABLE_THREAD_AUTO_REPLY": "0",
+                "FORUM_ENABLE_UNSIGNED_POST_FALLBACK": "1",
+            },
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Record-ID: thread-unsigned-enabled-001", body)
 
     def test_first_post_pow_accepts_valid_stamp(self) -> None:
         pow_stamp = self.solve_pow(post_id="thread-pow-valid-001", difficulty=8)

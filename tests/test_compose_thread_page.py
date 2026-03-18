@@ -68,6 +68,7 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('id="public-key-output" class="technical-textarea key-display" rows="8" spellcheck="false" wrap="off" readonly', body)
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
+        self.assertIn('data-unsigned-fallback-enabled="false"', body)
         self.assertIn("Requirements and limitations", body)
         self.assertIn("ASCII-only canonical text records", body)
         self.assertIn("reduces Unicode obfuscation risks", body)
@@ -104,6 +105,15 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('data-pow-enabled="true"', body)
         self.assertIn('data-pow-difficulty="9"', body)
+
+    def test_compose_thread_page_exposes_unsigned_fallback_flag_when_enabled(self) -> None:
+        status, _, body = self.get_with_env(
+            "/compose/thread",
+            extra_env={"FORUM_ENABLE_UNSIGNED_POST_FALLBACK": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('data-unsigned-fallback-enabled="true"', body)
 
 
 if __name__ == "__main__":

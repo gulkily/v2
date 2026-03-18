@@ -709,7 +709,7 @@ async function main() {
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
   const pendingSubmissionKey = pendingSubmissionStorageKey(commandName, defaults);
   const canStorePendingSubmission = draftStorageAvailable();
-  const allowUnsignedFallback = commandName !== "update_profile";
+  const allowUnsignedFallback = root.dataset.unsignedFallbackEnabled === "true";
   let currentKeys = null;
   let pendingDraftTimer = 0;
 
