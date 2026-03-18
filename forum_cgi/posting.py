@@ -11,7 +11,7 @@ from typing import Callable
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
 from forum_core.post_index import refresh_post_index_after_commit
-from forum_core.public_keys import store_or_reuse_public_key
+from forum_core.public_keys import store_or_reuse_public_key, store_or_reuse_public_key_for_fingerprint
 from forum_web.repository import Post, index_posts, load_posts, parse_post_text
 
 
@@ -178,6 +178,7 @@ def store_post(
     *,
     signature_text: str | None = None,
     public_key_text: str | None = None,
+    signer_fingerprint: str | None = None,
     identity_bootstrap_path: Path | None = None,
     identity_bootstrap_text: str | None = None,
     timing_callback: PhaseTimingCallback | None = None,
@@ -195,19 +196,34 @@ def store_post(
         )
         paths.append(signature_path)
     if public_key_text is not None:
-        stored_public_key = store_or_reuse_public_key(
-            repo_root=repo_root,
-            public_key_text=ensure_ascii_text(public_key_text, field_name="public_key"),
+        started_at = time.perf_counter()
+        normalized_public_key_text = ensure_ascii_text(public_key_text, field_name="public_key")
+        stored_public_key = (
+            store_or_reuse_public_key_for_fingerprint(
+                repo_root=repo_root,
+                public_key_text=normalized_public_key_text,
+                fingerprint=signer_fingerprint,
+            )
+            if signer_fingerprint is not None
+            else store_or_reuse_public_key(
+                repo_root=repo_root,
+                public_key_text=normalized_public_key_text,
+            )
         )
+        if timing_callback is not None:
+            timing_callback("store_public_key", (time.perf_counter() - started_at) * 1000.0)
         public_key_path = stored_public_key.path
         if stored_public_key.created:
             paths.append(public_key_path)
     if identity_bootstrap_path is not None and identity_bootstrap_text is not None:
+        started_at = time.perf_counter()
         identity_bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
         stored_identity_bootstrap_path = write_ascii_file(
             identity_bootstrap_path,
             ensure_ascii_text(identity_bootstrap_text, field_name="identity_bootstrap"),
         )
+        if timing_callback is not None:
+            timing_callback("store_identity_bootstrap", (time.perf_counter() - started_at) * 1000.0)
         paths.append(stored_identity_bootstrap_path)
 
     commit_id = commit_post(

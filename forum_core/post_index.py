@@ -847,11 +847,7 @@ def refresh_post_index_after_commit(
 
     index = open_post_index(repo_root)
     try:
-        if any(
-            touched_path.startswith("records/identity/")
-            or touched_path.startswith("records/identity-links/")
-            for touched_path in touched_paths
-        ):
+        if any(touched_path.startswith("records/identity-links/") for touched_path in touched_paths):
             rebuild_post_index(repo_root, index=index, timing_callback=timing_callback)
             set_index_metadata(index.connection, "indexed_head", commit_id)
             set_index_metadata(
@@ -862,23 +858,7 @@ def refresh_post_index_after_commit(
             set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
             index.connection.commit()
             return
-        if any(touched_path.startswith("records/profile-updates/") for touched_path in touched_paths):
-            refresh_profile_update_metadata_after_commit(
-                repo_root,
-                index=index,
-                timing_callback=timing_callback,
-            )
-            set_index_metadata(index.connection, "indexed_head", commit_id)
-            set_index_metadata(
-                index.connection,
-                "indexed_post_count",
-                str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
-            )
-            set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
-            started_at = time.perf_counter()
-            index.connection.commit()
-            record_timing("post_index_commit_sqlite", started_at)
-            return
+
         started_at = time.perf_counter()
         posts = load_posts(records_posts_dir(repo_root))
         record_timing("post_index_load_posts", started_at)
@@ -886,6 +866,11 @@ def refresh_post_index_after_commit(
         identity_context = load_identity_context(repo_root=repo_root, posts=posts)
         record_timing("post_index_load_identity_context", started_at)
         posts_by_path = {candidate.path: candidate for candidate in posts}
+        metadata_refresh_needed = any(
+            touched_path.startswith("records/profile-updates/")
+            or touched_path.startswith("records/identity/")
+            for touched_path in touched_paths
+        )
         started_at = time.perf_counter()
         timestamps_by_post_id = post_commit_timestamps_for_paths(
             repo_root,
@@ -914,6 +899,14 @@ def refresh_post_index_after_commit(
                 identity_context=identity_context,
             )
         record_timing("post_index_upsert_touched_posts", started_at)
+        if metadata_refresh_needed:
+            refresh_identity_metadata_from_context(
+                repo_root,
+                index=index,
+                posts=posts,
+                identity_context=identity_context,
+                timing_callback=timing_callback,
+            )
         set_index_metadata(index.connection, "indexed_head", commit_id)
         set_index_metadata(
             index.connection,
@@ -928,10 +921,12 @@ def refresh_post_index_after_commit(
         index.connection.close()
 
 
-def refresh_profile_update_metadata_after_commit(
+def refresh_identity_metadata_from_context(
     repo_root: Path,
     *,
     index: PostIndex,
+    posts: list[Post],
+    identity_context: IdentityContext,
     timing_callback: PhaseTimingCallback | None = None,
 ) -> None:
     def record_timing(phase_name: str, started_at: float) -> None:
@@ -939,17 +934,17 @@ def refresh_profile_update_metadata_after_commit(
             timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
-    posts = load_posts(records_posts_dir(repo_root))
-    record_timing("post_index_load_posts", started_at)
-    started_at = time.perf_counter()
-    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
-    record_timing("post_index_load_identity_context", started_at)
-    started_at = time.perf_counter()
     index.connection.execute("DELETE FROM authors")
+    index.connection.execute("DELETE FROM identity_members")
+    index.connection.execute("DELETE FROM active_merge_edges")
+    index.connection.execute("DELETE FROM current_username_claims")
+    index.connection.execute("DELETE FROM username_roots")
     for post in posts:
         author = author_row_for_post(post, identity_context=identity_context)
         if author is not None:
             upsert_indexed_author(index.connection, author=author)
+    upsert_identity_members(index.connection, identity_context=identity_context)
+    upsert_active_merge_edges(index.connection, identity_context=identity_context)
     record_timing("post_index_refresh_authors", started_at)
     started_at = time.perf_counter()
     commit_order = repo_commit_order(repo_root)
@@ -958,8 +953,6 @@ def refresh_profile_update_metadata_after_commit(
         identity_context=identity_context,
         commit_order=commit_order,
     )
-    index.connection.execute("DELETE FROM current_username_claims")
-    index.connection.execute("DELETE FROM username_roots")
     upsert_current_username_claims(index.connection, claim_rows=claim_rows)
     upsert_username_roots(index.connection, claim_rows=claim_rows)
     record_timing("post_index_refresh_profile_claims", started_at)

@@ -12,6 +12,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text
+from forum_core.post_index import ensure_post_index_current, load_indexed_identity_members
 from forum_core.proof_of_work import build_pow_message, count_leading_zero_bits
 from forum_core.public_keys import resolve_canonical_public_key_path
 from forum_web.web import application
@@ -331,6 +332,28 @@ process.stdout.write(signature);
         self.assertIn("Identity-Bootstrap-Created: yes", body)
         stored_post = (self.repo_root / "records" / "posts" / "thread-pow-valid-001.txt").read_text(encoding="ascii")
         self.assertIn(f"Proof-Of-Work: {pow_stamp}", stored_post)
+
+    def test_first_signed_post_refreshes_identity_metadata_without_full_rebuild(self) -> None:
+        ensure_post_index_current(self.repo_root).connection.close()
+        payload_text = self.build_thread_payload(post_id="thread-first-identity-fast-001")
+
+        with mock.patch(
+            "forum_core.post_index.rebuild_post_index",
+            side_effect=AssertionError("full rebuild should not run for first signed post refresh when index exists"),
+        ):
+            status, _, body = self.request(
+                "/api/create_thread",
+                method="POST",
+                body=self.create_request_body(payload_text, dry_run=False),
+                extra_env={"FORUM_ENABLE_FIRST_POST_POW": "0", "FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
+            )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Record-ID: thread-first-identity-fast-001", body)
+        self.assertIn("Identity-Bootstrap-Created: yes", body)
+        identity_members = load_indexed_identity_members(self.repo_root)
+        identity_id = build_identity_id(self.fingerprint)
+        self.assertEqual(identity_members[identity_id], (identity_id,))
 
     def test_first_post_pow_applies_to_dry_run_preview(self) -> None:
         payload_text = self.build_thread_payload(post_id="thread-pow-preview-001")

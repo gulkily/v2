@@ -38,6 +38,19 @@ def resolve_public_key_by_fingerprint(repo_root: Path, fingerprint: str) -> Path
 
 def store_or_reuse_public_key(*, repo_root: Path, public_key_text: str) -> StoredPublicKeyRef:
     fingerprint = fingerprint_from_public_key_text(public_key_text)
+    return store_or_reuse_public_key_for_fingerprint(
+        repo_root=repo_root,
+        public_key_text=public_key_text,
+        fingerprint=fingerprint,
+    )
+
+
+def store_or_reuse_public_key_for_fingerprint(
+    *,
+    repo_root: Path,
+    public_key_text: str,
+    fingerprint: str,
+) -> StoredPublicKeyRef:
     path = resolve_canonical_public_key_path(repo_root, fingerprint)
     legacy_path = resolve_legacy_public_key_path(repo_root, fingerprint)
     if not path.exists() and legacy_path.exists():

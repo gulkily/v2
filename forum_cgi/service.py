@@ -209,6 +209,7 @@ def _submit_post(
         payload_text,
         signature_text=signature_text,
         public_key_text=public_key_text,
+        signer_fingerprint=signer_fingerprint,
         identity_bootstrap_path=(
             resolve_identity_bootstrap_path(repo_root, identity_id)
             if identity_bootstrap_created and identity_id and identity_bootstrap_text
