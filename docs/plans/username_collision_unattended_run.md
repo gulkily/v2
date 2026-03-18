@@ -344,7 +344,7 @@ Use one short entry per completed loop.
 - Visible result:
   - duplicate-name profile pages remain readable when many unrelated identities share the same current username
 - Commits:
-  - pending
+  - `29882d4` `username-collision loop 10: polish duplicate-name peer lists`
 - Tests or verification:
   - `python -m unittest tests.test_username_profile_route`
   - result: `Ran 11 tests ... OK`
@@ -393,4 +393,6 @@ Leave empty if none.
 
 ## Handoff Summary
 
-Write a short summary of what the unattended run accomplished and what still needs a human decision.
+The unattended run completed all ten username-collision loops on the `username-collision-unattended` branch. The branch now includes cache-backed canonical username roots, duplicate-name profile rendering, merge suggestions and notifications, set-wide merge activation, one-sided append-only revocation, revocation-aware readback coverage, local suppression for repeated self-merge suggestions, and duplicate-name list overflow handling.
+
+No new blocking product-policy questions were introduced during implementation. The remaining repo-level housekeeping is outside this run: there are still unrelated working-tree changes in other docs files that were intentionally left untouched.
