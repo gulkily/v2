@@ -16,3 +16,12 @@
   - Ran `FORUM_ENABLE_UNSIGNED_POST_FALLBACK=0 python3 -m unittest /home/wsl/v2/tests/test_browser_signing_normalization.py /home/wsl/v2/tests/test_first_post_pow_submission.py`.
 - Notes:
   - Signed submission itself is unchanged here; only the advisory PoW lookup path is lighter.
+
+## Stage 3 - regression coverage and authoritative submission guard
+- Changes:
+  - No further product code was needed beyond Stages 1 and 2; this stage locked in the boundary that `/api/pow_requirement` is the fast advisory path while signed submission remains authoritative.
+  - Reused the updated endpoint and browser tests, plus compose-page coverage, as the regression gate for the new preflight contract.
+- Verification:
+  - Ran `FORUM_ENABLE_UNSIGNED_POST_FALLBACK=0 python3 -m unittest /home/wsl/v2/tests/test_browser_signing_normalization.py /home/wsl/v2/tests/test_first_post_pow_submission.py /home/wsl/v2/tests/test_compose_thread_page.py /home/wsl/v2/tests/test_compose_reply_page.py`.
+- Notes:
+  - Submission-time `public_key` plus signature verification and first-post PoW enforcement are unchanged; only the browser preflight request is lighter.
