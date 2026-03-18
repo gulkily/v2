@@ -47,3 +47,13 @@ Multi-repo content idea for later:
 - the frontpage should be designed for new users new to the site
 	- this means the most insightful and beneficial posts
 	- not necessarily the most recent ones.
+
+Merge approval UX idea for later:
+
+- Before confirming a merge, show stronger warning language and more account-history evidence.
+- Possible contents:
+  - prior usernames
+  - linked identities
+  - first-seen chronology
+  - recent posts
+  - a plain warning that approval affects the whole resolved set and may require later revocation if it was a mistake
