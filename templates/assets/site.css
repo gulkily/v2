@@ -503,6 +503,12 @@ textarea.key-display {
   max-width: 72ch;
 }
 
+#private-key-input,
+#public-key-output {
+  width: min(100%, calc(64ch + 1.5rem + 2px));
+  max-width: calc(64ch + 1.5rem + 2px);
+}
+
 .key-block {
   overflow-x: auto;
   margin: 0;
@@ -554,16 +560,28 @@ button:disabled {
 
 .compose-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 42rem), 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 31rem), 1fr));
+  gap: 0.75rem;
 }
 
 .compose-card {
   display: grid;
   gap: 0.85rem;
-  padding: 1rem;
+  padding: 0.75rem;
   border: 1px solid var(--accent-soft);
   background: rgba(255, 249, 240, 0.72);
+}
+
+.compose-panel,
+.compose-details {
+  padding: 1rem;
+}
+
+.compose-panel input,
+.compose-panel textarea,
+.compose-details input,
+.compose-details textarea {
+  padding: 0.7rem 0.75rem;
 }
 
 .compose-details summary {

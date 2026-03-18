@@ -62,6 +62,8 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
         self.assertIn('id="public-key-output" class="technical-textarea key-display"', body)
+        self.assertIn('id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"', body)
+        self.assertIn('id="public-key-output" class="technical-textarea key-display" rows="8" spellcheck="false" wrap="off" readonly', body)
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
         self.assertIn("Requirements and limitations", body)
