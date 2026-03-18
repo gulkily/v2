@@ -14,6 +14,7 @@ Uses:
 - Checklist doc: [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 - Run date: 2026-03-17
 - Operator: unattended
+- Branch: `username-collision-unattended`
 - Target loop range: Loops 1-10
 
 ## Controlling Docs
@@ -80,6 +81,7 @@ Uses:
     - chronology should follow repository commit history, not payload timestamps
 
 - [ ] Loop 3: Public profile rendering for duplicate usernames
+- [x] Loop 3: Public profile rendering for duplicate usernames
   - Goal: render the canonical-root model clearly on profile pages and `/user/<username>`.
   - Smallest intended visible result: users can see one canonical root and an `other users with this name` section.
   - Controlling docs:
@@ -186,7 +188,7 @@ Use one short entry per completed loop.
 - Visible result:
   - `/user/<username>` now resolves to the canonical root profile when multiple current identities share the same username
 - Commits:
-  - pending
+  - `b5e82ee` `username-collision loop 2: add canonical username root read model`
 - Tests or verification:
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
   - result: `Ran 19 tests ... OK`
@@ -194,6 +196,26 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 2 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 3
+
+- Status: completed
+- What landed:
+  - added visible `Other Users With This Name` rendering on profile pages
+  - used the cached username-root and username-claim state to populate the peer list
+  - extended duplicate-name route tests to verify the new visible section on both `/user/<username>` and canonical identity profile pages
+- Visible result:
+  - users can now open the canonical root profile for a duplicate current username and immediately see the other identities that currently share that name
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_username_profile_route`
+  - `python -m unittest tests.test_post_index tests.test_username_profile_route`
+  - result: `Ran 20 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 3 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -206,16 +228,18 @@ Leave empty if none.
 - Completed loops:
   - Loop 1
   - Loop 2
+  - Loop 3
 - Deferred loops:
-  - Loops 3-10
+  - Loops 4-10
 - New unresolved questions:
-  - none from Loops 1-2
+  - none from Loops 1-3
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
 - Tests run:
   - `python -m unittest tests.test_post_index`
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
+  - `python -m unittest tests.test_username_profile_route`
 
 ## Handoff Summary
 

@@ -28,7 +28,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: earliest username-claim by git commit chronology, root-set resolution, and deterministic `other users with this name` derivation.
   - Why next: this locks the core semantics before adding more UI behavior.
 
-- [ ] Loop 3: Public profile rendering for duplicate usernames
+- [x] Loop 3: Public profile rendering for duplicate usernames
   - Goal: render the new canonical-root model clearly on profile pages and `/user/<username>`.
   - Includes: canonical root rendering, `other users with this name` section, conservative duplicate-name handling, and ordering for the other-identities list.
   - Why next: this is the first visible user-facing result of the new policy.

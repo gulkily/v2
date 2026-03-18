@@ -60,6 +60,7 @@ from forum_web.profiles import (
     load_identity_context,
     profile_usernames,
     resolve_identity_display_name,
+    other_users_with_username,
     resolve_profile_summary_by_username,
     username_route_token,
 )
@@ -494,6 +495,27 @@ def render_profile_page(
         for username in usernames
         if username_route_token(username)
     ) or f"<code>{html.escape(summary.display_name)}</code>"
+    other_username_peers = other_users_with_username(
+        repo_root=get_repo_root(),
+        posts=posts,
+        username=summary.display_name,
+        exclude_identity_id=summary.identity_id,
+        identity_context=identity_context,
+    )
+    other_username_html = (
+        '<section class="panel page-section">'
+        '<div class="section-head page-lede"><h2>Other Users With This Name</h2></div>'
+        '<div class="profile-links link-cluster">'
+        + "".join(
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(peer.canonical_identity_id))}">'
+            f'{html.escape(peer.display_name)}'
+            "</a>"
+            for peer in other_username_peers
+        )
+        + "</div></section>"
+        if other_username_peers
+        else ""
+    )
     preferred_href = preferred_profile_href(
         repo_root=get_repo_root(),
         posts=posts,
@@ -539,6 +561,7 @@ def render_profile_page(
         bootstrap_thread_id=html.escape(summary.bootstrap_thread_id),
         bootstrap_path=html.escape(summary.bootstrap_path),
         username_links_html=username_links_html,
+        other_username_html=other_username_html,
         username_route_html=username_route_html,
         public_key_text=html.escape(summary.public_key_text),
         member_identity_html="".join(

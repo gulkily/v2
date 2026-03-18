@@ -71,6 +71,12 @@ class UsernameRootResolution:
     other_canonical_identity_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class UsernamePeerSummary:
+    canonical_identity_id: str
+    display_name: str
+
+
 def identity_records_dir(repo_root: Path) -> Path:
     return repo_root / "records" / "identity"
 
@@ -298,3 +304,40 @@ def resolve_username_root(*, repo_root: Path, username: str) -> UsernameRootReso
         canonical_identity_id=root.canonical_identity_id,
         other_canonical_identity_ids=other_canonical_identity_ids,
     )
+
+
+def other_users_with_username(
+    *,
+    repo_root: Path,
+    posts: list[Post],
+    username: str,
+    exclude_identity_id: str,
+    identity_context: IdentityContext | None = None,
+) -> tuple[UsernamePeerSummary, ...]:
+    from forum_core.post_index import load_indexed_username_claims
+
+    root_resolution = resolve_username_root(repo_root=repo_root, username=username)
+    if root_resolution is None:
+        return ()
+    context = identity_context or load_identity_context(repo_root=repo_root, posts=posts)
+    claims = load_indexed_username_claims(repo_root, username_token=root_resolution.username_token)
+    peer_summaries: list[UsernamePeerSummary] = []
+    seen: set[str] = set()
+    for claim in claims:
+        canonical_identity_id = claim.canonical_identity_id
+        if canonical_identity_id == exclude_identity_id or canonical_identity_id in seen:
+            continue
+        summary = find_profile_summary(
+            repo_root=repo_root,
+            posts=posts,
+            identity_id=canonical_identity_id,
+            identity_context=context,
+        )
+        peer_summaries.append(
+            UsernamePeerSummary(
+                canonical_identity_id=canonical_identity_id,
+                display_name=summary.display_name if summary is not None else claim.display_name,
+            )
+        )
+        seen.add(canonical_identity_id)
+    return tuple(peer_summaries)

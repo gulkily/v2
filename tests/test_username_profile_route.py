@@ -212,7 +212,15 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn("openpgp:alpha", body)
-        self.assertNotIn("openpgp:beta</", body)
+        self.assertIn("Other Users With This Name", body)
+        self.assertIn("/profiles/openpgp-beta", body)
+
+    def test_identity_profile_lists_other_users_with_same_name(self) -> None:
+        status, _, body = self.get("/profiles/openpgp-alpha")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Other Users With This Name", body)
+        self.assertIn("/profiles/openpgp-beta", body)
 
 
 class UsernameAttributionLinkTests(unittest.TestCase):
