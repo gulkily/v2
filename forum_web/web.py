@@ -55,7 +55,14 @@ from forum_web.api_text import (
     render_profile_text,
     render_thread_text,
 )
-from forum_web.profiles import find_profile_summary, load_identity_context, resolve_identity_display_name
+from forum_web.profiles import (
+    find_profile_summary,
+    load_identity_context,
+    profile_usernames,
+    resolve_identity_display_name,
+    resolve_profile_summary_by_username,
+    username_route_token,
+)
 from forum_web.repository import (
     Post,
     group_threads,
@@ -443,6 +450,110 @@ def resolved_profile_identity_id(identity_context, identity_id: str | None) -> s
     if identity_id is None:
         return None
     return identity_context.canonical_identity_id(identity_id) or identity_id
+
+
+def preferred_profile_href(*, repo_root: Path, posts: list[Post], identity_context, identity_id: str | None) -> str:
+    if identity_id is None:
+        raise LookupError("unknown identity")
+    canonical_identity_id = resolved_profile_identity_id(identity_context, identity_id) or identity_id
+    fallback_href = f"/profiles/{identity_slug(canonical_identity_id)}"
+    resolved_display_name = identity_context.resolved_display_name(canonical_identity_id)
+    if resolved_display_name is None:
+        return fallback_href
+    route_token = username_route_token(resolved_display_name.display_name)
+    if not route_token:
+        return fallback_href
+    summary = resolve_profile_summary_by_username(
+        repo_root=repo_root,
+        posts=posts,
+        username=route_token,
+        identity_context=identity_context,
+    )
+    if summary is None or summary.identity_id != canonical_identity_id:
+        return fallback_href
+    return f"/user/{route_token}"
+
+
+def render_profile_page(
+    *,
+    summary,
+    posts: list[Post],
+    identity_context,
+    route_path: str,
+) -> str:
+    post_links_html = "".join(
+        f'<a class="thread-chip" href="/posts/{html.escape(post_id)}">{html.escape(post_id)}</a>'
+        for post_id in summary.post_ids
+    ) or '<p>No visible signed posts are currently associated with this identity.</p>'
+    usernames = profile_usernames(
+        identity_context=identity_context,
+        identity_id=summary.identity_id,
+    ) or (summary.display_name,)
+    username_links_html = "".join(
+        f'<a class="thread-chip" href="/user/{html.escape(username_route_token(username))}">{html.escape(username)}</a>'
+        for username in usernames
+        if username_route_token(username)
+    ) or f"<code>{html.escape(summary.display_name)}</code>"
+    preferred_href = preferred_profile_href(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_context=identity_context,
+        identity_id=summary.identity_id,
+    )
+    username_route_html = (
+        f'<a href="{html.escape(preferred_href)}">{html.escape(preferred_href)}</a>'
+        if preferred_href.startswith("/user/")
+        else "<span>no unambiguous current username route</span>"
+    )
+    content = load_template("profile.html").substitute(
+        breadcrumb_html=render_breadcrumb(
+            [
+                ("/", "board index"),
+                (route_path, summary.display_name),
+            ]
+        ),
+        profile_heading=html.escape(summary.display_name),
+        profile_subhead=html.escape(summary.identity_id),
+        profile_action_html=(
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
+            "update username"
+            "</a>"
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
+            "manage merges"
+            "</a>"
+        ),
+        stat_html=(
+            '<div class="stat-grid">'
+            f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
+            f'<article class="stat-card"><span class="stat-number">{len(summary.post_ids)}</span><span class="stat-label">visible posts</span></article>'
+            f'<article class="stat-card"><span class="stat-number">{len(summary.thread_ids)}</span><span class="stat-label">threads touched</span></article>'
+            "</div>"
+        ),
+        bootstrap_identity_id=html.escape(summary.identity_id),
+        bootstrap_source_identity_id=html.escape(summary.bootstrap_identity_id),
+        bootstrap_fingerprint=html.escape(summary.signer_fingerprint),
+        display_name=html.escape(summary.display_name),
+        display_name_source=html.escape(summary.display_name_source),
+        fallback_display_name=html.escape(summary.fallback_display_name),
+        bootstrap_post_id=html.escape(summary.bootstrap_post_id),
+        bootstrap_thread_id=html.escape(summary.bootstrap_thread_id),
+        bootstrap_path=html.escape(summary.bootstrap_path),
+        username_links_html=username_links_html,
+        username_route_html=username_route_html,
+        public_key_text=html.escape(summary.public_key_text),
+        member_identity_html="".join(
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(member_identity_id))}">{html.escape(member_identity_id)}</a>'
+            for member_identity_id in summary.member_identity_ids
+        ),
+        post_links_html=post_links_html,
+    )
+    return render_page(
+        title=summary.display_name,
+        hero_kicker="Profile View",
+        hero_title=summary.display_name,
+        hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
+        content_html=content,
+    )
 
 
 def render_board_index() -> str:
@@ -887,57 +998,29 @@ def render_profile(identity_id: str) -> str:
     )
     if summary is None:
         raise LookupError(f"unknown identity: {identity_id}")
-
-    post_links_html = "".join(
-        f'<a class="thread-chip" href="/posts/{html.escape(post_id)}">{html.escape(post_id)}</a>'
-        for post_id in summary.post_ids
-    ) or '<p>No visible signed posts are currently associated with this identity.</p>'
-    content = load_template("profile.html").substitute(
-        breadcrumb_html=render_breadcrumb(
-            [
-                ("/", "board index"),
-                (f"/profiles/{identity_slug(summary.identity_id)}", summary.display_name),
-            ]
-        ),
-        profile_heading=html.escape(summary.display_name),
-        profile_subhead=html.escape(summary.identity_id),
-        profile_action_html=(
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
-            "update username"
-            "</a>"
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
-            "manage merges"
-            "</a>"
-        ),
-        stat_html=(
-            '<div class="stat-grid">'
-            f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
-            f'<article class="stat-card"><span class="stat-number">{len(summary.post_ids)}</span><span class="stat-label">visible posts</span></article>'
-            f'<article class="stat-card"><span class="stat-number">{len(summary.thread_ids)}</span><span class="stat-label">threads touched</span></article>'
-            "</div>"
-        ),
-        bootstrap_identity_id=html.escape(summary.identity_id),
-        bootstrap_source_identity_id=html.escape(summary.bootstrap_identity_id),
-        bootstrap_fingerprint=html.escape(summary.signer_fingerprint),
-        display_name=html.escape(summary.display_name),
-        display_name_source=html.escape(summary.display_name_source),
-        fallback_display_name=html.escape(summary.fallback_display_name),
-        bootstrap_post_id=html.escape(summary.bootstrap_post_id),
-        bootstrap_thread_id=html.escape(summary.bootstrap_thread_id),
-        bootstrap_path=html.escape(summary.bootstrap_path),
-        public_key_text=html.escape(summary.public_key_text),
-        member_identity_html="".join(
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(member_identity_id))}">{html.escape(member_identity_id)}</a>'
-            for member_identity_id in summary.member_identity_ids
-        ),
-        post_links_html=post_links_html,
+    return render_profile_page(
+        summary=summary,
+        posts=posts,
+        identity_context=identity_context,
+        route_path=f"/profiles/{identity_slug(summary.identity_id)}",
     )
-    return render_page(
-        title=summary.display_name,
-        hero_kicker="Profile View",
-        hero_title=summary.display_name,
-        hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
-        content_html=content,
+
+
+def render_profile_by_username(username: str) -> str:
+    posts, _, _, _, _, identity_context = load_repository_state()
+    summary = resolve_profile_summary_by_username(
+        repo_root=get_repo_root(),
+        posts=posts,
+        username=username,
+        identity_context=identity_context,
+    )
+    if summary is None:
+        raise LookupError(f"unknown username: {username}")
+    return render_profile_page(
+        summary=summary,
+        posts=posts,
+        identity_context=identity_context,
+        route_path=f"/user/{username_route_token(username)}",
     )
 
 
@@ -1192,6 +1275,8 @@ def render_merge_request_action_page(
 
 
 def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False, compact_thread_view: bool = False, show_subject: bool = True) -> str:
+    repo_root = get_repo_root()
+    posts = load_posts(repo_root / "records" / "posts")
     subject_html = ""
     if show_subject and post.subject:
         subject_html = f'<h3 class="post-subject">{html.escape(post.subject)}</h3>'
@@ -1212,7 +1297,7 @@ def render_post_card(post, *, root_thread_id: str, identity_context, hidden: boo
             fallback_display_name=short_identity_label(post.signer_fingerprint),
         )
         identity_html = (
-            f'<p class="post-identity">signed by <a href="/profiles/{html.escape(identity_slug(canonical_identity_id or post.identity_id))}">'
+            f'<p class="post-identity">signed by <a href="{html.escape(preferred_profile_href(repo_root=repo_root, posts=posts, identity_context=identity_context, identity_id=canonical_identity_id or post.identity_id))}">'
             f'{html.escape(display_name)}</a></p>'
         )
 
@@ -1282,6 +1367,8 @@ def render_compose_reference(post, *, root_thread_id: str, identity_context) -> 
 
 
 def render_moderation_card(record, *, identity_context) -> str:
+    repo_root = get_repo_root()
+    posts = load_posts(repo_root / "records" / "posts")
     target_href = f"/threads/{html.escape(record.target_id)}" if record.target_type == "thread" else f"/posts/{html.escape(record.target_id)}"
     moderator_html = ""
     if record.identity_id and record.signer_fingerprint:
@@ -1292,7 +1379,7 @@ def render_moderation_card(record, *, identity_context) -> str:
             fallback_display_name=short_identity_label(record.signer_fingerprint),
         )
         moderator_html = (
-            f'<p class="post-identity">moderated by <a href="/profiles/{html.escape(identity_slug(canonical_identity_id or record.identity_id))}">'
+            f'<p class="post-identity">moderated by <a href="{html.escape(preferred_profile_href(repo_root=repo_root, posts=posts, identity_context=identity_context, identity_id=canonical_identity_id or record.identity_id))}">'
             f'{html.escape(display_name)}</a></p>'
         )
     reason_html = (
@@ -2521,6 +2608,19 @@ def application(environ, start_response):
                 start_response("200 OK", headers)
                 return [body]
             except (LookupError, ValueError):
+                body = render_missing_resource("profile").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
+
+        if path.startswith("/user/"):
+            username = unquote(path.removeprefix("/user/")).rstrip("/")
+            try:
+                body = render_profile_by_username(username).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except LookupError:
                 body = render_missing_resource("profile").encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
                 start_response("404 Not Found", headers)

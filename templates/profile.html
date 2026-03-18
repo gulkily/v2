@@ -14,12 +14,16 @@
     <p><strong>Current display name:</strong> <code>${display_name}</code></p>
     <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
     <p><strong>Fallback label:</strong> <code>${fallback_display_name}</code></p>
+    <p><strong>Public username route:</strong> ${username_route_html}</p>
     <p><strong>Resolved Identity-ID:</strong> <code>${bootstrap_identity_id}</code></p>
     <p><strong>Bootstrap Identity-ID:</strong> <code>${bootstrap_source_identity_id}</code></p>
     <p><strong>Fingerprint:</strong> <code>${bootstrap_fingerprint}</code></p>
     <p><strong>Bootstrap source post:</strong> <a href="/posts/${bootstrap_post_id}">${bootstrap_post_id}</a></p>
     <p><strong>Bootstrap source thread:</strong> <a href="/threads/${bootstrap_thread_id}">${bootstrap_thread_id}</a></p>
     <p><strong>Bootstrap path:</strong> <code>${bootstrap_path}</code></p>
+  </div>
+  <div class="profile-links link-cluster">
+    ${username_links_html}
   </div>
   <div class="profile-links link-cluster">
     ${member_identity_html}

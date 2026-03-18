@@ -45,6 +45,7 @@ def render_llms_text() -> str:
         "- GET /threads/<thread-id>",
         "- GET /posts/<post-id>",
         "- GET /profiles/<identity-slug>",
+        "- GET /user/<username>",
         "- GET /instance/",
         "- GET /planning/task-priorities/",
         "- GET /planning/tasks/<task-id>",
