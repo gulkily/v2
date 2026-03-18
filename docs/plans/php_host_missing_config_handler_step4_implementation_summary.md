@@ -26,3 +26,16 @@
     - visible recovery guidance including `./forum php-host-setup /absolute/path/to/public-web-root`
 - Notes:
   - The page styling stays fully local to the PHP adapter so this stage does not introduce a broader shared presentation layer.
+
+## Stage 3 - link the page back to the install guide
+- Changes:
+  - Added one explicit documentation-reference card to the missing-config page in [index.php](/home/wsl/v2/php_host/public/index.php).
+  - Pointed operators to `docs/php_primary_host_installation.md` in the application checkout as the canonical long-form recovery guide, while keeping `./forum php-host-setup` as the primary action.
+- Verification:
+  - Ran `php -l php_host/public/index.php`.
+  - Ran the temp-copy CGI smoke test and confirmed the rendered page includes:
+    - `Need more detail?`
+    - `docs/php_primary_host_installation.md`
+    - the existing `./forum php-host-setup /absolute/path/to/public-web-root` recovery command
+- Notes:
+  - The docs reference is textual rather than an external link so it still works in broken local deployments without depending on public documentation hosting.

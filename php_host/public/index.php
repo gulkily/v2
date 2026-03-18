@@ -190,6 +190,10 @@ function forum_render_missing_config_page(string $path): never
         <p>From the application checkout, regenerate the PHP host config and publish the expected public files:</p>
         <pre>{$commandHtml}</pre>
       </article>
+      <article class="card">
+        <h2>Need more detail?</h2>
+        <p>Open <code>docs/php_primary_host_installation.md</code> in the application checkout for the supported PHP-host installation flow and verification steps.</p>
+      </article>
       <article class="card note">
         <h2>Why the site stops here</h2>
         <p>This page indicates a deployment/configuration problem, not a normal application error. The adapter fails closed until the required host-local config include is present.</p>
