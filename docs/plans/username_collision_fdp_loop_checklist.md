@@ -58,7 +58,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: post attribution, moderation attribution, profile pages, `/user/<username>`, and notification state after revocation.
   - Why here: revocation must not exist only in the data model; readers need to see the updated state consistently.
 
-- [ ] Loop 9: Suggested self-merge dismissal or suppression
+- [x] Loop 9: Suggested self-merge dismissal or suppression
   - Goal: prevent repetitive false-positive merge suggestions without adding a broad new trust system.
   - Includes: simple `not me` handling or equivalent suppression for repeated same-name suggestions.
   - Why here: once auto-issued requests exist, the product needs a low-friction way to reduce noise.

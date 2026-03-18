@@ -227,6 +227,8 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Likely Self-Merge", body)
+        self.assertIn("not me", body)
+        self.assertIn("/assets/profile_merge_suggestion.js", body)
         self.assertIn(
             "/profiles/openpgp-beta/merge/action?action=request_merge&other_identity_id=openpgp:alpha",
             body,

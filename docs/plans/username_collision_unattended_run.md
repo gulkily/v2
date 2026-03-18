@@ -134,7 +134,7 @@ Uses:
   - Notes:
     - follow current graph-derived visible state without special-case backfill rules
 
-- [ ] Loop 9: Suggested self-merge dismissal or suppression
+- [x] Loop 9: Suggested self-merge dismissal or suppression
   - Goal: prevent repetitive false-positive merge suggestions.
   - Smallest intended visible result: users have a low-friction way to stop repeated unwanted same-name suggestions.
   - Controlling docs:
@@ -306,7 +306,7 @@ Use one short entry per completed loop.
 - Visible result:
   - revocation now has verified end-to-end readback across public profile routing, attribution links, and merge-management summaries
 - Commits:
-  - pending
+  - `584ba4d` `username-collision loop 8: verify revoked merge readback`
 - Tests or verification:
   - `python -m unittest tests.test_username_profile_route tests.test_merge_management_api`
   - result: `Ran 13 tests ... OK`
@@ -314,6 +314,25 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 8 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 9
+
+- Status: completed
+- What landed:
+  - added a browser-persistent `not me` dismissal control to the profile-page `Likely Self-Merge` suggestion
+  - kept suppression local to the browser so the first version avoids introducing new signed records or moderation state
+  - added page and asset regressions covering the visible control and its local persistence behavior
+- Visible result:
+  - users can now dismiss repeated same-name self-merge suggestions on a device without affecting repository state or other users
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_username_profile_route tests.test_profile_merge_suggestion_asset`
+  - result: `Ran 12 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 9 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -332,10 +351,11 @@ Leave empty if none.
   - Loop 6
   - Loop 7
   - Loop 8
+  - Loop 9
 - Deferred loops:
-  - Loops 9-10
+  - Loop 10
 - New unresolved questions:
-  - none from Loops 1-8
+  - none from Loops 1-9
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -348,6 +368,7 @@ Leave empty if none.
   - `python -m unittest tests.test_merge_requests tests.test_merge_management_api tests.test_merge_request_submission`
   - `python -m unittest tests.test_merge_requests tests.test_merge_request_submission tests.test_merge_management_page`
   - `python -m unittest tests.test_username_profile_route tests.test_merge_management_api`
+  - `python -m unittest tests.test_username_profile_route tests.test_profile_merge_suggestion_asset`
 
 ## Handoff Summary
 

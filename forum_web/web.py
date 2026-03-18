@@ -519,6 +519,7 @@ def render_profile_page(
     )
     root_resolution = resolve_username_root(repo_root=get_repo_root(), username=summary.display_name)
     merge_suggestion_html = ""
+    profile_script_html = ""
     if root_resolution is not None and root_resolution.canonical_identity_id != summary.identity_id:
         merge_target_summary = find_profile_summary(
             repo_root=get_repo_root(),
@@ -536,15 +537,18 @@ def render_profile_page(
             f'&other_identity_id={html.escape(root_resolution.canonical_identity_id)}'
         )
         merge_suggestion_html = (
-            '<section class="panel page-section">'
+            '<section class="panel page-section" data-merge-suggestion '
+            f'data-identity-id="{html.escape(summary.identity_id)}" '
+            f'data-other-identity-id="{html.escape(root_resolution.canonical_identity_id)}">'
             '<div class="section-head page-lede"><h2>Likely Self-Merge</h2></div>'
             '<p>This identity currently shares its username with an earlier canonical root. '
             'If this is also you, you can request a merge directly.</p>'
             f'<div class="link-cluster"><a class="thread-chip" href="{merge_request_link}">'
             f'request merge with {html.escape(merge_target_label)}'
-            '</a></div>'
+            '</a><button class="thread-chip" type="button" data-dismiss-merge-suggestion hidden>not me</button></div>'
             '</section>'
         )
+        profile_script_html = '<script type="module" src="/assets/profile_merge_suggestion.js"></script>'
     preferred_href = preferred_profile_href(
         repo_root=get_repo_root(),
         posts=posts,
@@ -606,6 +610,7 @@ def render_profile_page(
         hero_title=summary.display_name,
         hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
         content_html=content,
+        page_script_html=profile_script_html,
     )
 
 
@@ -2580,6 +2585,12 @@ def application(environ, start_response):
 
         if path == "/assets/profile_nav.js":
             body = load_asset_text("profile_nav.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/profile_merge_suggestion.js":
+            body = load_asset_text("profile_merge_suggestion.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
