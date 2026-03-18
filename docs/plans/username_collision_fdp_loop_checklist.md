@@ -48,7 +48,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: approval by one member of the resolved set activates the merge for the whole set, plus regression coverage for set-wide graph updates.
   - Why here: notification and auto-request flows should feed into the final merge semantics users actually experience.
 
-- [ ] Loop 7: One-sided append-only `revoke_merge`
+- [x] Loop 7: One-sided append-only `revoke_merge`
   - Goal: add the simplest recovery path for mistaken merges.
   - Includes: canonical `revoke_merge` record shape, immediate effect, deterministic reference to the revoked approval or active edge, graph recomputation from remaining active edges, and updated root/other rendering after split.
   - Why here: merge ergonomics should not expand further without a recovery mechanism.

@@ -1195,13 +1195,13 @@ def render_merge_management_page(identity_id: str) -> str:
             )
         return "".join(parts)
 
-    def render_state_rows(states, *, show_actions: bool) -> str:
+    def render_state_rows(states, *, action_mode: str) -> str:
         if not states:
             return "<p>None.</p>"
         parts = []
         for state in states:
             actions_html = ""
-            if show_actions:
+            if action_mode == "incoming":
                 approve_link = (
                     f'/profiles/{html.escape(profile_slug)}/merge/action?action=approve_merge'
                     f'&requester_identity_id={html.escape(state.requester_identity_id)}'
@@ -1222,6 +1222,17 @@ def render_merge_management_page(identity_id: str) -> str:
                     f'<a class="thread-chip" href="{approve_link}">approve</a>'
                     f'<a class="thread-chip" href="{dismiss_link}">dismiss</a>'
                     f'<a class="thread-chip" href="{moderator_link}">moderator approve</a>'
+                    "</div>"
+                )
+            elif action_mode == "approved":
+                revoke_link = (
+                    f'/profiles/{html.escape(profile_slug)}/merge/action?action=revoke_merge'
+                    f'&requester_identity_id={html.escape(state.requester_identity_id)}'
+                    f'&target_identity_id={html.escape(state.target_identity_id)}'
+                )
+                actions_html = (
+                    f'<div class="link-cluster">'
+                    f'<a class="thread-chip" href="{revoke_link}">revoke merge</a>'
                     "</div>"
                 )
             response_label = state.latest_response_action or "pending"
@@ -1251,10 +1262,10 @@ def render_merge_management_page(identity_id: str) -> str:
         identity_id=html.escape(summary.identity_id),
         display_name=html.escape(summary.display_name),
         historical_match_html=render_match_rows(),
-        outgoing_request_html=render_state_rows(management_summary.outgoing_requests, show_actions=False),
-        incoming_request_html=render_state_rows(management_summary.incoming_requests, show_actions=True),
-        dismissed_request_html=render_state_rows(management_summary.dismissed_requests, show_actions=False),
-        approved_request_html=render_state_rows(management_summary.approved_requests, show_actions=False),
+        outgoing_request_html=render_state_rows(management_summary.outgoing_requests, action_mode="none"),
+        incoming_request_html=render_state_rows(management_summary.incoming_requests, action_mode="incoming"),
+        dismissed_request_html=render_state_rows(management_summary.dismissed_requests, action_mode="none"),
+        approved_request_html=render_state_rows(management_summary.approved_requests, action_mode="approved"),
     )
     return render_page(
         title=f"Manage merges · {summary.display_name}",
@@ -1288,6 +1299,7 @@ def render_merge_request_action_page(
         "approve_merge": "Approve merge",
         "dismiss_merge": "Dismiss merge request",
         "moderator_approve_merge": "Moderator approve merge",
+        "revoke_merge": "Revoke merge",
     }
     if action not in action_labels:
         raise LookupError(f"unknown merge action: {action}")
@@ -1295,6 +1307,27 @@ def render_merge_request_action_page(
         raise LookupError("request merge page must be anchored on the requester identity")
     if action in {"approve_merge", "dismiss_merge", "moderator_approve_merge"} and summary.identity_id != target_identity_id:
         raise LookupError("response page must be anchored on the target identity")
+    if action == "revoke_merge":
+        requester_summary = find_profile_summary(
+            repo_root=get_repo_root(),
+            posts=posts,
+            identity_id=requester_identity_id,
+            identity_context=identity_context,
+        )
+        target_summary = find_profile_summary(
+            repo_root=get_repo_root(),
+            posts=posts,
+            identity_id=target_identity_id,
+            identity_context=identity_context,
+        )
+        allowed_identity_ids = {
+            identity_id
+            for candidate_summary in (requester_summary, target_summary)
+            if candidate_summary is not None
+            for identity_id in candidate_summary.member_identity_ids
+        }
+        if summary.identity_id not in allowed_identity_ids:
+            raise LookupError("revoke page must be anchored on a currently merged identity")
 
     content = load_template("merge_request_action.html").substitute(
         breadcrumb_html=render_breadcrumb(

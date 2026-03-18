@@ -13,6 +13,7 @@ from forum_web.web import application
 
 IDENTITY_ID = "openpgp:0123456789abcdef"
 OTHER_IDENTITY_ID = "openpgp:fedcba9876543210"
+THIRD_IDENTITY_ID = "openpgp:ffffffffffffffff"
 PROFILE_SLUG = "openpgp-0123456789abcdef"
 
 
@@ -75,6 +76,33 @@ class MergeManagementPageTests(unittest.TestCase):
             """,
         )
         self.write_record(
+            "records/identity/identity-openpgp-ffffffffffffffff.txt",
+            f"""
+            Post-ID: identity-openpgp-ffffffffffffffff
+            Board-Tags: identity
+            Subject: identity bootstrap
+            Identity-ID: {THIRD_IDENTITY_ID}
+            Signer-Fingerprint: FFFFFFFFFFFFFFFF
+            Bootstrap-By-Post: third-identity
+            Bootstrap-By-Thread: third-identity
+
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            example
+            -----END PGP PUBLIC KEY BLOCK-----
+            """,
+        )
+        self.write_record(
+            "records/profile-updates/profile-update-c.txt",
+            f"""
+            Record-ID: profile-update-c
+            Action: set_display_name
+            Source-Identity-ID: {THIRD_IDENTITY_ID}
+            Timestamp: 2026-03-17T20:20:00Z
+
+            Ilya
+            """,
+        )
+        self.write_record(
             "records/merge-requests/merge-request-001.txt",
             f"""
             Record-ID: merge-request-001
@@ -85,6 +113,32 @@ class MergeManagementPageTests(unittest.TestCase):
             Timestamp: 2026-03-17T21:00:00Z
 
             please merge
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-002.txt",
+            f"""
+            Record-ID: merge-request-002
+            Action: request_merge
+            Requester-Identity-ID: {THIRD_IDENTITY_ID}
+            Target-Identity-ID: {IDENTITY_ID}
+            Actor-Identity-ID: {THIRD_IDENTITY_ID}
+            Timestamp: 2026-03-17T21:04:00Z
+
+            please merge
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-003.txt",
+            f"""
+            Record-ID: merge-request-003
+            Action: approve_merge
+            Requester-Identity-ID: {THIRD_IDENTITY_ID}
+            Target-Identity-ID: {IDENTITY_ID}
+            Actor-Identity-ID: {IDENTITY_ID}
+            Timestamp: 2026-03-17T21:05:00Z
+
+            approved
             """,
         )
 
@@ -135,6 +189,7 @@ class MergeManagementPageTests(unittest.TestCase):
         self.assertIn("approve", body)
         self.assertIn("dismiss", body)
         self.assertIn("moderator approve", body)
+        self.assertIn("revoke merge", body)
 
     def test_merge_action_page_renders_signing_flow(self) -> None:
         status, _, body = self.get(

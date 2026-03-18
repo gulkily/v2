@@ -345,6 +345,85 @@ process.stdout.write(signature);
         self.assertTrue(states[0].active_merge)
         self.assertTrue(states[0].approved_by_target)
 
+    def test_api_merge_request_allows_one_sided_revoke_merge(self) -> None:
+        request_payload = dedent(
+            f"""
+            Record-ID: merge-request-030
+            Action: request_merge
+            Requester-Identity-ID: {self.alpha['identity_id']}
+            Target-Identity-ID: {self.beta['identity_id']}
+            Actor-Identity-ID: {self.alpha['identity_id']}
+            Timestamp: 2026-03-17T23:00:00Z
+
+            please merge
+            """
+        ).lstrip()
+        request_signature = self.sign_payload(request_payload, self.alpha["private_key"])
+        request_body = json.dumps(
+            {
+                "payload": request_payload,
+                "signature": request_signature,
+                "public_key": self.alpha["public_key"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        request_status, _, _ = self.request("/api/merge_request", method="POST", body=request_body)
+        self.assertEqual(request_status, "200 OK")
+
+        approve_payload = dedent(
+            f"""
+            Record-ID: merge-request-031
+            Action: approve_merge
+            Requester-Identity-ID: {self.alpha['identity_id']}
+            Target-Identity-ID: {self.beta['identity_id']}
+            Actor-Identity-ID: {self.beta['identity_id']}
+            Timestamp: 2026-03-17T23:05:00Z
+
+            """
+        ).lstrip()
+        approve_signature = self.sign_payload(approve_payload, self.beta["private_key"])
+        approve_body = json.dumps(
+            {
+                "payload": approve_payload,
+                "signature": approve_signature,
+                "public_key": self.beta["public_key"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        approve_status, _, _ = self.request("/api/merge_request", method="POST", body=approve_body)
+        self.assertEqual(approve_status, "200 OK")
+
+        revoke_payload = dedent(
+            f"""
+            Record-ID: merge-request-032
+            Action: revoke_merge
+            Requester-Identity-ID: {self.alpha['identity_id']}
+            Target-Identity-ID: {self.beta['identity_id']}
+            Actor-Identity-ID: {self.alpha['identity_id']}
+            Timestamp: 2026-03-17T23:10:00Z
+
+            """
+        ).lstrip()
+        revoke_signature = self.sign_payload(revoke_payload, self.alpha["private_key"])
+        revoke_body = json.dumps(
+            {
+                "payload": revoke_payload,
+                "signature": revoke_signature,
+                "public_key": self.alpha["public_key"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        revoke_status, _, revoke_response = self.request("/api/merge_request", method="POST", body=revoke_body)
+
+        self.assertEqual(revoke_status, "200 OK")
+        self.assertIn("Action: revoke_merge", revoke_response)
+
+        states = derive_merge_request_states(load_merge_request_records(merge_request_records_dir(self.repo_root)))
+        self.assertEqual(len(states), 1)
+        self.assertTrue(states[0].revoked)
+        self.assertFalse(states[0].active_merge)
+
 
 if __name__ == "__main__":
     unittest.main()

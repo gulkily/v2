@@ -104,12 +104,12 @@ def validate_merge_request_record(
         raise PostingError("not_found", f"unknown requester identity: {record.requester_identity_id}", status="404 Not Found")
     if record.target_identity_id not in visible_identity_ids:
         raise PostingError("not_found", f"unknown target identity: {record.target_identity_id}", status="404 Not Found")
-    if identity_context.canonical_identity_id(record.requester_identity_id) == identity_context.canonical_identity_id(
-        record.target_identity_id
-    ):
-        raise PostingError("conflict", "identities already resolve together", status="409 Conflict")
+    requester_canonical_identity_id = identity_context.canonical_identity_id(record.requester_identity_id)
+    target_canonical_identity_id = identity_context.canonical_identity_id(record.target_identity_id)
 
     if record.action == "request_merge":
+        if requester_canonical_identity_id == target_canonical_identity_id:
+            raise PostingError("conflict", "identities already resolve together", status="409 Conflict")
         if signer_identity_id != record.requester_identity_id or record.actor_identity_id != signer_identity_id:
             raise PostingError("forbidden", "request signer must match Requester-Identity-ID and Actor-Identity-ID", status="403 Forbidden")
         return
@@ -119,10 +119,9 @@ def validate_merge_request_record(
         requester_identity_id=record.requester_identity_id,
         target_identity_id=record.target_identity_id,
     )
-    if pending_state is None or not pending_state.pending:
-        raise PostingError("conflict", "no pending merge request exists for this identity pair", status="409 Conflict")
-
     if record.action in {"approve_merge", "dismiss_merge"}:
+        if pending_state is None or not pending_state.pending:
+            raise PostingError("conflict", "no pending merge request exists for this identity pair", status="409 Conflict")
         target_canonical_identity_id = identity_context.canonical_identity_id(record.target_identity_id)
         signer_canonical_identity_id = identity_context.canonical_identity_id(signer_identity_id)
         if (
@@ -132,6 +131,23 @@ def validate_merge_request_record(
             raise PostingError(
                 "forbidden",
                 "response signer must belong to the Target-Identity-ID resolved set and match Actor-Identity-ID",
+                status="403 Forbidden",
+            )
+        return
+
+    if record.action == "revoke_merge":
+        if pending_state is None:
+            raise PostingError("conflict", "no merge request exists for this identity pair", status="409 Conflict")
+        if not pending_state.active_merge:
+            raise PostingError("conflict", "no active merge exists for this identity pair", status="409 Conflict")
+        signer_canonical_identity_id = identity_context.canonical_identity_id(signer_identity_id)
+        if (
+            signer_canonical_identity_id not in {requester_canonical_identity_id, target_canonical_identity_id}
+            or record.actor_identity_id != signer_identity_id
+        ):
+            raise PostingError(
+                "forbidden",
+                "revoke signer must belong to the merged resolved set and match Actor-Identity-ID",
                 status="403 Forbidden",
             )
         return

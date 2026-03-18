@@ -18,6 +18,7 @@ ALLOWED_MERGE_REQUEST_ACTIONS = (
     "approve_merge",
     "dismiss_merge",
     "moderator_approve_merge",
+    "revoke_merge",
 )
 
 
@@ -50,6 +51,7 @@ class MergeRequestState:
     approved_by_target: bool
     approved_by_moderator: bool
     dismissed: bool
+    revoked: bool
     active_merge: bool
     pending: bool
 
@@ -227,12 +229,31 @@ def derive_merge_request_states(records: list[MergeRequestRecord]) -> tuple[Merg
             key=merge_request_sort_key,
             default=None,
         )
+        latest_revocation = max(
+            (
+                record
+                for record in pair_records
+                if record.action == "revoke_merge"
+                and merge_request_sort_key(record) > merge_request_sort_key(latest_request)
+            ),
+            key=merge_request_sort_key,
+            default=None,
+        )
 
         approved_by_target = latest_target_response is not None and latest_target_response.action == "approve_merge"
         dismissed = latest_target_response is not None and latest_target_response.action == "dismiss_merge"
         approved_by_moderator = latest_moderator_approval is not None
-        active_merge = approved_by_target or approved_by_moderator
-        pending = not dismissed and not active_merge
+        latest_activation = latest_target_response if approved_by_target else None
+        if latest_moderator_approval is not None and (
+            latest_activation is None
+            or merge_request_sort_key(latest_moderator_approval) > merge_request_sort_key(latest_activation)
+        ):
+            latest_activation = latest_moderator_approval
+        revoked = latest_revocation is not None and latest_activation is not None and (
+            merge_request_sort_key(latest_revocation) > merge_request_sort_key(latest_activation)
+        )
+        active_merge = (approved_by_target or approved_by_moderator) and not revoked
+        pending = not dismissed and not active_merge and not revoked
 
         latest_response = latest_target_response
         if latest_moderator_approval is not None and (
@@ -240,6 +261,11 @@ def derive_merge_request_states(records: list[MergeRequestRecord]) -> tuple[Merg
             or merge_request_sort_key(latest_moderator_approval) > merge_request_sort_key(latest_response)
         ):
             latest_response = latest_moderator_approval
+        if latest_revocation is not None and (
+            latest_response is None
+            or merge_request_sort_key(latest_revocation) > merge_request_sort_key(latest_response)
+        ):
+            latest_response = latest_revocation
 
         states.append(
             MergeRequestState(
@@ -254,6 +280,7 @@ def derive_merge_request_states(records: list[MergeRequestRecord]) -> tuple[Merg
                 approved_by_target=approved_by_target,
                 approved_by_moderator=approved_by_moderator,
                 dismissed=dismissed,
+                revoked=revoked,
                 active_merge=active_merge,
                 pending=pending,
             )

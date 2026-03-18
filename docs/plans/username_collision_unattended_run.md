@@ -80,7 +80,6 @@ Uses:
   - Notes:
     - chronology should follow repository commit history, not payload timestamps
 
-- [ ] Loop 3: Public profile rendering for duplicate usernames
 - [x] Loop 3: Public profile rendering for duplicate usernames
   - Goal: render the canonical-root model clearly on profile pages and `/user/<username>`.
   - Smallest intended visible result: users can see one canonical root and an `other users with this name` section.
@@ -117,7 +116,7 @@ Uses:
   - Notes:
     - preserve existing graph-resolution approach rather than inventing a second merge state model
 
-- [ ] Loop 7: One-sided append-only `revoke_merge`
+- [x] Loop 7: One-sided append-only `revoke_merge`
   - Goal: add the simplest recovery path for mistaken merges.
   - Smallest intended visible result: a signed one-sided revocation changes current graph state immediately.
   - Controlling docs:
@@ -268,7 +267,7 @@ Use one short entry per completed loop.
 - Visible result:
   - one approved merge now joins the incoming identity to the whole currently resolved target set rather than only the directly named target identity
 - Commits:
-  - pending
+  - `fa5be50` `username-collision loop 6: merge whole resolved sets`
 - Tests or verification:
   - `python -m unittest tests.test_merge_requests tests.test_merge_management_api tests.test_merge_request_submission`
   - result: `Ran 11 tests ... OK`
@@ -276,6 +275,26 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 6 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 7
+
+- Status: completed
+- What landed:
+  - added append-only `revoke_merge` handling to merge-request state derivation so revocations disable previously active merges without deleting history
+  - allowed one-sided immediate revocation through the merge-request submission API for signers already in the merged resolved set
+  - exposed `revoke merge` actions on approved merge-management rows and wired the existing signing flow to that action
+  - added focused regression coverage for revoke state derivation, API submission, and merge-management rendering
+- Visible result:
+  - users can now revoke an active merge immediately from merge management, and the current graph drops that merge while keeping the original approval records in history
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_merge_requests tests.test_merge_request_submission tests.test_merge_management_page`
+  - result: `Ran 14 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 7 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -292,10 +311,11 @@ Leave empty if none.
   - Loop 4
   - Loop 5
   - Loop 6
+  - Loop 7
 - Deferred loops:
-  - Loops 7-10
+  - Loops 8-10
 - New unresolved questions:
-  - none from Loops 1-6
+  - none from Loops 1-7
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -306,6 +326,7 @@ Leave empty if none.
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
   - `python -m unittest tests.test_profile_nav_asset`
   - `python -m unittest tests.test_merge_requests tests.test_merge_management_api tests.test_merge_request_submission`
+  - `python -m unittest tests.test_merge_requests tests.test_merge_request_submission tests.test_merge_management_page`
 
 ## Handoff Summary
 

@@ -180,6 +180,47 @@ class MergeRequestTests(unittest.TestCase):
         self.assertFalse(states[0].pending)
         self.assertFalse(states[0].active_merge)
 
+    def test_revoke_merge_deactivates_previously_active_merge(self) -> None:
+        states = derive_merge_request_states(
+            [
+                parse_merge_request_text(
+                    (
+                        "Record-ID: merge-request-030\n"
+                        "Action: request_merge\n"
+                        "Requester-Identity-ID: openpgp:alpha\n"
+                        "Target-Identity-ID: openpgp:beta\n"
+                        "Actor-Identity-ID: openpgp:alpha\n"
+                        "Timestamp: 2026-03-17T23:00:00Z\n\n"
+                    )
+                ),
+                parse_merge_request_text(
+                    (
+                        "Record-ID: merge-request-031\n"
+                        "Action: approve_merge\n"
+                        "Requester-Identity-ID: openpgp:alpha\n"
+                        "Target-Identity-ID: openpgp:beta\n"
+                        "Actor-Identity-ID: openpgp:beta\n"
+                        "Timestamp: 2026-03-17T23:05:00Z\n\n"
+                    )
+                ),
+                parse_merge_request_text(
+                    (
+                        "Record-ID: merge-request-032\n"
+                        "Action: revoke_merge\n"
+                        "Requester-Identity-ID: openpgp:alpha\n"
+                        "Target-Identity-ID: openpgp:beta\n"
+                        "Actor-Identity-ID: openpgp:alpha\n"
+                        "Timestamp: 2026-03-17T23:10:00Z\n\n"
+                    )
+                ),
+            ]
+        )
+
+        self.assertEqual(len(states), 1)
+        self.assertTrue(states[0].revoked)
+        self.assertFalse(states[0].active_merge)
+        self.assertFalse(states[0].pending)
+
     def test_historical_username_matches_use_visible_profile_history(self) -> None:
         resolution = derive_identity_resolution(
             visible_identity_ids=frozenset({"openpgp:alpha", "openpgp:beta", "openpgp:gamma"}),
