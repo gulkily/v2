@@ -70,7 +70,7 @@ Uses:
   - Notes:
     - default to extending the existing SQLite cache rather than adding a new DB file
 
-- [ ] Loop 2: Canonical username root read model
+- [x] Loop 2: Canonical username root read model
   - Goal: make the canonical username-root rule explicit in the read layer.
   - Smallest intended visible result: one deterministic source of truth for root set and `other users with this name`.
   - Controlling docs:
@@ -166,7 +166,7 @@ Use one short entry per completed loop.
 - Visible result:
   - the repo now has one cached derived source for current identity-membership and canonical username-root state without changing public read behavior yet
 - Commits:
-  - pending
+  - `53e4065` `username-collision loop 1: cache identity graph and username roots`
 - Tests or verification:
   - `python -m unittest tests.test_post_index`
   - result: `Ran 14 tests ... OK`
@@ -174,6 +174,26 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 1 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 2
+
+- Status: completed
+- What landed:
+  - added cache-backed username-root claim loaders for the existing SQLite index
+  - added a canonical username-root read-model helper in [profiles.py](/home/wsl/v2/forum_web/profiles.py)
+  - switched username-route profile resolution to use the cached root decision rather than the old duplicate-name rejection path
+  - updated route regressions to assert canonical-root behavior for duplicate current usernames
+- Visible result:
+  - `/user/<username>` now resolves to the canonical root profile when multiple current identities share the same username
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_post_index tests.test_username_profile_route`
+  - result: `Ran 19 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 2 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -185,15 +205,17 @@ Leave empty if none.
 
 - Completed loops:
   - Loop 1
+  - Loop 2
 - Deferred loops:
-  - Loops 2-10
+  - Loops 3-10
 - New unresolved questions:
-  - none from Loop 1
+  - none from Loops 1-2
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
 - Tests run:
   - `python -m unittest tests.test_post_index`
+  - `python -m unittest tests.test_post_index tests.test_username_profile_route`
 
 ## Handoff Summary
 

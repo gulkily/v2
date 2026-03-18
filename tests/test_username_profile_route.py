@@ -207,10 +207,12 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
 
         return response["status"], dict(response["headers"]), body
 
-    def test_ambiguous_username_route_returns_not_found(self) -> None:
-        status, _, _ = self.get("/user/ilya")
+    def test_duplicate_username_route_resolves_to_canonical_root(self) -> None:
+        status, _, body = self.get("/user/ilya")
 
-        self.assertEqual(status, "404 Not Found")
+        self.assertEqual(status, "200 OK")
+        self.assertIn("openpgp:alpha", body)
+        self.assertNotIn("openpgp:beta</", body)
 
 
 class UsernameAttributionLinkTests(unittest.TestCase):
@@ -363,7 +365,7 @@ process.stdout.write(JSON.stringify({{
         self.assertIn('/user/ilya-alt', body)
         self.assertNotIn(f'/profiles/{identity_slug(self.alpha_identity)}', body)
 
-    def test_moderation_attribution_falls_back_to_identity_route_when_username_is_ambiguous(self) -> None:
+    def test_moderation_attribution_prefers_username_route_for_canonical_root(self) -> None:
         self.write_record(
             "records/profile-updates/profile-update-alpha.txt",
             f"""
@@ -413,8 +415,7 @@ process.stdout.write(JSON.stringify({{
         status, _, body = self.get("/activity/", "view=moderation")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn(f'/profiles/{identity_slug(self.alpha_identity)}', body)
-        self.assertNotIn('/user/ilya', body)
+        self.assertIn('/user/ilya', body)
 
 
 if __name__ == "__main__":

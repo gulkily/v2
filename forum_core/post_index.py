@@ -941,3 +941,37 @@ def load_indexed_username_roots(repo_root: Path) -> dict[str, IndexedUsernameRoo
         }
     finally:
         index.connection.close()
+
+
+def load_indexed_username_claims(
+    repo_root: Path,
+    *,
+    username_token: str | None = None,
+) -> tuple[IndexedUsernameClaimRow, ...]:
+    index = ensure_post_index_current(repo_root)
+    try:
+        sql = """
+            SELECT canonical_identity_id, source_identity_id, display_name, username_token,
+                   claim_record_id, claim_commit_id, claim_commit_rank
+            FROM current_username_claims
+        """
+        parameters: list[str] = []
+        if username_token is not None:
+            sql += " WHERE username_token = ?"
+            parameters.append(username_token)
+        sql += " ORDER BY username_token, claim_commit_rank, claim_record_id, canonical_identity_id"
+        rows = index.connection.execute(sql, parameters).fetchall()
+        return tuple(
+            IndexedUsernameClaimRow(
+                canonical_identity_id=row["canonical_identity_id"],
+                source_identity_id=row["source_identity_id"],
+                display_name=row["display_name"],
+                username_token=row["username_token"],
+                claim_record_id=row["claim_record_id"],
+                claim_commit_id=row["claim_commit_id"],
+                claim_commit_rank=row["claim_commit_rank"],
+            )
+            for row in rows
+        )
+    finally:
+        index.connection.close()

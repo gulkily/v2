@@ -23,7 +23,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: tables for active merge edges, revoked merge edges or their effective state, current username claims, canonical root resolution, and cache refresh hooks on relevant writes.
   - Why first: later loops need one deterministic place to read current username-root and graph state cheaply.
 
-- [ ] Loop 2: Canonical username root read model
+- [x] Loop 2: Canonical username root read model
   - Goal: make the canonical username-root rule explicit in the read layer.
   - Includes: earliest username-claim by git commit chronology, root-set resolution, and deterministic `other users with this name` derivation.
   - Why next: this locks the core semantics before adding more UI behavior.

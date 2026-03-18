@@ -64,6 +64,13 @@ class IdentityContext:
         )
 
 
+@dataclass(frozen=True)
+class UsernameRootResolution:
+    username_token: str
+    canonical_identity_id: str
+    other_canonical_identity_ids: tuple[str, ...]
+
+
 def identity_records_dir(repo_root: Path) -> Path:
     return repo_root / "records" / "identity"
 
@@ -253,29 +260,41 @@ def resolve_profile_summary_by_username(
     username: str,
     identity_context: IdentityContext | None = None,
 ) -> ProfileSummary | None:
-    context = identity_context or load_identity_context(repo_root=repo_root, posts=posts)
     requested_token = username_route_token(username)
     if not requested_token:
         return None
-
-    matching_identity_ids: list[str] = []
-    for canonical_identity_id, member_identity_ids in context.resolution.members_by_canonical_identity_id.items():
-        resolved_display_name = resolve_current_display_name(
-            member_identity_ids=member_identity_ids,
-            profile_updates=list(context.profile_update_records),
-        )
-        if resolved_display_name is None:
-            continue
-        if username_route_token(resolved_display_name.display_name) != requested_token:
-            continue
-        matching_identity_ids.append(canonical_identity_id)
-
-    if len(matching_identity_ids) != 1:
+    root_resolution = resolve_username_root(repo_root=repo_root, username=username)
+    if root_resolution is None:
         return None
-
+    context = identity_context or load_identity_context(repo_root=repo_root, posts=posts)
     return find_profile_summary(
         repo_root=repo_root,
         posts=posts,
-        identity_id=matching_identity_ids[0],
+        identity_id=root_resolution.canonical_identity_id,
         identity_context=context,
+    )
+
+
+def resolve_username_root(*, repo_root: Path, username: str) -> UsernameRootResolution | None:
+    from forum_core.post_index import load_indexed_username_claims, load_indexed_username_roots
+
+    requested_token = username_route_token(username)
+    if not requested_token:
+        return None
+    roots = load_indexed_username_roots(repo_root)
+    root = roots.get(requested_token)
+    if root is None:
+        return None
+    claims = load_indexed_username_claims(repo_root, username_token=requested_token)
+    other_canonical_identity_ids = tuple(
+        sorted(
+            claim.canonical_identity_id
+            for claim in claims
+            if claim.canonical_identity_id != root.canonical_identity_id
+        )
+    )
+    return UsernameRootResolution(
+        username_token=requested_token,
+        canonical_identity_id=root.canonical_identity_id,
+        other_canonical_identity_ids=other_canonical_identity_ids,
     )
