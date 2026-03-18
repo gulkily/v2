@@ -716,6 +716,7 @@ async function main() {
   const signatureOutput = $("signature-output");
   const responseOutput = $("response-output");
   const signSubmitButton = $("sign-submit-button");
+  const clearPendingSubmissionButton = $("clear-pending-submission-button");
   const normalizationActions = $("compose-normalization-actions");
   const removeUnsupportedButton = $("remove-unsupported-button");
   const draftContext = composeDraftContext(commandName, defaults);
@@ -772,6 +773,19 @@ async function main() {
     setButtonLabel(signSubmitButton, defaultSubmitLabel());
   }
 
+  function idleDraftStatus() {
+    if (draftContext && canStoreDraft) {
+      return "Drafts are saved locally in this browser.";
+    }
+    return "No saved submission is currently stored in this browser.";
+  }
+
+  function setPendingSubmissionButtonVisible(visible) {
+    if (clearPendingSubmissionButton) {
+      clearPendingSubmissionButton.hidden = !visible;
+    }
+  }
+
   applySubmitLabel("default");
 
   if (draftContext) {
@@ -791,11 +805,14 @@ async function main() {
         setDraftStatus("Drafts are saved locally in this browser.");
       }
     }
+  } else {
+    setDraftStatus(idleDraftStatus());
   }
   if (canStorePendingSubmission) {
     const pendingSubmission = loadPendingSubmission(pendingSubmissionKey);
     if (pendingSubmission) {
       setDraftStatus(formatPendingSubmissionStatus(pendingSubmission.savedAt));
+      setPendingSubmissionButtonVisible(true);
     }
   }
 
@@ -809,7 +826,7 @@ async function main() {
         const fields = captureDraftFields(state, draftContext);
         if (!hasDraftContent(fields)) {
           clearDraft(draftContext.storageKey);
-          setDraftStatus("Drafts are saved locally in this browser.");
+          setDraftStatus(idleDraftStatus());
           return;
         }
         const savedDraft = saveDraft(draftContext.storageKey, fields);
@@ -823,6 +840,16 @@ async function main() {
         setDraftStatus("Local draft saving is unavailable in this browser. Compose will still work.");
       }
     }, DRAFT_SAVE_DELAY_MS);
+  }
+
+  if (clearPendingSubmissionButton) {
+    clearPendingSubmissionButton.addEventListener("click", () => {
+      clearPendingSubmission(pendingSubmissionKey);
+      setPendingSubmissionButtonVisible(false);
+      responseOutput.value = "";
+      setDraftStatus(idleDraftStatus());
+      setStatus("submit-status", "Cleared the saved local submission snapshot.");
+    });
   }
 
   function applyKeys(keys) {
@@ -1041,15 +1068,16 @@ async function main() {
         const keys = await resolveSubmitKeys();
         payloadOutput.value = built.payload;
         if (canStorePendingSubmission) {
-          savePendingSubmission(pendingSubmissionKey, {
-            commandName,
-            endpoint,
-            payload: built.payload,
-            recordId: built.recordId || built.postId || "",
-            savedAt: new Date().toISOString(),
-            attemptedSignedSubmit: true,
-          });
-        }
+            savePendingSubmission(pendingSubmissionKey, {
+              commandName,
+              endpoint,
+              payload: built.payload,
+              recordId: built.recordId || built.postId || "",
+              savedAt: new Date().toISOString(),
+              attemptedSignedSubmit: true,
+            });
+            setPendingSubmissionButtonVisible(true);
+          }
         setStatus("submit-status", "Signing payload...");
         signature = await signPayload(built.payload, keys.privateKey);
         publicKey = keys.publicKey;
@@ -1090,6 +1118,7 @@ async function main() {
               attemptedSignedSubmit: true,
             });
             setDraftStatus("Saved the current submission locally until the server confirms it.");
+            setPendingSubmissionButtonVisible(true);
           }
           setStatus("submit-status", "Signing payload...");
           signature = await signPayload(built.payload, keys.privateKey);
@@ -1113,6 +1142,7 @@ async function main() {
               attemptedSignedSubmit: false,
             });
             setDraftStatus("Saved the current submission locally until the server confirms it.");
+            setPendingSubmissionButtonVisible(true);
           }
           signatureOutput.value = "";
           setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
@@ -1147,6 +1177,7 @@ async function main() {
         }
         if (canStorePendingSubmission) {
           clearPendingSubmission(pendingSubmissionKey);
+          setPendingSubmissionButtonVisible(false);
         }
         setStatus("submit-status", usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
         const target = redirectTarget(commandName, recordId, defaults);

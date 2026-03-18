@@ -61,6 +61,7 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn(">Submit post<", body)
         self.assertNotIn("Sign and submit", body)
         self.assertIn('id="draft-status"', body)
+        self.assertIn('id="clear-pending-submission-button"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
         self.assertIn('id="public-key-output" class="technical-textarea key-display"', body)
