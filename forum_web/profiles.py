@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from forum_core.merge_requests import (
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
     ResolvedDisplayName,
+    profile_update_sort_key,
     profile_update_records_dir,
     load_profile_update_records,
     resolve_current_display_name,
@@ -211,3 +213,69 @@ def resolve_identity_display_name(
     if resolved_display_name is None:
         return fallback_display_name
     return resolved_display_name.display_name
+
+
+def username_route_token(display_name: str) -> str:
+    token = re.sub(r"[^a-z0-9]+", "-", display_name.strip().lower()).strip("-")
+    return token
+
+
+def profile_usernames(
+    *,
+    identity_context: IdentityContext,
+    identity_id: str,
+) -> tuple[str, ...]:
+    canonical_identity_id = identity_context.canonical_identity_id(identity_id)
+    if canonical_identity_id is None:
+        return ()
+    member_identity_ids = identity_context.member_identity_ids(canonical_identity_id) or (canonical_identity_id,)
+    member_identity_id_set = frozenset(member_identity_ids)
+    usernames: list[str] = []
+    current_display_name = resolve_current_display_name(
+        member_identity_ids=member_identity_ids,
+        profile_updates=list(identity_context.profile_update_records),
+    )
+    if current_display_name is not None:
+        usernames.append(current_display_name.display_name)
+    for record in sorted(identity_context.profile_update_records, key=profile_update_sort_key, reverse=True):
+        if record.source_identity_id not in member_identity_id_set:
+            continue
+        if record.display_name in usernames:
+            continue
+        usernames.append(record.display_name)
+    return tuple(usernames)
+
+
+def resolve_profile_summary_by_username(
+    *,
+    repo_root: Path,
+    posts: list[Post],
+    username: str,
+    identity_context: IdentityContext | None = None,
+) -> ProfileSummary | None:
+    context = identity_context or load_identity_context(repo_root=repo_root, posts=posts)
+    requested_token = username_route_token(username)
+    if not requested_token:
+        return None
+
+    matching_identity_ids: list[str] = []
+    for canonical_identity_id, member_identity_ids in context.resolution.members_by_canonical_identity_id.items():
+        resolved_display_name = resolve_current_display_name(
+            member_identity_ids=member_identity_ids,
+            profile_updates=list(context.profile_update_records),
+        )
+        if resolved_display_name is None:
+            continue
+        if username_route_token(resolved_display_name.display_name) != requested_token:
+            continue
+        matching_identity_ids.append(canonical_identity_id)
+
+    if len(matching_identity_ids) != 1:
+        return None
+
+    return find_profile_summary(
+        repo_root=repo_root,
+        posts=posts,
+        identity_id=matching_identity_ids[0],
+        identity_context=context,
+    )
