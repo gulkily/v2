@@ -160,18 +160,31 @@ process.stdout.write(signature);
             body_text="Hello from the disabled path.",
         )
 
-        status, _, body = self.request(
-            "/api/create_thread",
-            method="POST",
-            body=self.create_thread_request_body(payload_text),
-            extra_env={"FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
-        )
+        with self.assertLogs("forum_cgi.service", level="INFO") as captured_logs:
+            status, _, body = self.request(
+                "/api/create_thread",
+                method="POST",
+                body=self.create_thread_request_body(payload_text),
+                extra_env={"FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
+            )
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: thread-disabled-001", body)
         self.assertIn("Auto-Reply-Status: disabled", body)
         self.assertNotIn("Auto-Reply-Record-ID:", body)
         self.assertTrue((self.repo_root / "records" / "posts" / "thread-disabled-001.txt").exists())
+        self.assertEqual(len(captured_logs.output), 1)
+        timing_message = captured_logs.output[0]
+        self.assertIn("create_thread timings for thread-disabled-001:", timing_message)
+        self.assertIn("parse_and_validate_thread=", timing_message)
+        self.assertIn("verify_detached_signature=", timing_message)
+        self.assertIn("git_add=", timing_message)
+        self.assertIn("git_commit=", timing_message)
+        self.assertIn("git_rev_parse=", timing_message)
+        self.assertIn("post_index_load_posts=", timing_message)
+        self.assertIn("post_index_commit_timestamps=", timing_message)
+        self.assertIn("post_index_refresh=", timing_message)
+        self.assertIn("auto_reply=", timing_message)
 
     def test_api_create_thread_creates_auto_reply_when_feature_flag_is_on(self) -> None:
         payload_text = self.build_thread_payload(

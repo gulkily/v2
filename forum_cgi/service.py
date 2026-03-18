@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,8 +63,16 @@ def submit_create_thread(
     public_key_text: str | None = None,
     require_signature: bool = False,
 ) -> SubmissionResult:
+    timing_measurements: list[tuple[str, float]] = []
+
+    def record_timing(phase_name: str, duration_ms: float) -> None:
+        timing_measurements.append((phase_name, duration_ms))
+
+    started_at = time.perf_counter()
     post = parse_payload(ensure_ascii_text(payload_text, field_name="payload"))
     validate_create_thread(post)
+    record_timing("parse_and_validate_thread", (time.perf_counter() - started_at) * 1000.0)
+    started_at = time.perf_counter()
     result = _submit_post(
         "create_thread",
         post=post,
@@ -73,8 +82,18 @@ def submit_create_thread(
         signature_text=signature_text,
         public_key_text=public_key_text,
         require_signature=require_signature,
+        timing_callback=record_timing,
     )
-    return maybe_create_thread_auto_reply(post=post, repo_root=repo_root, dry_run=dry_run, result=result)
+    record_timing("submit_post", (time.perf_counter() - started_at) * 1000.0)
+    started_at = time.perf_counter()
+    final_result = maybe_create_thread_auto_reply(post=post, repo_root=repo_root, dry_run=dry_run, result=result)
+    record_timing("auto_reply", (time.perf_counter() - started_at) * 1000.0)
+    logger.info(
+        "create_thread timings for %s: %s",
+        post.post_id,
+        ", ".join(f"{phase_name}={duration_ms:.2f}ms" for phase_name, duration_ms in timing_measurements),
+    )
+    return final_result
 
 
 def submit_create_reply(
@@ -110,6 +129,7 @@ def _submit_post(
     signature_text: str | None,
     public_key_text: str | None,
     require_signature: bool,
+    timing_callback=None,
 ) -> SubmissionResult:
     signer_fingerprint = None
     signature_path = None
@@ -124,11 +144,14 @@ def _submit_post(
     if signature_text is not None or public_key_text is not None:
         if not signature_text or not public_key_text:
             raise PostingError("bad_request", "signature and public_key must be provided together")
+        started_at = time.perf_counter()
         signer_fingerprint = verify_detached_signature(
             payload_text=payload_text,
             signature_text=signature_text,
             public_key_text=public_key_text,
         )
+        if timing_callback is not None:
+            timing_callback("verify_detached_signature", (time.perf_counter() - started_at) * 1000.0)
         identity_id = build_identity_id(signer_fingerprint)
         signature_path = str(resolve_signature_path(repo_root, post.post_id).relative_to(repo_root))
         public_key_path = str(resolve_canonical_public_key_path(repo_root, signer_fingerprint).relative_to(repo_root))
@@ -148,11 +171,14 @@ def _submit_post(
             signer_fingerprint=signer_fingerprint,
         ):
             try:
+                started_at = time.perf_counter()
                 verify_first_post_pow_stamp(
                     payload_text=payload_text,
                     signer_fingerprint=signer_fingerprint,
                     difficulty=first_post_pow_difficulty(),
                 )
+                if timing_callback is not None:
+                    timing_callback("verify_first_post_pow", (time.perf_counter() - started_at) * 1000.0)
             except ValueError as exc:
                 raise PostingError("bad_request", str(exc)) from exc
 
@@ -189,6 +215,7 @@ def _submit_post(
             else None
         ),
         identity_bootstrap_text=identity_bootstrap_text,
+        timing_callback=timing_callback,
     )
     return SubmissionResult(
         command_name=command_name,

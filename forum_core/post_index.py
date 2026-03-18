@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import sqlite3
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from forum_core.identity import normalize_fingerprint, short_identity_label
 from forum_core.merge_requests import derive_approved_merge_links
@@ -17,6 +19,7 @@ from forum_web.profiles import (
 
 
 POST_INDEX_SCHEMA_VERSION = 3
+PhaseTimingCallback = Callable[[str, float], None]
 
 
 @dataclass(frozen=True)
@@ -292,6 +295,34 @@ def post_commit_timestamps(repo_root: Path) -> dict[str, PostCommitTimestamps]:
     timestamps: dict[str, PostCommitTimestamps] = {}
     for path in sorted(records_posts_dir(repo_root).glob("*.txt")):
         relative_path = str(path.relative_to(repo_root))
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "log", "--follow", "--format=%cI", "--", relative_path],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        commit_times = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if not commit_times:
+            timestamps[path.stem] = PostCommitTimestamps(created_at=None, updated_at=None)
+            continue
+        timestamps[path.stem] = PostCommitTimestamps(
+            created_at=commit_times[-1],
+            updated_at=commit_times[0],
+        )
+    return timestamps
+
+
+def post_commit_timestamps_for_paths(
+    repo_root: Path,
+    *,
+    relative_paths: tuple[str, ...],
+) -> dict[str, PostCommitTimestamps]:
+    timestamps: dict[str, PostCommitTimestamps] = {}
+    for relative_path in sorted(relative_paths):
+        path = repo_root / relative_path
+        if path.parent != records_posts_dir(repo_root) or path.suffix != ".txt":
+            continue
         result = subprocess.run(
             ["git", "-C", str(repo_root), "log", "--follow", "--format=%cI", "--", relative_path],
             check=False,
@@ -724,12 +755,28 @@ def upsert_indexed_post(
         )
 
 
-def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> IndexBuildResult:
+def rebuild_post_index(
+    repo_root: Path,
+    index: PostIndex | None = None,
+    *,
+    timing_callback: PhaseTimingCallback | None = None,
+) -> IndexBuildResult:
+    def record_timing(phase_name: str, started_at: float) -> None:
+        if timing_callback is not None:
+            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+
     owned_index = index is None
     active_index = index or open_post_index(repo_root)
+    started_at = time.perf_counter()
     posts = load_posts(records_posts_dir(repo_root))
+    record_timing("post_index_load_posts", started_at)
+    started_at = time.perf_counter()
     identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+    record_timing("post_index_load_identity_context", started_at)
+    started_at = time.perf_counter()
     timestamps_by_post_id = post_commit_timestamps(repo_root)
+    record_timing("post_index_commit_timestamps", started_at)
+    started_at = time.perf_counter()
     commit_order = repo_commit_order(repo_root)
     clear_post_index(active_index.connection)
     for post in posts:
@@ -740,6 +787,8 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
             timestamps=timestamps_by_post_id.get(post.post_id, PostCommitTimestamps(created_at=None, updated_at=None)),
             identity_context=identity_context,
         )
+    record_timing("post_index_upsert_all_posts", started_at)
+    started_at = time.perf_counter()
     upsert_identity_members(active_index.connection, identity_context=identity_context)
     upsert_active_merge_edges(active_index.connection, identity_context=identity_context)
     claim_rows = current_username_claim_rows(
@@ -753,7 +802,9 @@ def rebuild_post_index(repo_root: Path, index: PostIndex | None = None) -> Index
     set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
     set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
     set_index_metadata(active_index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+    started_at = time.perf_counter()
     active_index.connection.commit()
+    record_timing("post_index_commit_sqlite", started_at)
     if owned_index:
         active_index.connection.close()
     return IndexBuildResult(post_count=len(posts), indexed_head=indexed_head)
@@ -783,10 +834,15 @@ def refresh_post_index_after_commit(
     *,
     commit_id: str,
     touched_paths: tuple[str, ...],
+    timing_callback: PhaseTimingCallback | None = None,
 ) -> None:
+    def record_timing(phase_name: str, started_at: float) -> None:
+        if timing_callback is not None:
+            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+
     db_exists = post_index_path(repo_root).exists()
     if not db_exists:
-        rebuild_post_index(repo_root)
+        rebuild_post_index(repo_root, timing_callback=timing_callback)
         return
 
     index = open_post_index(repo_root)
@@ -797,7 +853,7 @@ def refresh_post_index_after_commit(
             or touched_path.startswith("records/identity-links/")
             for touched_path in touched_paths
         ):
-            rebuild_post_index(repo_root, index=index)
+            rebuild_post_index(repo_root, index=index, timing_callback=timing_callback)
             set_index_metadata(index.connection, "indexed_head", commit_id)
             set_index_metadata(
                 index.connection,
@@ -807,10 +863,17 @@ def refresh_post_index_after_commit(
             set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
             index.connection.commit()
             return
+        started_at = time.perf_counter()
         posts = load_posts(records_posts_dir(repo_root))
+        record_timing("post_index_load_posts", started_at)
+        started_at = time.perf_counter()
         identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+        record_timing("post_index_load_identity_context", started_at)
         posts_by_path = {candidate.path: candidate for candidate in posts}
+        started_at = time.perf_counter()
         timestamps_by_post_id = post_commit_timestamps(repo_root)
+        record_timing("post_index_commit_timestamps", started_at)
+        started_at = time.perf_counter()
         for touched_path in touched_paths:
             path = repo_root / touched_path
             if path.parent != records_posts_dir(repo_root) or path.suffix != ".txt":
@@ -831,6 +894,7 @@ def refresh_post_index_after_commit(
                 timestamps=timestamps,
                 identity_context=identity_context,
             )
+        record_timing("post_index_upsert_touched_posts", started_at)
         set_index_metadata(index.connection, "indexed_head", commit_id)
         set_index_metadata(
             index.connection,
@@ -838,7 +902,9 @@ def refresh_post_index_after_commit(
             str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
         )
         set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+        started_at = time.perf_counter()
         index.connection.commit()
+        record_timing("post_index_commit_sqlite", started_at)
     finally:
         index.connection.close()
 

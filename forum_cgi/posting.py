@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
@@ -37,6 +39,9 @@ class StoredArtifacts:
     signature_path: str | None = None
     public_key_path: str | None = None
     identity_bootstrap_path: str | None = None
+
+
+PhaseTimingCallback = Callable[[str, float], None]
 
 
 def get_repo_root() -> Path:
@@ -175,6 +180,7 @@ def store_post(
     public_key_text: str | None = None,
     identity_bootstrap_path: Path | None = None,
     identity_bootstrap_text: str | None = None,
+    timing_callback: PhaseTimingCallback | None = None,
 ) -> tuple[str, StoredArtifacts]:
     ensure_post_id_available(post, repo_root)
     post_path = write_post_file(post, repo_root, payload_text)
@@ -208,6 +214,7 @@ def store_post(
         repo_root,
         paths,
         message=build_commit_message(command_name, post.post_id),
+        timing_callback=timing_callback,
     )
     return commit_id, StoredArtifacts(
         post_path=str(post_path.relative_to(repo_root)),
@@ -221,7 +228,17 @@ def store_post(
     )
 
 
-def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
+def commit_post(
+    repo_root: Path,
+    paths: list[Path],
+    *,
+    message: str,
+    timing_callback: PhaseTimingCallback | None = None,
+) -> str:
+    def record_timing(phase_name: str, started_at: float) -> None:
+        if timing_callback is not None:
+            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+
     env = os.environ.copy()
     env.setdefault("GIT_AUTHOR_NAME", "Forum CGI")
     env.setdefault("GIT_AUTHOR_EMAIL", "forum-cgi@example.invalid")
@@ -229,11 +246,14 @@ def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
     env.setdefault("GIT_COMMITTER_EMAIL", env["GIT_AUTHOR_EMAIL"])
 
     relative_paths = [str(path.relative_to(repo_root)) for path in paths]
+    started_at = time.perf_counter()
     subprocess.run(
         ["git", "-C", str(repo_root), "add", *relative_paths],
         check=True,
         env=env,
     )
+    record_timing("git_add", started_at)
+    started_at = time.perf_counter()
     subprocess.run(
         [
             "git",
@@ -253,6 +273,8 @@ def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
         stderr=subprocess.PIPE,
         text=True,
     )
+    record_timing("git_commit", started_at)
+    started_at = time.perf_counter()
     commit_id = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
         check=True,
@@ -261,9 +283,13 @@ def commit_post(repo_root: Path, paths: list[Path], *, message: str) -> str:
         stderr=subprocess.PIPE,
         text=True,
     ).stdout.strip()
+    record_timing("git_rev_parse", started_at)
+    started_at = time.perf_counter()
     refresh_post_index_after_commit(
         repo_root,
         commit_id=commit_id,
         touched_paths=tuple(relative_paths),
+        timing_callback=timing_callback,
     )
+    record_timing("post_index_refresh", started_at)
     return commit_id
