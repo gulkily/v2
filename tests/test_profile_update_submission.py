@@ -11,6 +11,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text, identity_slug
+from forum_core.post_index import ensure_post_index_current, load_indexed_username_roots
 from forum_core.public_keys import resolve_canonical_public_key_path
 from forum_web.web import application
 
@@ -165,13 +166,24 @@ process.stdout.write(signature);
             }
         ).encode("utf-8")
 
-        status, _, body = self.request("/api/update_profile", method="POST", body=request_body)
+        with self.assertLogs("forum_cgi.profile_updates", level="INFO") as captured_logs:
+            status, _, body = self.request("/api/update_profile", method="POST", body=request_body)
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: profile-update-test-001", body)
         self.assertIn("Display-Name: BrightName", body)
         self.assertIn("Commit-ID:", body)
         self.assertTrue((self.repo_root / "records/profile-updates/profile-update-test-001.txt").exists())
+        self.assertEqual(len(captured_logs.output), 1)
+        timing_message = captured_logs.output[0]
+        self.assertIn("update_profile timings for profile-update-test-001:", timing_message)
+        self.assertIn("parse_profile_update=", timing_message)
+        self.assertIn("verify_detached_signature=", timing_message)
+        self.assertIn("validate_profile_update=", timing_message)
+        self.assertIn("git_add=", timing_message)
+        self.assertIn("git_commit=", timing_message)
+        self.assertIn("git_rev_parse=", timing_message)
+        self.assertIn("post_index_refresh=", timing_message)
 
         profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
 
@@ -242,6 +254,39 @@ process.stdout.write(signature);
         self.assertEqual(profile_status, "200 OK")
         self.assertNotIn("<script>alert()</script>", profile_body)
         self.assertIn("&lt;script&gt;alert()&lt;/script&gt;", profile_body)
+
+    def test_api_update_profile_refreshes_username_index_without_full_rebuild(self) -> None:
+        ensure_post_index_current(self.repo_root).connection.close()
+        payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-004
+            Action: set_display_name
+            Source-Identity-ID: {self.identity_id}
+            Timestamp: 2026-03-14T12:03:00Z
+
+            BrightName
+            """
+        ).lstrip()
+        signature_text = self.sign_payload(payload_text)
+        request_body = json.dumps(
+            {
+                "payload": payload_text,
+                "signature": signature_text,
+                "public_key": self.public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        with mock.patch(
+            "forum_core.post_index.rebuild_post_index",
+            side_effect=AssertionError("full rebuild should not run for profile update refresh when index exists"),
+        ):
+            status, _, body = self.request("/api/update_profile", method="POST", body=request_body)
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Record-ID: profile-update-test-004", body)
+        roots = load_indexed_username_roots(self.repo_root)
+        self.assertEqual(roots["brightname"].claim_record_id, "profile-update-test-004")
 
 
 if __name__ == "__main__":

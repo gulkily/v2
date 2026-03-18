@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,6 +23,8 @@ from forum_cgi.posting import (
 from forum_cgi.signing import verify_detached_signature
 from forum_web.profiles import load_identity_context
 from forum_web.repository import load_posts
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -104,6 +108,7 @@ def store_profile_update_record(
     *,
     signature_text: str,
     public_key_text: str,
+    timing_callback=None,
 ) -> tuple[str, str, str, str]:
     records_path = profile_update_records_dir(repo_root)
     records_path.mkdir(parents=True, exist_ok=True)
@@ -124,6 +129,7 @@ def store_profile_update_record(
         repo_root,
         [record_path, signature_path, *([public_key_path] if stored_public_key.created else [])],
         message=build_commit_message("update_profile", record.record_id),
+        timing_callback=timing_callback,
     )
     return (
         commit_id,
@@ -142,22 +148,33 @@ def submit_profile_update(
     public_key_text: str | None = None,
     require_signature: bool = True,
 ) -> ProfileUpdateSubmissionResult:
+    timing_measurements: list[tuple[str, float]] = []
+
+    def record_timing(phase_name: str, duration_ms: float) -> None:
+        timing_measurements.append((phase_name, duration_ms))
+
+    started_at = time.perf_counter()
     payload_text = ensure_ascii_text(payload_text, field_name="payload")
     record = parse_profile_update_payload(payload_text)
+    record_timing("parse_profile_update", (time.perf_counter() - started_at) * 1000.0)
 
     if require_signature and (signature_text is None or public_key_text is None):
         raise PostingError("bad_request", "signature and public_key are required")
     if not signature_text or not public_key_text:
         raise PostingError("bad_request", "signature and public_key must be provided together")
 
+    started_at = time.perf_counter()
     signer_fingerprint = verify_detached_signature(
         payload_text=payload_text,
         signature_text=signature_text,
         public_key_text=public_key_text,
     )
+    record_timing("verify_detached_signature", (time.perf_counter() - started_at) * 1000.0)
     signer_identity_id = build_identity_id(signer_fingerprint)
 
+    started_at = time.perf_counter()
     validate_profile_update_record(record, repo_root, signer_identity_id=signer_identity_id)
+    record_timing("validate_profile_update", (time.perf_counter() - started_at) * 1000.0)
     ensure_profile_update_record_id_available(record, repo_root)
 
     signature_path = str(
@@ -189,6 +206,12 @@ def submit_profile_update(
         payload_text,
         signature_text=signature_text,
         public_key_text=public_key_text,
+        timing_callback=record_timing,
+    )
+    logger.info(
+        "update_profile timings for %s: %s",
+        record.record_id,
+        ", ".join(f"{phase_name}={duration_ms:.2f}ms" for phase_name, duration_ms in timing_measurements),
     )
     return ProfileUpdateSubmissionResult(
         command_name="update_profile",

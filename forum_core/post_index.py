@@ -848,8 +848,7 @@ def refresh_post_index_after_commit(
     index = open_post_index(repo_root)
     try:
         if any(
-            touched_path.startswith("records/profile-updates/")
-            or touched_path.startswith("records/identity/")
+            touched_path.startswith("records/identity/")
             or touched_path.startswith("records/identity-links/")
             for touched_path in touched_paths
         ):
@@ -862,6 +861,23 @@ def refresh_post_index_after_commit(
             )
             set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
             index.connection.commit()
+            return
+        if any(touched_path.startswith("records/profile-updates/") for touched_path in touched_paths):
+            refresh_profile_update_metadata_after_commit(
+                repo_root,
+                index=index,
+                timing_callback=timing_callback,
+            )
+            set_index_metadata(index.connection, "indexed_head", commit_id)
+            set_index_metadata(
+                index.connection,
+                "indexed_post_count",
+                str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
+            )
+            set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+            started_at = time.perf_counter()
+            index.connection.commit()
+            record_timing("post_index_commit_sqlite", started_at)
             return
         started_at = time.perf_counter()
         posts = load_posts(records_posts_dir(repo_root))
@@ -910,6 +926,43 @@ def refresh_post_index_after_commit(
         record_timing("post_index_commit_sqlite", started_at)
     finally:
         index.connection.close()
+
+
+def refresh_profile_update_metadata_after_commit(
+    repo_root: Path,
+    *,
+    index: PostIndex,
+    timing_callback: PhaseTimingCallback | None = None,
+) -> None:
+    def record_timing(phase_name: str, started_at: float) -> None:
+        if timing_callback is not None:
+            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+
+    started_at = time.perf_counter()
+    posts = load_posts(records_posts_dir(repo_root))
+    record_timing("post_index_load_posts", started_at)
+    started_at = time.perf_counter()
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+    record_timing("post_index_load_identity_context", started_at)
+    started_at = time.perf_counter()
+    index.connection.execute("DELETE FROM authors")
+    for post in posts:
+        author = author_row_for_post(post, identity_context=identity_context)
+        if author is not None:
+            upsert_indexed_author(index.connection, author=author)
+    record_timing("post_index_refresh_authors", started_at)
+    started_at = time.perf_counter()
+    commit_order = repo_commit_order(repo_root)
+    claim_rows = current_username_claim_rows(
+        repo_root=repo_root,
+        identity_context=identity_context,
+        commit_order=commit_order,
+    )
+    index.connection.execute("DELETE FROM current_username_claims")
+    index.connection.execute("DELETE FROM username_roots")
+    upsert_current_username_claims(index.connection, claim_rows=claim_rows)
+    upsert_username_roots(index.connection, claim_rows=claim_rows)
+    record_timing("post_index_refresh_profile_claims", started_at)
 
 
 def load_indexed_root_posts(repo_root: Path, *, board_tag: str | None = None) -> dict[str, IndexedPostRow]:
