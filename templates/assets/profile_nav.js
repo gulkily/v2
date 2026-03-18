@@ -24,6 +24,26 @@ export async function profileHrefFromPublicKey(armoredPublicKey) {
   return profileHrefFromIdentityId(identityId);
 }
 
+export function mergeNotificationCount(summaryText) {
+  const text = typeof summaryText === "string" ? summaryText : "";
+  const historicalMatches = Number((text.match(/^Historical-Match-Count:\s+(\d+)$/m) || [])[1] || 0);
+  const incomingRequests = Number((text.match(/^Incoming-Request-Count:\s+(\d+)$/m) || [])[1] || 0);
+  return historicalMatches + incomingRequests;
+}
+
+export async function mergeNotificationCountForIdentity(identityId, fetchImpl = globalThis.fetch) {
+  const trimmed = typeof identityId === "string" ? identityId.trim() : "";
+  if (!trimmed || typeof fetchImpl !== "function") {
+    return 0;
+  }
+  const response = await fetchImpl(`/api/get_merge_management?identity_id=${encodeURIComponent(trimmed)}`);
+  if (!response || !response.ok) {
+    return 0;
+  }
+  const bodyText = await response.text();
+  return mergeNotificationCount(bodyText);
+}
+
 export function storedPublicKey(storage = globalThis.localStorage) {
   if (!storage || typeof storage.getItem !== "function") {
     return "";
@@ -31,7 +51,11 @@ export function storedPublicKey(storage = globalThis.localStorage) {
   return storage.getItem(STORAGE_PUBLIC) || "";
 }
 
-export async function enhanceProfileNav(doc = globalThis.document, storage = globalThis.localStorage) {
+export async function enhanceProfileNav(
+  doc = globalThis.document,
+  storage = globalThis.localStorage,
+  fetchImpl = globalThis.fetch,
+) {
   if (!doc || typeof doc.querySelector !== "function") {
     return;
   }
@@ -44,11 +68,14 @@ export async function enhanceProfileNav(doc = globalThis.document, storage = glo
     return;
   }
   try {
-    const href = await profileHrefFromPublicKey(publicKey);
+    const identityId = await identityIdFromPublicKey(publicKey);
+    const href = profileHrefFromIdentityId(identityId);
     if (!href) {
       return;
     }
-    navLink.setAttribute("href", href);
+    const notificationCount = await mergeNotificationCountForIdentity(identityId, fetchImpl);
+    navLink.setAttribute("href", notificationCount > 0 ? `${href}/merge` : href);
+    navLink.textContent = notificationCount > 0 ? `My profile (${notificationCount})` : "My profile";
     navLink.hidden = false;
   } catch (_error) {
     navLink.hidden = true;

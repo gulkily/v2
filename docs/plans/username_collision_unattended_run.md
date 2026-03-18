@@ -99,7 +99,7 @@ Uses:
   - Notes:
     - username overlap alone is sufficient evidence for the first version
 
-- [ ] Loop 5: `My profile` notification badge and merge queue
+- [x] Loop 5: `My profile` notification badge and merge queue
   - Goal: surface account and merge actions without building a full inbox.
   - Smallest intended visible result: the existing nav shows pending merge and username-related actions that need attention.
   - Controlling docs:
@@ -227,7 +227,7 @@ Use one short entry per completed loop.
 - Visible result:
   - a user who lands on their non-root duplicate-name profile can request a merge with the canonical root directly from that page instead of hunting through merge management
 - Commits:
-  - pending
+  - `3cf724c` `username-collision loop 4: suggest direct self-merges`
 - Tests or verification:
   - `python -m unittest tests.test_username_profile_route`
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
@@ -236,6 +236,26 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 4 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 5
+
+- Status: completed
+- What landed:
+  - extended the existing `My profile` nav asset to fetch merge-management counts for the stored identity
+  - made the nav link show `My profile (N)` when pending username or merge attention exists
+  - pointed the nav link at merge management when those notifications are present
+  - added focused asset tests for count parsing and merge-page targeting
+- Visible result:
+  - the shared nav now surfaces username and merge attention directly on `My profile` without adding a full inbox
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_profile_nav_asset`
+  - result: `Ran 3 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 5 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -250,10 +270,11 @@ Leave empty if none.
   - Loop 2
   - Loop 3
   - Loop 4
+  - Loop 5
 - Deferred loops:
-  - Loops 5-10
+  - Loops 6-10
 - New unresolved questions:
-  - none from Loops 1-4
+  - none from Loops 1-5
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -262,6 +283,7 @@ Leave empty if none.
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
   - `python -m unittest tests.test_username_profile_route`
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
+  - `python -m unittest tests.test_profile_nav_asset`
 
 ## Handoff Summary
 

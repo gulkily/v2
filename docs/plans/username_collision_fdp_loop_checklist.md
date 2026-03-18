@@ -38,7 +38,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: automatic or near-automatic merge-request issuance when a new identity claims a username already used elsewhere, targeting the canonical root or root set.
   - Why here: once root ownership is clear in the read model, auto-request creation has a stable target.
 
-- [ ] Loop 5: `My profile` notification badge and merge queue
+- [x] Loop 5: `My profile` notification badge and merge queue
   - Goal: surface account and merge actions without building a full inbox.
   - Includes: nav-attached notification state, pending merge approvals, and other username/account actions that need attention.
   - Why here: auto-issued merge requests need a visible place to show up.
