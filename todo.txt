@@ -106,3 +106,5 @@ things that need to be folded into the dev process:
 - when a new thread is created, automatically use llm to assess its 0-1 zen value.
 	- this can be done by sending the thread content to an llm with a prompt that asks it to evaluate the zen value of the thread on a scale of 0 to 1, where 0 is not zen at all and 1 is extremely zen.
 	- the resulting zen value can then be stored in the database and displayed on the thread page, allowing users to quickly assess the zen quality of a thread before reading it.
+
+- add a queue system for async processes
