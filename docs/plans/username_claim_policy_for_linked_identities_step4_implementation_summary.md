@@ -16,3 +16,12 @@
   - `python -m unittest tests.test_profile_update_page`
 - Notes:
   - This stage keeps the browser signing flow and payload shape unchanged; it only clarifies the policy before the user submits.
+
+## Stage 3 - preserve merged-profile winner behavior under the new claim limit
+- Changes:
+  - Extended [test_username_profile_route.py](/home/wsl/v2/tests/test_username_profile_route.py) with an explicit merged-profile regression asserting that two linked identities with one claim each still render the latest visible winning username on the joined profile.
+  - Reused the existing submission regression from Stage 1 as the blocked repeat-claim path, so the feature now proves both “repeat same-key claim fails” and “merged read winner remains deterministic.”
+- Verification:
+  - `python -m unittest tests.test_profile_update_submission tests.test_username_profile_route`
+- Notes:
+  - No production logic changed in this stage; it is focused on locking in the intended policy plus unchanged merged-read behavior.

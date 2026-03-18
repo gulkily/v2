@@ -137,6 +137,15 @@ class UsernameProfileRouteTests(unittest.TestCase):
         self.assertIn("/user/ilya-alt", body)
         self.assertIn(self.alpha, body)
 
+    def test_merged_profile_read_prefers_latest_single_claim_across_linked_identities(self) -> None:
+        status, _, body = self.get("/profiles/openpgp-alpha")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Ilya Alt", body)
+        self.assertIn("Ilya", body)
+        self.assertIn("/user/ilya-alt", body)
+        self.assertNotIn("/user/ilya</a>", body)
+
     def test_old_username_route_does_not_resolve_after_rename(self) -> None:
         status, _, _ = self.get("/user/ilya")
 
