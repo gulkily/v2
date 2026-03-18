@@ -148,6 +148,19 @@ def load_profile_update_records(records_dir: Path) -> list[ProfileUpdateRecord]:
     return sorted(records, key=profile_update_sort_key)
 
 
+def has_visible_profile_update_for_source_identity(
+    *,
+    source_identity_id: str,
+    profile_updates: list[ProfileUpdateRecord],
+    exclude_record_id: str | None = None,
+) -> bool:
+    return any(
+        record.source_identity_id == source_identity_id
+        and record.record_id != exclude_record_id
+        for record in profile_updates
+    )
+
+
 def resolve_current_display_name(
     *,
     member_identity_ids: tuple[str, ...],

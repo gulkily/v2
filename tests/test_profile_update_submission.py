@@ -288,6 +288,60 @@ process.stdout.write(signature);
         roots = load_indexed_username_roots(self.repo_root)
         self.assertEqual(roots["brightname"].claim_record_id, "profile-update-test-004")
 
+    def test_api_update_profile_rejects_second_claim_from_same_identity(self) -> None:
+        first_payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-005
+            Action: set_display_name
+            Source-Identity-ID: {self.identity_id}
+            Timestamp: 2026-03-14T12:04:00Z
+
+            FirstName
+            """
+        ).lstrip()
+        first_request_body = json.dumps(
+            {
+                "payload": first_payload_text,
+                "signature": self.sign_payload(first_payload_text),
+                "public_key": self.public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
+
+        second_payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-006
+            Action: set_display_name
+            Source-Identity-ID: {self.identity_id}
+            Timestamp: 2026-03-14T12:05:00Z
+
+            SecondName
+            """
+        ).lstrip()
+        second_request_body = json.dumps(
+            {
+                "payload": second_payload_text,
+                "signature": self.sign_payload(second_payload_text),
+                "public_key": self.public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
+
+        self.assertEqual(first_status, "200 OK")
+        self.assertEqual(second_status, "403 Forbidden")
+        self.assertIn("Error-Code: forbidden", second_body)
+        self.assertIn("username/display name can only be claimed once per signer identity", second_body)
+
+        profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
+
+        self.assertEqual(profile_status, "200 OK")
+        self.assertIn("FirstName", profile_body)
+        self.assertNotIn("SecondName", profile_body)
+
+        self.assertFalse((self.repo_root / "records/profile-updates/profile-update-test-006.txt").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,8 @@ from pathlib import Path
 from forum_core.identity import build_identity_id
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
+    has_visible_profile_update_for_source_identity,
+    load_profile_update_records,
     parse_profile_update_text,
     profile_update_records_dir,
 )
@@ -76,6 +78,7 @@ def validate_profile_update_record(
 ) -> None:
     posts = load_posts(records_dir(repo_root))
     identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+    profile_updates = load_profile_update_records(profile_update_records_dir(repo_root))
 
     if signer_identity_id != record.source_identity_id:
         raise PostingError("forbidden", "signer must match Source-Identity-ID", status="403 Forbidden")
@@ -84,6 +87,16 @@ def validate_profile_update_record(
             "not_found",
             f"unknown source identity: {record.source_identity_id}",
             status="404 Not Found",
+        )
+    if has_visible_profile_update_for_source_identity(
+        source_identity_id=record.source_identity_id,
+        profile_updates=profile_updates,
+        exclude_record_id=record.record_id,
+    ):
+        raise PostingError(
+            "forbidden",
+            "username/display name can only be claimed once per signer identity",
+            status="403 Forbidden",
         )
 
 
