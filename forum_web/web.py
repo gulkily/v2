@@ -503,20 +503,38 @@ def render_profile_page(
         exclude_identity_id=summary.identity_id,
         identity_context=identity_context,
     )
-    other_username_html = (
-        '<section class="panel page-section">'
-        '<div class="section-head page-lede"><h2>Other Users With This Name</h2></div>'
-        '<div class="profile-links link-cluster">'
-        + "".join(
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(peer.canonical_identity_id))}">'
-            f'{html.escape(peer.display_name)}'
-            "</a>"
-            for peer in other_username_peers
+    other_username_html = ""
+    if other_username_peers:
+        visible_other_username_peers = other_username_peers[:5]
+        hidden_other_username_peers = other_username_peers[5:]
+        overflow_html = ""
+        if hidden_other_username_peers:
+            overflow_html = (
+                '<details class="page-section-subsection">'
+                f'<summary>show {len(hidden_other_username_peers)} more</summary>'
+                '<div class="profile-links link-cluster">'
+                + "".join(
+                    f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(peer.canonical_identity_id))}">'
+                    f'{html.escape(peer.display_name)}'
+                    "</a>"
+                    for peer in hidden_other_username_peers
+                )
+                + "</div></details>"
+            )
+        other_username_html = (
+            '<section class="panel page-section">'
+            '<div class="section-head page-lede"><h2>Other Users With This Name</h2></div>'
+            '<div class="profile-links link-cluster">'
+            + "".join(
+                f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(peer.canonical_identity_id))}">'
+                f'{html.escape(peer.display_name)}'
+                "</a>"
+                for peer in visible_other_username_peers
+            )
+            + "</div>"
+            + overflow_html
+            + "</section>"
         )
-        + "</div></section>"
-        if other_username_peers
-        else ""
-    )
     root_resolution = resolve_username_root(repo_root=get_repo_root(), username=summary.display_name)
     merge_suggestion_html = ""
     profile_script_html = ""

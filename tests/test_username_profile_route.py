@@ -282,6 +282,55 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         self.assertIn("Other Users With This Name", body)
         self.assertIn("/profiles/openpgp-beta", body)
 
+    def test_duplicate_username_list_collapses_after_first_five_peers(self) -> None:
+        for index, identity_id in enumerate(
+            (
+                "openpgp:gamma",
+                "openpgp:delta",
+                "openpgp:epsilon",
+                "openpgp:zeta",
+                "openpgp:eta",
+                "openpgp:theta",
+            ),
+            start=2,
+        ):
+            slug = identity_id.replace(":", "-")
+            self.write_record(
+                f"records/identity/identity-{slug}.txt",
+                f"""
+                Post-ID: identity-{slug}
+                Board-Tags: identity
+                Subject: identity bootstrap
+                Identity-ID: {identity_id}
+                Signer-Fingerprint: {index:016X}
+                Bootstrap-By-Post: root-{slug}
+                Bootstrap-By-Thread: root-{slug}
+
+                -----BEGIN PGP PUBLIC KEY BLOCK-----
+                {slug}
+                -----END PGP PUBLIC KEY BLOCK-----
+                """,
+            )
+            self.write_record(
+                f"records/profile-updates/profile-update-{slug}.txt",
+                f"""
+                Record-ID: profile-update-{slug}
+                Action: set_display_name
+                Source-Identity-ID: {identity_id}
+                Timestamp: 2026-03-18T01:{index:02d}:00Z
+
+                Ilya
+                """,
+            )
+
+        status, _, body = self.get("/profiles/openpgp-alpha")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Other Users With This Name", body)
+        self.assertIn("show 2 more", body)
+        self.assertIn("/profiles/openpgp-beta", body)
+        self.assertIn("/profiles/openpgp-gamma", body)
+
 
 class UsernameAttributionLinkTests(unittest.TestCase):
     def setUp(self) -> None:

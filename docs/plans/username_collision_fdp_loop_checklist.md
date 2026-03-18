@@ -63,7 +63,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: simple `not me` handling or equivalent suppression for repeated same-name suggestions.
   - Why here: once auto-issued requests exist, the product needs a low-friction way to reduce noise.
 
-- [ ] Loop 10: Duplicate-name list scaling and presentation polish
+- [x] Loop 10: Duplicate-name list scaling and presentation polish
   - Goal: keep `other users with this name` usable when many unrelated claimants exist.
   - Includes: ordering policy, truncation or collapse behavior, and any lightweight explanation of why another identity appears in the list.
   - Why here: this is polish on top of the settled root/non-root behavior, not a prerequisite for correctness.

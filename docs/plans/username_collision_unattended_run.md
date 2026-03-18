@@ -143,7 +143,7 @@ Uses:
   - Notes:
     - keep the first version narrow; no broad trust or reputation system
 
-- [ ] Loop 10: Duplicate-name list scaling and presentation polish
+- [x] Loop 10: Duplicate-name list scaling and presentation polish
   - Goal: keep `other users with this name` usable when many unrelated claimants exist.
   - Smallest intended visible result: the list stays readable under high duplicate count.
   - Controlling docs:
@@ -325,7 +325,7 @@ Use one short entry per completed loop.
 - Visible result:
   - users can now dismiss repeated same-name self-merge suggestions on a device without affecting repository state or other users
 - Commits:
-  - pending
+  - `196b474` `username-collision loop 9: suppress repeated self-merge suggestions`
 - Tests or verification:
   - `python -m unittest tests.test_username_profile_route tests.test_profile_merge_suggestion_asset`
   - result: `Ran 12 tests ... OK`
@@ -333,6 +333,25 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 9 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 10
+
+- Status: completed
+- What landed:
+  - capped the always-visible `other users with this name` list at five peers while preserving chronology-based ordering
+  - added a simple `show N more` expansion for overflow identities instead of letting large duplicate-name sets sprawl across the page
+  - added a duplicate-name regression covering the new collapsed-overflow presentation
+- Visible result:
+  - duplicate-name profile pages remain readable when many unrelated identities share the same current username
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_username_profile_route`
+  - result: `Ran 11 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 10 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -352,10 +371,11 @@ Leave empty if none.
   - Loop 7
   - Loop 8
   - Loop 9
-- Deferred loops:
   - Loop 10
+- Deferred loops:
+  - none
 - New unresolved questions:
-  - none from Loops 1-9
+  - none from Loops 1-10
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -369,6 +389,7 @@ Leave empty if none.
   - `python -m unittest tests.test_merge_requests tests.test_merge_request_submission tests.test_merge_management_page`
   - `python -m unittest tests.test_username_profile_route tests.test_merge_management_api`
   - `python -m unittest tests.test_username_profile_route tests.test_profile_merge_suggestion_asset`
+  - `python -m unittest tests.test_username_profile_route`
 
 ## Handoff Summary
 
