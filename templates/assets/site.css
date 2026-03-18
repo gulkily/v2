@@ -487,6 +487,7 @@ body {
   gap: 0.7rem;
 }
 
+.technical-textarea,
 .key-display,
 .key-block {
   border: 1px solid var(--accent-soft);
@@ -494,6 +495,12 @@ body {
   background: rgba(255, 249, 240, 0.84);
   color: var(--ink);
   font: 0.82rem/1.45 "Courier New", Courier, monospace;
+}
+
+textarea.technical-textarea,
+textarea.key-display {
+  width: min(100%, 72ch);
+  max-width: 72ch;
 }
 
 .key-block {
@@ -526,6 +533,7 @@ textarea {
   resize: vertical;
 }
 
+textarea.technical-textarea,
 textarea.key-display {
   min-height: 10rem;
 }
@@ -546,7 +554,7 @@ button:disabled {
 
 .compose-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 42rem), 1fr));
   gap: 1rem;
 }
 
