@@ -210,6 +210,12 @@ async function privateToPublic(armoredPrivateKey) {
   return privateKey.toPublic().armor();
 }
 
+async function publicKeyFingerprint(armoredPublicKey) {
+  const openpgp = await loadOpenPgp();
+  const publicKey = await openpgp.readKey({ armoredKey: armoredPublicKey });
+  return publicKey.getFingerprint().toUpperCase();
+}
+
 async function signPayload(payloadText, armoredPrivateKey) {
   const openpgp = await loadOpenPgp();
   const privateKey = await openpgp.readPrivateKey({ armoredKey: armoredPrivateKey });
@@ -643,14 +649,14 @@ async function ensureLocalKeys({ forceGenerate = false, importedPrivateKey = "" 
   return { privateKey, publicKey };
 }
 
-async function fetchPowRequirement(publicKey) {
+async function fetchPowRequirement(signerFingerprint) {
   const response = await fetch("/api/pow_requirement", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      public_key: publicKey,
+      signer_fingerprint: signerFingerprint,
     }),
   });
   if (!response.ok) {
@@ -1087,7 +1093,8 @@ async function main() {
           const keys = await resolveSubmitKeys();
           if (defaults.powEnabled) {
             setStatus("submit-status", "Checking whether proof-of-work is required...");
-            const requirement = await fetchPowRequirement(keys.publicKey);
+            const signerFingerprint = await publicKeyFingerprint(keys.publicKey);
+            const requirement = await fetchPowRequirement(signerFingerprint);
             if (requirement.required) {
               setStatus("submit-status", `Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
               const proofOfWork = await solveProofOfWork({
@@ -1214,5 +1221,6 @@ export {
   formatSigningStatus,
   normalizeComposeAscii,
   pendingSubmissionStorageKey,
+  publicKeyFingerprint,
   requiresSigningSubmitLabel,
 };

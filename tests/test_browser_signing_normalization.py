@@ -138,6 +138,24 @@ process.stdout.write(JSON.stringify(result));
         self.assertIn("publish", result["publishKey"])
         self.assertIn("dry-run", result["previewKey"])
 
+    def test_public_key_fingerprint_is_uppercase(self) -> None:
+        result = self.run_expression(
+            f"""await (async () => {{
+  const openpgp = await import({json.dumps((self.assets_root / "vendor" / "openpgp.min.mjs").as_uri())});
+  const generated = await openpgp.generateKey({{
+    type: "ecc",
+    curve: "ed25519",
+    userIDs: [{{ name: "Pow Fingerprint Test" }}],
+    format: "armored",
+  }});
+  return {{
+    fingerprint: await mod.publicKeyFingerprint(generated.publicKey),
+  }};
+}})()"""
+        )
+
+        self.assertEqual(result["fingerprint"], result["fingerprint"].upper())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,3 +7,12 @@
   - Ran `FORUM_ENABLE_UNSIGNED_POST_FALLBACK=0 python3 -m unittest /home/wsl/v2/tests/test_first_post_pow_submission.py`.
 - Notes:
   - This stage only changes the preflight contract. Signed submission still performs the existing authoritative public-key and signature verification path.
+
+## Stage 2 - switch browser preflight to signer fingerprints
+- Changes:
+  - Updated [browser_signing.js](/home/wsl/v2/templates/assets/browser_signing.js) so the compose flow derives the fingerprint from the locally available public key and sends `signer_fingerprint` to `/api/pow_requirement` instead of uploading the full armored public key on that preflight call.
+  - Exported a small browser helper for uppercase fingerprint derivation and added a focused asset test in [test_browser_signing_normalization.py](/home/wsl/v2/tests/test_browser_signing_normalization.py).
+- Verification:
+  - Ran `FORUM_ENABLE_UNSIGNED_POST_FALLBACK=0 python3 -m unittest /home/wsl/v2/tests/test_browser_signing_normalization.py /home/wsl/v2/tests/test_first_post_pow_submission.py`.
+- Notes:
+  - Signed submission itself is unchanged here; only the advisory PoW lookup path is lighter.
