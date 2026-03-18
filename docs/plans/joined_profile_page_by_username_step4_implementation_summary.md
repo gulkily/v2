@@ -20,3 +20,13 @@
   - Result: `Ran 7 tests ... OK`.
 - Notes:
   - The joined page now exposes `/user/<username>` conservatively: if a latest current username is not unambiguous, the profile still renders through the identity-based route only.
+
+## Stage 3 - attribution regression coverage
+- Changes:
+  - Added [test_username_profile_route.py](/home/wsl/v2/tests/test_username_profile_route.py) covering direct `/user/<username>` reads, old-name failure after rename, collision failure, post attribution preferring the username route when it is unambiguous, and moderation attribution falling back to the identity route when it is not.
+  - Re-ran the existing profile update and merge-management page tests to confirm the shared profile surface still renders correctly after the username-route changes.
+- Verification:
+  - Ran `python -m unittest tests.test_username_profile_route tests.test_profile_update_page tests.test_merge_management_page tests.test_merge_management_api`.
+  - Result: `Ran 12 tests ... OK`.
+- Notes:
+  - This stage locks the conservative fallback rule into tests: `/user/<username>` is preferred only when the latest current username maps cleanly to one resolved profile; otherwise the app stays on `/profiles/<identity-slug>`.
