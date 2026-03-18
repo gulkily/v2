@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_path
+from forum_core.public_keys import resolve_public_key_from_signature
 
 
 @dataclass(frozen=True)
@@ -197,7 +198,9 @@ def resolve_signature_path(post_path: Path) -> Path | None:
 
 def resolve_public_key_path(post_path: Path) -> Path | None:
     candidate = post_path.with_name(f"{post_path.name}.pub.asc")
-    return candidate if candidate.exists() else None
+    if candidate.exists():
+        return candidate
+    return resolve_public_key_from_signature(repo_root=post_path.parents[2], signature_path=resolve_signature_path(post_path))
 
 
 def load_posts(records_dir: Path) -> list[Post]:

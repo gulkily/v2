@@ -6,6 +6,7 @@ from pathlib import Path
 
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_path
 from forum_core.identity_links import ensure_identity_id_text
+from forum_core.public_keys import resolve_public_key_from_signature
 
 
 ALLOWED_PROFILE_UPDATE_ACTIONS = ("set_display_name",)
@@ -107,7 +108,12 @@ def resolve_profile_update_signature_path(record_path: Path) -> Path | None:
 
 def resolve_profile_update_public_key_path(record_path: Path) -> Path | None:
     candidate = record_path.with_name(f"{record_path.name}.pub.asc")
-    return candidate if candidate.exists() else None
+    if candidate.exists():
+        return candidate
+    return resolve_public_key_from_signature(
+        repo_root=record_path.parents[2],
+        signature_path=resolve_profile_update_signature_path(record_path),
+    )
 
 
 def parse_profile_update_record(path: Path) -> ProfileUpdateRecord:

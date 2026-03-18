@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_path, fingerprint_from_public_key_text
+from forum_core.public_keys import resolve_public_key_from_signature
 
 
 ALLOWED_IDENTITY_LINK_ACTIONS = ("rotate_key", "merge_identity")
@@ -122,7 +123,12 @@ def resolve_identity_link_signature_path(record_path: Path) -> Path | None:
 
 def resolve_identity_link_public_key_path(record_path: Path) -> Path | None:
     candidate = record_path.with_name(f"{record_path.name}.pub.asc")
-    return candidate if candidate.exists() else None
+    if candidate.exists():
+        return candidate
+    return resolve_public_key_from_signature(
+        repo_root=record_path.parents[2],
+        signature_path=resolve_identity_link_signature_path(record_path),
+    )
 
 
 def parse_identity_link_record(path: Path) -> IdentityLinkRecord:

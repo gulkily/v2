@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from forum_core.identity_links import IdentityLinkRecord, IdentityResolution, ensure_identity_id_text
+from forum_core.public_keys import resolve_public_key_from_signature
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
     ResolvedDisplayName,
@@ -153,7 +154,12 @@ def resolve_merge_request_signature_path(record_path: Path) -> Path | None:
 
 def resolve_merge_request_public_key_path(record_path: Path) -> Path | None:
     candidate = record_path.with_name(f"{record_path.name}.pub.asc")
-    return candidate if candidate.exists() else None
+    if candidate.exists():
+        return candidate
+    return resolve_public_key_from_signature(
+        repo_root=record_path.parents[2],
+        signature_path=resolve_merge_request_signature_path(record_path),
+    )
 
 
 def parse_merge_request_record(path: Path) -> MergeRequestRecord:

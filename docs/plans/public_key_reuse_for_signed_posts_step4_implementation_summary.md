@@ -18,3 +18,13 @@
   - Confirmed repeated signed writes reuse one canonical stored key file and no longer create per-record `.txt.pub.asc` files in the write directories.
 - Notes:
   - The read model still assumes sibling `.pub.asc` files at this point, so Stage 3 will refactor loaders to resolve public keys from detached signatures plus the canonical key store.
+
+## Stage 3 - resolve canonical keys in read models
+- Changes:
+  - Updated post, moderation, profile-update, merge-request, and identity-link loaders to prefer the legacy sibling `.pub.asc` file when present and otherwise resolve the signer's canonical stored key by extracting the fingerprint from the detached signature.
+  - Kept the read-side identity derivation behavior unchanged from the caller perspective: readers still surface `public_key_path`, `signer_fingerprint`, and derived identity information, but now against the canonical key store for newly written records.
+- Verification:
+  - Ran `FORUM_ENABLE_UNSIGNED_POST_FALLBACK=0 python3 -m unittest /home/wsl/v2/tests/test_thread_auto_reply.py /home/wsl/v2/tests/test_profile_update_submission.py /home/wsl/v2/tests/test_merge_request_submission.py`.
+  - Confirmed new signed posts still render in thread/profile flows and merge-request records still load into the existing resolution/state model.
+- Notes:
+  - The legacy sibling-file fallback remains in place so older repositories stay readable without migration.

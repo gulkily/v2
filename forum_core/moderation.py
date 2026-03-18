@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_path, normalize_fingerprint
+from forum_core.public_keys import resolve_public_key_from_signature
 
 
 ALLOWED_MODERATION_ACTIONS = ("hide", "lock", "pin", "unpin")
@@ -110,7 +111,12 @@ def resolve_moderation_signature_path(record_path: Path) -> Path | None:
 
 def resolve_moderation_public_key_path(record_path: Path) -> Path | None:
     candidate = record_path.with_name(f"{record_path.name}.pub.asc")
-    return candidate if candidate.exists() else None
+    if candidate.exists():
+        return candidate
+    return resolve_public_key_from_signature(
+        repo_root=record_path.parents[2],
+        signature_path=resolve_moderation_signature_path(record_path),
+    )
 
 
 def parse_moderation_record(path: Path) -> ModerationRecord:
