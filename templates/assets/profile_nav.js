@@ -1,4 +1,4 @@
-import * as openpgp from "./vendor/openpgp.min.mjs";
+import { loadOpenPgp } from "./openpgp_loader.js";
 
 const STORAGE_PUBLIC = "forum_public_key_armored";
 
@@ -15,6 +15,7 @@ export async function identityIdFromPublicKey(armoredPublicKey) {
   if (!trimmed) {
     return "";
   }
+  const openpgp = await loadOpenPgp();
   const publicKey = await openpgp.readKey({ armoredKey: trimmed });
   return `openpgp:${publicKey.getFingerprint().toLowerCase()}`;
 }

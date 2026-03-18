@@ -25,10 +25,16 @@ class ProfileNavAssetTests(unittest.TestCase):
         script = f"""
 import fs from "node:fs/promises";
 import * as openpgp from {json.dumps(vendor_url)};
+const loaderSource = await fs.readFile(new URL({json.dumps((Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js").as_uri())}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
 const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
 const rewrittenAssetSource = assetSource.replace(
-  './vendor/openpgp.min.mjs',
-  {json.dumps(vendor_url)},
+  "./openpgp_loader.js",
+  loaderModuleUrl,
 );
 const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
 const {{ profileHrefFromPublicKey }} = await import(assetModuleUrl);
@@ -55,10 +61,16 @@ process.stdout.write(JSON.stringify({{ href, fingerprint }}));
         ).as_uri()
         script = f"""
 import fs from "node:fs/promises";
+const loaderSource = await fs.readFile(new URL({json.dumps((Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js").as_uri())}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
 const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
 const rewrittenAssetSource = assetSource.replace(
-  './vendor/openpgp.min.mjs',
-  {json.dumps(vendor_url)},
+  "./openpgp_loader.js",
+  loaderModuleUrl,
 );
 const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
 const {{ mergeNotificationCount }} = await import(assetModuleUrl);
@@ -86,10 +98,16 @@ process.stdout.write(JSON.stringify({{ count: mergeNotificationCount(summaryText
         script = f"""
 import fs from "node:fs/promises";
 import * as openpgp from {json.dumps(vendor_url)};
+const loaderSource = await fs.readFile(new URL({json.dumps((Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js").as_uri())}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
 const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
 const rewrittenAssetSource = assetSource.replace(
-  './vendor/openpgp.min.mjs',
-  {json.dumps(vendor_url)},
+  "./openpgp_loader.js",
+  loaderModuleUrl,
 );
 const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
 const {{ enhanceProfileNav }} = await import(assetModuleUrl);

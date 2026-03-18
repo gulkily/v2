@@ -1,4 +1,8 @@
-import * as openpgp from "./vendor/openpgp.min.mjs";
+import {
+  classifyOpenPgpError,
+  describeOpenPgpFailure,
+  loadOpenPgp,
+} from "./openpgp_loader.js";
 
 const STORAGE_PRIVATE = "forum_private_key_armored";
 const STORAGE_PUBLIC = "forum_public_key_armored";
@@ -55,11 +59,13 @@ function loadKeys() {
 }
 
 async function privateToPublic(armoredPrivateKey) {
+  const openpgp = await loadOpenPgp();
   const privateKey = await openpgp.readPrivateKey({ armoredKey: armoredPrivateKey });
   return privateKey.toPublic().armor();
 }
 
 async function signPayload(payloadText, armoredPrivateKey) {
+  const openpgp = await loadOpenPgp();
   const privateKey = await openpgp.readPrivateKey({ armoredKey: armoredPrivateKey });
   const message = await openpgp.createMessage({ text: payloadText });
   return openpgp.sign({
@@ -71,6 +77,7 @@ async function signPayload(payloadText, armoredPrivateKey) {
 }
 
 async function generateKeypair() {
+  const openpgp = await loadOpenPgp();
   const generated = await openpgp.generateKey({
     type: "ecc",
     curve: "ed25519",
@@ -84,8 +91,13 @@ async function generateKeypair() {
 }
 
 async function identityIdFromPublicKey(armoredPublicKey) {
+  const openpgp = await loadOpenPgp();
   const publicKey = await openpgp.readKey({ armoredKey: armoredPublicKey });
   return `openpgp:${publicKey.getFingerprint().toLowerCase()}`;
+}
+
+function signingStatus(error) {
+  return `${describeOpenPgpFailure(error)} Merge requests still require a working signing key.`;
 }
 
 function generateMergeRequestId(actionName) {
@@ -190,7 +202,7 @@ async function main() {
     try {
       await prepareKeys({ forceGenerate: true }, "Generated and stored a fresh local signing key.");
     } catch (error) {
-      setStatus("key-status", `Key generation failed: ${error.message}`);
+      setStatus("key-status", signingStatus(classifyOpenPgpError(error)));
     }
   });
 
@@ -203,7 +215,7 @@ async function main() {
       applyKeys(keys);
       setStatus("key-status", "Imported and stored the provided local signing key.");
     } catch (error) {
-      setStatus("key-status", `Key import failed: ${error.message}`);
+      setStatus("key-status", signingStatus(classifyOpenPgpError(error)));
     }
   });
 
@@ -216,8 +228,8 @@ async function main() {
     const stored = await ensureLocalKeys();
     applyKeys(stored);
     setStatus("key-status", "Loaded the stored local signing key.");
-  } catch (_error) {
-    // Leave the instructional status in place.
+  } catch (error) {
+    setStatus("key-status", signingStatus(classifyOpenPgpError(error)));
   }
 
   form.addEventListener("submit", async (event) => {

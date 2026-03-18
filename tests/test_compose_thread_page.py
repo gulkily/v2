@@ -58,6 +58,8 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertNotIn("Signed Posting", body)
         self.assertNotIn('class="breadcrumb"', body)
         self.assertIn('id="signed-post-form"', body)
+        self.assertIn(">Submit post<", body)
+        self.assertNotIn("Sign and submit", body)
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
@@ -82,6 +84,13 @@ class ComposeThreadPageTests(unittest.TestCase):
 
         self.assertLess(textarea_index, draft_status_index)
         self.assertLess(draft_status_index, requirements_index)
+
+    def test_openpgp_loader_asset_is_served(self) -> None:
+        status, headers, body = self.get("/assets/openpgp_loader.js")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers.get("Content-Type"), "text/javascript; charset=utf-8")
+        self.assertIn("async function loadOpenPgp()", body)
 
     def test_compose_thread_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get_with_env(

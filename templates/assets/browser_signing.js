@@ -1,8 +1,13 @@
-import * as openpgp from "./vendor/openpgp.min.mjs";
+import {
+  classifyOpenPgpError,
+  describeOpenPgpFailure,
+  loadOpenPgp,
+} from "./openpgp_loader.js";
 
 const STORAGE_PRIVATE = "forum_private_key_armored";
 const STORAGE_PUBLIC = "forum_public_key_armored";
 const STORAGE_DRAFT_PREFIX = "forum_compose_draft_v1:";
+const STORAGE_PENDING_PREFIX = "forum_pending_submission_v1:";
 const DRAFT_SAVE_DELAY_MS = 400;
 
 function $(id) {
@@ -13,6 +18,12 @@ function setStatus(id, message) {
   const element = $(id);
   if (element) {
     element.textContent = message;
+  }
+}
+
+function setButtonLabel(button, label) {
+  if (button && typeof label === "string" && label) {
+    button.textContent = label;
   }
 }
 
@@ -184,11 +195,13 @@ function draftStorageAvailable() {
 }
 
 async function privateToPublic(armoredPrivateKey) {
+  const openpgp = await loadOpenPgp();
   const privateKey = await openpgp.readPrivateKey({ armoredKey: armoredPrivateKey });
   return privateKey.toPublic().armor();
 }
 
 async function signPayload(payloadText, armoredPrivateKey) {
+  const openpgp = await loadOpenPgp();
   const privateKey = await openpgp.readPrivateKey({ armoredKey: armoredPrivateKey });
   const message = await openpgp.createMessage({ text: payloadText });
   return openpgp.sign({
@@ -200,6 +213,7 @@ async function signPayload(payloadText, armoredPrivateKey) {
 }
 
 async function generateKeypair() {
+  const openpgp = await loadOpenPgp();
   const generated = await openpgp.generateKey({
     type: "ecc",
     curve: "ed25519",
@@ -466,6 +480,20 @@ function setDraftStatus(message) {
   setStatus("draft-status", message);
 }
 
+function pendingSubmissionStorageKey(commandName, defaults) {
+  const scopeParts = [commandName];
+  if (commandName === "update_profile") {
+    scopeParts.push(defaults.sourceIdentityId || "");
+    scopeParts.push(defaults.profileSlug || "");
+  } else {
+    scopeParts.push(defaults.threadType || "plain");
+    scopeParts.push(defaults.boardTags || "general");
+    scopeParts.push(defaults.threadId || "");
+    scopeParts.push(defaults.parentId || "");
+  }
+  return `${STORAGE_PENDING_PREFIX}${scopeParts.join("|")}`;
+}
+
 function loadDraft(storageKey) {
   try {
     const rawValue = localStorage.getItem(storageKey);
@@ -492,6 +520,31 @@ function saveDraft(storageKey, fields) {
 }
 
 function clearDraft(storageKey) {
+  localStorage.removeItem(storageKey);
+}
+
+function loadPendingSubmission(storageKey) {
+  try {
+    const rawValue = localStorage.getItem(storageKey);
+    if (!rawValue) {
+      return null;
+    }
+    const parsed = JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.payload !== "string") {
+      return null;
+    }
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function savePendingSubmission(storageKey, pending) {
+  localStorage.setItem(storageKey, JSON.stringify(pending));
+  return pending;
+}
+
+function clearPendingSubmission(storageKey) {
   localStorage.removeItem(storageKey);
 }
 
@@ -605,6 +658,33 @@ async function fetchPowRequirement(publicKey) {
   };
 }
 
+function formatSigningStatus(commandName, error) {
+  const baseMessage = describeOpenPgpFailure(error);
+  if (commandName === "update_profile") {
+    return `${baseMessage} Profile updates still require a working signing key.`;
+  }
+  return `${baseMessage} Posting can still continue unsigned.`;
+}
+
+function formatFallbackSubmitStatus(error) {
+  return `${describeOpenPgpFailure(error)} Submitting unsigned post instead...`;
+}
+
+function formatPendingSubmissionStatus(savedAt) {
+  const formatted = formatSavedAt(savedAt);
+  if (formatted) {
+    return `A previous submission attempt is still saved locally from ${formatted}.`;
+  }
+  return "A previous submission attempt is still saved locally in this browser.";
+}
+
+function errorMessage(error) {
+  if (error && typeof error.message === "string" && error.message) {
+    return error.message;
+  }
+  return String(error);
+}
+
 async function main() {
   const root = $("compose-app") || $("profile-update-app");
   if (!root) {
@@ -627,6 +707,9 @@ async function main() {
   const removeUnsupportedButton = $("remove-unsupported-button");
   const draftContext = composeDraftContext(commandName, defaults);
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
+  const pendingSubmissionKey = pendingSubmissionStorageKey(commandName, defaults);
+  const canStorePendingSubmission = draftStorageAvailable();
+  const allowUnsignedFallback = commandName !== "update_profile";
   let currentKeys = null;
   let pendingDraftTimer = 0;
 
@@ -641,6 +724,38 @@ async function main() {
   ) {
     return;
   }
+
+  function defaultSubmitLabel() {
+    if (dryRun) {
+      return "Submit preview";
+    }
+    return commandName === "update_profile" ? "Submit update" : "Submit post";
+  }
+
+  function signedSubmitLabel() {
+    return dryRun ? "Sign and preview" : "Sign and submit";
+  }
+
+  function unsignedSubmitLabel() {
+    if (dryRun) {
+      return "Submit preview";
+    }
+    return commandName === "update_profile" ? "Submit update" : "Submit without signing";
+  }
+
+  function applySubmitLabel(mode = "default") {
+    if (mode === "signed") {
+      setButtonLabel(signSubmitButton, signedSubmitLabel());
+      return;
+    }
+    if (mode === "unsigned") {
+      setButtonLabel(signSubmitButton, unsignedSubmitLabel());
+      return;
+    }
+    setButtonLabel(signSubmitButton, defaultSubmitLabel());
+  }
+
+  applySubmitLabel("default");
 
   if (draftContext) {
     if (!canStoreDraft) {
@@ -658,6 +773,12 @@ async function main() {
       } else {
         setDraftStatus("Drafts are saved locally in this browser.");
       }
+    }
+  }
+  if (canStorePendingSubmission) {
+    const pendingSubmission = loadPendingSubmission(pendingSubmissionKey);
+    if (pendingSubmission) {
+      setDraftStatus(formatPendingSubmissionStatus(pendingSubmission.savedAt));
     }
   }
 
@@ -691,6 +812,7 @@ async function main() {
     currentKeys = keys;
     privateKeyInput.value = keys.privateKey;
     publicKeyOutput.value = keys.publicKey;
+    applySubmitLabel("signed");
   }
 
   async function prepareKeys(options, successMessage) {
@@ -763,6 +885,31 @@ async function main() {
     return "Signed post accepted. Redirecting...";
   }
 
+  function unsignedSuccessMessage() {
+    if (dryRun) {
+      return "Unsigned preview accepted.";
+    }
+    return "Unsigned post accepted. Redirecting. It may be reviewed by moderation.";
+  }
+
+  async function submitPayload({ payload, signature = "", publicKey = "" }) {
+    const requestBody = {
+      payload,
+      dry_run: dryRun,
+    };
+    if (signature && publicKey) {
+      requestBody.signature = signature;
+      requestBody.public_key = publicKey;
+    }
+    return fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+  }
+
   function normalizeBodyInput({ removeUnsupported = false } = {}) {
     if (!state.body) {
       return { text: "", hadCorrections: false, unsupportedCount: 0, removedUnsupportedCount: 0 };
@@ -820,7 +967,7 @@ async function main() {
     try {
       await prepareKeys({ forceGenerate: true }, "Generated and stored a fresh local signing key.");
     } catch (error) {
-      setStatus("key-status", `Key generation failed: ${error.message}`);
+      setStatus("key-status", formatSigningStatus(commandName, classifyOpenPgpError(error)));
     }
   });
 
@@ -834,7 +981,7 @@ async function main() {
       );
       applyKeys(keys);
     } catch (error) {
-      setStatus("key-status", `Key import failed: ${error.message}`);
+      setStatus("key-status", formatSigningStatus(commandName, classifyOpenPgpError(error)));
     }
   });
 
@@ -852,13 +999,6 @@ async function main() {
     normalizeBodyInput();
   }
   updatePayloadPreview(state, commandName, defaults);
-  setStatus("key-status", "Preparing local signing key...");
-  try {
-    await prepareInitialKeys();
-  } catch (error) {
-    setStatus("key-status", `Key setup failed: ${error.message}`);
-  }
-
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     signSubmitButton.disabled = true;
@@ -868,49 +1008,101 @@ async function main() {
 
     try {
       normalizeBodyInput();
-      const keys = await resolveSubmitKeys();
       let built = buildCanonicalPayload(state, commandName, defaults);
-
-      if (defaults.powEnabled && commandName !== "update_profile") {
-        setStatus("submit-status", "Checking whether proof-of-work is required...");
-        const requirement = await fetchPowRequirement(keys.publicKey);
-        if (requirement.required) {
-          setStatus("submit-status", `Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
-          const proofOfWork = await solveProofOfWork({
-            fingerprint: requirement.signerFingerprint,
-            postId: built.postId,
-            difficulty: requirement.difficulty,
-            onProgress: (attempts) => {
-              setStatus(
-                "submit-status",
-                `Computing proof-of-work (${requirement.difficulty} leading zero bits, ${attempts} attempts)...`,
-              );
-            },
+      let signature = "";
+      let publicKey = "";
+      let usedUnsignedFallback = false;
+      if (commandName === "update_profile") {
+        const keys = await resolveSubmitKeys();
+        payloadOutput.value = built.payload;
+        if (canStorePendingSubmission) {
+          savePendingSubmission(pendingSubmissionKey, {
+            commandName,
+            endpoint,
+            payload: built.payload,
+            recordId: built.recordId || built.postId || "",
+            savedAt: new Date().toISOString(),
+            attemptedSignedSubmit: true,
           });
-          built = buildCanonicalPostPayload(state, commandName, defaults, {
-            proofOfWork,
-            postId: built.postId,
-          });
+        }
+        setStatus("submit-status", "Signing payload...");
+        signature = await signPayload(built.payload, keys.privateKey);
+        publicKey = keys.publicKey;
+        signatureOutput.value = signature;
+      } else {
+        try {
+          const keys = await resolveSubmitKeys();
+          if (defaults.powEnabled) {
+            setStatus("submit-status", "Checking whether proof-of-work is required...");
+            const requirement = await fetchPowRequirement(keys.publicKey);
+            if (requirement.required) {
+              setStatus("submit-status", `Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
+              const proofOfWork = await solveProofOfWork({
+                fingerprint: requirement.signerFingerprint,
+                postId: built.postId,
+                difficulty: requirement.difficulty,
+                onProgress: (attempts) => {
+                  setStatus(
+                    "submit-status",
+                    `Computing proof-of-work (${requirement.difficulty} leading zero bits, ${attempts} attempts)...`,
+                  );
+                },
+              });
+              built = buildCanonicalPostPayload(state, commandName, defaults, {
+                proofOfWork,
+                postId: built.postId,
+              });
+            }
+          }
+          payloadOutput.value = built.payload;
+          if (canStorePendingSubmission) {
+            savePendingSubmission(pendingSubmissionKey, {
+              commandName,
+              endpoint,
+              payload: built.payload,
+              recordId: built.recordId || built.postId || "",
+              savedAt: new Date().toISOString(),
+              attemptedSignedSubmit: true,
+            });
+            setDraftStatus("Saved the current submission locally until the server confirms it.");
+          }
+          setStatus("submit-status", "Signing payload...");
+          signature = await signPayload(built.payload, keys.privateKey);
+          publicKey = keys.publicKey;
+          signatureOutput.value = signature;
+        } catch (error) {
+          const classified = classifyOpenPgpError(error);
+          if (!allowUnsignedFallback) {
+            throw classified;
+          }
+          usedUnsignedFallback = true;
+          applySubmitLabel("unsigned");
+          payloadOutput.value = built.payload;
+          if (canStorePendingSubmission) {
+            savePendingSubmission(pendingSubmissionKey, {
+              commandName,
+              endpoint,
+              payload: built.payload,
+              recordId: built.recordId || built.postId || "",
+              savedAt: new Date().toISOString(),
+              attemptedSignedSubmit: false,
+            });
+            setDraftStatus("Saved the current submission locally until the server confirms it.");
+          }
+          signatureOutput.value = "";
+          setStatus("key-status", formatSigningStatus(commandName, classified));
+          setStatus("submit-status", formatFallbackSubmitStatus(classified));
         }
       }
 
-      payloadOutput.value = built.payload;
-      setStatus("submit-status", "Signing payload...");
-      const signature = await signPayload(built.payload, keys.privateKey);
-      signatureOutput.value = signature;
-      setStatus("submit-status", submittingMessage());
+      if (!usedUnsignedFallback) {
+        setStatus("submit-status", submittingMessage());
+      }
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          payload: built.payload,
-          signature,
-          public_key: keys.publicKey,
-          dry_run: dryRun,
-        }),
+      const response = await submitPayload({
+        payload: built.payload,
+        signature,
+        publicKey,
       });
       const responseText = await response.text();
       responseOutput.value = responseText;
@@ -921,14 +1113,17 @@ async function main() {
 
       const recordId = responseRecordId(responseText);
       if (dryRun) {
-        setStatus("submit-status", successMessage());
+        setStatus("submit-status", usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
       } else {
         if (draftContext && canStoreDraft) {
           window.clearTimeout(pendingDraftTimer);
           clearDraft(draftContext.storageKey);
           setDraftStatus("Local draft cleared after successful submission.");
         }
-        setStatus("submit-status", successMessage());
+        if (canStorePendingSubmission) {
+          clearPendingSubmission(pendingSubmissionKey);
+        }
+        setStatus("submit-status", usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
         const target = redirectTarget(commandName, recordId, defaults);
         if (target) {
           window.setTimeout(() => {
@@ -937,9 +1132,18 @@ async function main() {
         }
       }
     } catch (error) {
-      setStatus("submit-status", `${failurePrefix()}: ${error.message}`);
+      setStatus("submit-status", `${failurePrefix()}: ${errorMessage(error)}`);
     } finally {
       signSubmitButton.disabled = false;
+    }
+  });
+
+  setStatus("key-status", "Checking browser signing support...");
+  void prepareInitialKeys().catch((error) => {
+    const classified = classifyOpenPgpError(error);
+    setStatus("key-status", formatSigningStatus(commandName, classified));
+    if (allowUnsignedFallback) {
+      applySubmitLabel("unsigned");
     }
   });
 }

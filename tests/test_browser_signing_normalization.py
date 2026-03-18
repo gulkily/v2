@@ -14,9 +14,16 @@ class BrowserSigningNormalizationTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.assets_root = Path(self.tempdir.name)
         (self.assets_root / "vendor").mkdir(parents=True, exist_ok=True)
+        browser_signing_text = (
+            self.repo_root / "templates" / "assets" / "browser_signing.js"
+        ).read_text(encoding="utf-8").replace("./openpgp_loader.js", "./openpgp_loader.mjs")
+        (self.assets_root / "browser_signing.mjs").write_text(
+            browser_signing_text,
+            encoding="utf-8",
+        )
         shutil.copyfile(
-            self.repo_root / "templates" / "assets" / "browser_signing.js",
-            self.assets_root / "browser_signing.mjs",
+            self.repo_root / "templates" / "assets" / "openpgp_loader.js",
+            self.assets_root / "openpgp_loader.mjs",
         )
         shutil.copyfile(
             self.repo_root / "templates" / "assets" / "vendor" / "openpgp.min.mjs",

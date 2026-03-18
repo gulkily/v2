@@ -1133,7 +1133,7 @@ def render_profile_update_page(identity_id: str) -> str:
         source_identity_id=html.escape(summary.identity_id),
         profile_slug=html.escape(profile_slug),
         display_name_value=html.escape(summary.display_name),
-        submit_label="Sign and submit",
+        submit_label="Submit update",
     )
     return render_page(
         title=f"Update username · {summary.display_name}",
@@ -2040,7 +2040,7 @@ def render_compose_page(
         pow_difficulty_value=str(first_post_pow_difficulty()),
         body_value="",
         extra_fields_html=extra_fields_html,
-        submit_label="Sign and preview" if dry_run else "Sign and submit",
+        submit_label="Submit preview" if dry_run else "Submit post",
     )
     return render_page(
         title=compose_heading,
@@ -2603,6 +2603,12 @@ def application(environ, start_response):
 
         if path == "/assets/profile_nav.js":
             body = load_asset_text("profile_nav.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/openpgp_loader.js":
+            body = load_asset_text("openpgp_loader.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
