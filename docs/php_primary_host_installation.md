@@ -42,13 +42,20 @@ The adapter allowlist is intentionally narrow. It is meant for public read route
 ## Planned Public Layout
 The supported installation shape assumes:
 
-- a public web root containing `index.php`, `.htaccess`, and any public static assets
+- a public web root containing symlinks or host-published copies of `index.php`, `.htaccess`, and `forum_host_config.php`
 - a Python-accessible repository root outside or alongside the public web root
 - a `cgi-bin` location for the canonical Python write commands
-- the sample adapter artifacts in `php_host/public/` copied into the host's public web root
+- the adapter artifacts in `php_host/public/` remaining repo-managed, with the real `forum_host_config.php` generated locally and ignored by git
 - the sample read bridge in `cgi-bin/forum_web.py` deployed with the rest of the repo
 
-If the public web root is separated from the application checkout, the sample `index.php` supports `FORUM_PHP_APP_ROOT` as an adapter-only override for locating the deployed Python application files. This is separate from the existing `FORUM_REPO_ROOT`, which keeps its canonical meaning as the forum data repository root.
+The generated `forum_host_config.php` is the primary adapter settings surface for:
+
+- `app_root`: the deployed application checkout path
+- `repo_root`: the writable forum data repository root
+- `cache_dir`: the writable PHP microcache directory
+- `microcache_ttl`: the short allowlisted read-cache lifetime in seconds
+
+`forum_host_config.example.php` is tracked as the shape reference, while the real `forum_host_config.php` stays ignored by git because it contains host-local paths.
 
 The exact file layout can vary by host, but the adapter contract stays fixed:
 
@@ -68,23 +75,22 @@ Any host-specific glue should stay inside the adapter and deployment docs, not s
 ## Installation Steps
 1. Deploy the application checkout from `https://github.com/gulkily/v2` onto the host so the Python code, `cgi-bin/`, and `records/` tree remain available on disk.
 2. If the host supports `git`, clone or update the checkout directly, for example `git clone https://github.com/gulkily/v2.git`.
-3. Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the host's public web root.
-4. If the public web root is not inside the application checkout, set `FORUM_PHP_APP_ROOT` so `index.php` can find the deployed Python code.
-5. Set `FORUM_REPO_ROOT` to the forum data repository root when runtime data should live somewhere other than the application checkout.
-6. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
-7. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
-8. Confirm the PHP front controller can write to a cache directory. By default it uses `sys_get_temp_dir() . '/forum_php_cache'`, or you can set `FORUM_PHP_CACHE_DIR` to a host-specific writable path.
-9. If needed, tune the short read-cache lifetime with `FORUM_PHP_MICROCACHE_TTL`. The default is 5 seconds and should stay short unless you are willing to accept longer read staleness.
+3. Run `./forum php-host-setup /absolute/path/to/public-web-root` from the deployed checkout.
+4. Accept the derived defaults or provide host-specific paths for the application checkout, forum data repository, and writable PHP cache directory when prompted.
+5. Confirm the command generated `php_host/public/forum_host_config.php` and attempted to symlink `index.php`, `.htaccess`, and `forum_host_config.php` into the public web root.
+6. If the host rejects symlinks, leave the generated config file in place and follow the command's manual copy or manual linking guidance for the three public files.
+7. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
+8. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
+9. If you need a non-default cache path or TTL, edit the generated `forum_host_config.php` rather than hand-editing `index.php`.
 
-## Adapter Cache Settings
-- `FORUM_PHP_APP_ROOT`: optional adapter-only override for locating the deployed Python application checkout.
-- `FORUM_PHP_CACHE_DIR`: optional writable directory for PHP-side microcache files.
-- `FORUM_PHP_MICROCACHE_TTL`: optional short TTL in seconds for allowlisted public read routes.
-
-These settings affect only the PHP compatibility layer. They do not change the canonical meaning of `FORUM_REPO_ROOT` or alter Python route behavior.
+## Adapter Config File
+- `php_host/public/forum_host_config.example.php`: tracked example showing the required config keys and file shape.
+- `php_host/public/forum_host_config.php`: generated real config include; ignored by git; intended to be refreshed by `./forum php-host-setup`.
+- The PHP adapter still tolerates narrowly scoped environment fallbacks for compatibility, but generated config is the primary supported operator path.
 
 ## Post-Install Checks
 - Request `/` and confirm the board index renders through the PHP front controller.
+- Confirm the public web root contains `index.php`, `.htaccess`, and `forum_host_config.php` as symlinks into the repo checkout when the host allows symlinks.
 - Request `/` twice in quick succession and confirm the second response is served from the PHP cache layer, for example by checking the adapter's `X-Forum-Php-Cache` response header for `HIT`.
 - Request `/threads/<existing-thread-id>` and confirm a thread page renders.
 - Request `/assets/site.css` and confirm the canonical asset path still resolves.

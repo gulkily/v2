@@ -13,6 +13,8 @@ class PhpHostCacheTests(unittest.TestCase):
     def setUp(self) -> None:
         self.repo_root = Path(__file__).resolve().parent.parent
         self.index_path = self.repo_root / "php_host" / "public" / "index.php"
+        self.config_path = self.repo_root / "php_host" / "public" / "forum_host_config.php"
+        self.original_config = self.config_path.read_text(encoding="utf-8") if self.config_path.exists() else None
         self.openpgp_module_url = (
             self.repo_root / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
         ).as_uri()
@@ -26,10 +28,35 @@ class PhpHostCacheTests(unittest.TestCase):
         self.run_command(["git", "config", "user.email", "codex@example.com"], cwd=self.data_repo_root)
 
         self.user_keys = self.generate_signing_keypair("PHP Host Cache Test")
+        self.write_php_host_config()
 
     def tearDown(self) -> None:
+        if self.original_config is None:
+            self.config_path.unlink(missing_ok=True)
+        else:
+            self.config_path.write_text(self.original_config, encoding="utf-8")
         self.cache_tempdir.cleanup()
         self.repo_tempdir.cleanup()
+
+    def write_php_host_config(self) -> None:
+        self.config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    f"    'app_root' => {self.repo_root.as_posix()!r},",
+                    f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
 
     def run_command(
         self,
@@ -110,9 +137,6 @@ process.stdout.write(signature);
         env = os.environ.copy()
         env.update(
             {
-                "FORUM_PHP_APP_ROOT": str(self.repo_root),
-                "FORUM_REPO_ROOT": str(self.data_repo_root),
-                "FORUM_PHP_CACHE_DIR": str(Path(self.cache_tempdir.name) / "cache"),
                 "FORUM_ENABLE_FIRST_POST_POW": "0",
                 "FORUM_ENABLE_THREAD_AUTO_REPLY": "0",
                 "GATEWAY_INTERFACE": "CGI/1.1",

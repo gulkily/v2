@@ -5,6 +5,7 @@ Use `./forum` as the short repo-root command for common local tasks.
 ## Common tasks
 - `./forum help`: show the available subcommands.
 - `./forum env-sync`: append missing `.env` settings from `.env.example` without overwriting existing values.
+- `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
 - `./forum start`: run the local read-only forum server.
 - `./forum test`: run the full unittest suite.
 - `./forum test test_profile_update_page.py`: run one unittest discovery pattern.
@@ -37,8 +38,9 @@ The command contract is intentionally small: future backends such as Perl should
 ## PHP-primary host profile
 - The supported PHP-primary deployment profile is documented in [php_primary_host_installation.md](/home/wsl/v2/docs/php_primary_host_installation.md).
 - The documented source checkout for that profile is `https://github.com/gulkily/v2`.
-- Copy `php_host/public/index.php` and `php_host/public/.htaccess` into the public web root for that profile.
-- Use `FORUM_PHP_APP_ROOT` only to help the PHP adapter locate the deployed application checkout; keep `FORUM_REPO_ROOT` reserved for the forum data repository root.
+- Run `./forum php-host-setup /absolute/path/to/public-web-root` from the deployed checkout to generate `php_host/public/forum_host_config.php` and symlink `index.php`, `.htaccess`, and `forum_host_config.php` into the public web root when the host allows symlinks.
+- Keep `php_host/public/forum_host_config.example.php` tracked as the example shape and let `php_host/public/forum_host_config.php` remain ignored as host-local state.
+- If the host rejects symlinks, follow the command output for the manual fallback instead of editing `index.php` directly.
 - The PHP adapter keeps the existing `/api/create_thread` and `/api/create_reply` routes intact rather than introducing PHP-specific write endpoints.
 
 ## Dedalus baseline

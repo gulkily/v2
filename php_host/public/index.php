@@ -2,16 +2,103 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/cache.php';
+function forum_source_script_path(): string
+{
+    $resolved = realpath(__FILE__);
+    if (is_string($resolved) && $resolved !== '') {
+        return $resolved;
+    }
+    return __FILE__;
+}
+
+function forum_source_dir(): string
+{
+    return dirname(forum_source_script_path());
+}
+
+function forum_public_script_path(): string
+{
+    $scriptFilename = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    if (is_string($scriptFilename) && $scriptFilename !== '') {
+        $resolved = realpath($scriptFilename);
+        if (is_string($resolved) && $resolved !== '') {
+            return $resolved;
+        }
+        if ($scriptFilename[0] === DIRECTORY_SEPARATOR) {
+            return $scriptFilename;
+        }
+        $cwd = getcwd();
+        if (is_string($cwd) && $cwd !== '') {
+            return $cwd . DIRECTORY_SEPARATOR . $scriptFilename;
+        }
+        return $scriptFilename;
+    }
+    return __FILE__;
+}
+
+function forum_public_dir(): string
+{
+    return dirname(forum_public_script_path());
+}
+
+function forum_host_config_path(): string
+{
+    $publicConfig = forum_public_dir() . DIRECTORY_SEPARATOR . 'forum_host_config.php';
+    if (is_file($publicConfig)) {
+        return $publicConfig;
+    }
+
+    $sourceConfig = forum_source_dir() . DIRECTORY_SEPARATOR . 'forum_host_config.php';
+    if (is_file($sourceConfig)) {
+        return $sourceConfig;
+    }
+
+    return $publicConfig;
+}
+
+function forum_host_config(): array
+{
+    static $config = null;
+    if (is_array($config)) {
+        return $config;
+    }
+
+    $path = forum_host_config_path();
+    if (!is_file($path)) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Missing PHP host config include.\n";
+        echo "Expected: {$path}\n";
+        exit;
+    }
+
+    $loaded = require $path;
+    if (!is_array($loaded)) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Invalid PHP host config include.\n";
+        exit;
+    }
+
+    $config = $loaded;
+    return $config;
+}
+
+require_once forum_source_dir() . '/cache.php';
 
 function forum_app_root(): string
 {
-    $configured = getenv('FORUM_PHP_APP_ROOT');
+    $configured = forum_host_config()['app_root'] ?? '';
     if (is_string($configured) && $configured !== '') {
         return rtrim($configured, DIRECTORY_SEPARATOR);
     }
 
-    return dirname(__DIR__, 2);
+    $fallback = getenv('FORUM_PHP_APP_ROOT');
+    if (is_string($fallback) && $fallback !== '') {
+        return rtrim($fallback, DIRECTORY_SEPARATOR);
+    }
+
+    return dirname(forum_source_dir(), 2);
 }
 
 function forum_python_command(string $repoRoot): array
@@ -27,6 +114,7 @@ function forum_python_command(string $repoRoot): array
 function forum_cgi_environment(): array
 {
     $environment = $_ENV;
+    $config = forum_host_config();
     foreach ($_SERVER as $key => $value) {
         if (is_string($value)) {
             $environment[$key] = $value;
@@ -53,6 +141,12 @@ function forum_cgi_environment(): array
     $environment['CONTENT_LENGTH'] = $_SERVER['CONTENT_LENGTH'] ?? '0';
     $environment['REQUEST_SCHEME'] = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $environment['REDIRECT_STATUS'] = '200';
+    if (isset($config['repo_root']) && is_string($config['repo_root']) && $config['repo_root'] !== '') {
+        $environment['FORUM_REPO_ROOT'] = $config['repo_root'];
+    }
+    if (isset($config['app_root']) && is_string($config['app_root']) && $config['app_root'] !== '') {
+        $environment['FORUM_PHP_APP_ROOT'] = $config['app_root'];
+    }
     return $environment;
 }
 

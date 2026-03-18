@@ -89,20 +89,34 @@ function forum_cacheable_read_request(): bool
 
 function forum_cache_dir(): string
 {
-    $configured = getenv('FORUM_PHP_CACHE_DIR');
+    $configured = forum_host_config()['cache_dir'] ?? '';
     if (is_string($configured) && $configured !== '') {
         return rtrim($configured, DIRECTORY_SEPARATOR);
+    }
+    $fallback = getenv('FORUM_PHP_CACHE_DIR');
+    if (is_string($fallback) && $fallback !== '') {
+        return rtrim($fallback, DIRECTORY_SEPARATOR);
     }
     return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'forum_php_cache';
 }
 
 function forum_microcache_ttl_seconds(): int
 {
-    $configured = getenv('FORUM_PHP_MICROCACHE_TTL');
-    if (!is_string($configured) || $configured === '') {
+    $configured = forum_host_config()['microcache_ttl'] ?? null;
+    if (is_int($configured) && $configured > 0) {
+        return $configured;
+    }
+    if (is_string($configured) && $configured !== '') {
+        $ttl = (int) $configured;
+        if ($ttl > 0) {
+            return $ttl;
+        }
+    }
+    $fallback = getenv('FORUM_PHP_MICROCACHE_TTL');
+    if (!is_string($fallback) || $fallback === '') {
         return FORUM_PHP_MICROCACHE_TTL_SECONDS;
     }
-    $ttl = (int) $configured;
+    $ttl = (int) $fallback;
     return $ttl > 0 ? $ttl : FORUM_PHP_MICROCACHE_TTL_SECONDS;
 }
 

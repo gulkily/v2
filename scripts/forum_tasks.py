@@ -20,12 +20,23 @@ from forum_core.runtime_env import (
     repo_env_paths,
     sync_env_defaults,
 )
+from forum_core.php_host_setup import (
+    PhpHostSetupRequest,
+    publish_php_host_public_files,
+    resolve_php_host_setup_config,
+    write_php_host_config,
+)
 
 
 @dataclass(frozen=True)
 class TaskRequest:
     command: str
     test_pattern: str | None = None
+    public_web_root: str | None = None
+    app_root: str | None = None
+    repo_root: str | None = None
+    cache_dir: str | None = None
+    non_interactive: bool = False
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,6 +48,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("help", help="Show help output.")
     subparsers.add_parser("env-sync", help="Append missing .env settings from .env.example.")
+    php_host_parser = subparsers.add_parser(
+        "php-host-setup",
+        help="Generate PHP-host config and publish public files into a web root.",
+    )
+    php_host_parser.add_argument("public_web_root", help="Target public web root for PHP-host files.")
+    php_host_parser.add_argument("--app-root", help="Override the deployed application checkout path.")
+    php_host_parser.add_argument("--repo-root", help="Override the forum data repository path.")
+    php_host_parser.add_argument("--cache-dir", help="Override the PHP cache directory path.")
+    php_host_parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Use derived defaults and fail on invalid explicit values instead of prompting.",
+    )
     subparsers.add_parser("start", help="Start the local read-only forum server.")
 
     test_parser = subparsers.add_parser("test", help="Run the unittest suite.")
@@ -57,6 +81,15 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         return parser, None
     if args.command == "env-sync":
         return parser, TaskRequest(command="env-sync")
+    if args.command == "php-host-setup":
+        return parser, TaskRequest(
+            command="php-host-setup",
+            public_web_root=args.public_web_root,
+            app_root=args.app_root,
+            repo_root=args.repo_root,
+            cache_dir=args.cache_dir,
+            non_interactive=bool(args.non_interactive),
+        )
     if args.command == "start":
         return parser, TaskRequest(command="start")
     if args.command == "test":
@@ -67,6 +100,8 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 def run_task(request: TaskRequest) -> int:
     if request.command == "env-sync":
         return run_env_sync()
+    if request.command == "php-host-setup":
+        return run_php_host_setup(request)
     if request.command == "start":
         return run_start()
     if request.command == "test":
@@ -103,6 +138,42 @@ def run_env_sync() -> int:
 def run_start() -> int:
     command = [sys.executable, str(REPO_ROOT / "scripts/run_read_only.py")]
     return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
+
+
+def run_php_host_setup(request: TaskRequest) -> int:
+    if not request.public_web_root:
+        print("Missing public web root path for php-host-setup.", file=sys.stderr)
+        return 1
+
+    setup_request = PhpHostSetupRequest(
+        public_web_root=request.public_web_root,
+        app_root=request.app_root,
+        repo_root=request.repo_root,
+        cache_dir=request.cache_dir,
+        non_interactive=request.non_interactive,
+    )
+    try:
+        config = resolve_php_host_setup_config(setup_request, repo_root=REPO_ROOT)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    config_path = write_php_host_config(REPO_ROOT, config)
+    public_web_root = Path(request.public_web_root).expanduser().resolve()
+    linked, notes = publish_php_host_public_files(REPO_ROOT, public_web_root)
+
+    print(f"Wrote PHP host config: {config_path}")
+    print(f"App root: {config.app_root}")
+    print(f"Forum repo root: {config.repo_root}")
+    print(f"Cache dir: {config.cache_dir}")
+    if linked:
+        for target, source in linked:
+            print(f"Linked {target} -> {source}")
+    else:
+        print("No new symlinks were created.")
+    for note in notes:
+        print(note)
+    return 0
 
 
 def run_tests(test_pattern: str | None = None) -> int:
