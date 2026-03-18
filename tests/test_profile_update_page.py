@@ -83,6 +83,8 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn("Update username", body)
         self.assertIn(DISPLAY_NAME, body)
         self.assertIn(IDENTITY_ID, body)
+        self.assertIn("claim one username for this signer identity", body)
+        self.assertIn("later username changes from the same key will be rejected", body)
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
         self.assertIn('data-dry-run="false"', body)
