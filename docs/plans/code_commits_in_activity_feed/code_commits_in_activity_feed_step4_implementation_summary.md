@@ -3,7 +3,7 @@
   - Extended `forum_web/web.py` so activity filtering recognizes `code` and the helper layer can load repository-wide commits instead of only `records/posts` changes.
   - Added deterministic commit classification rules for content, moderation, and code activity, with code taking precedence for mixed commits that touch both source and record files.
   - Expanded `tests/test_site_activity_git_log_helpers.py` to cover repository-wide commit loading, explicit classification, and the new `code` filter mode.
-  - Synced the approved Step 3 plan wording in `docs/plans/code_commits_in_activity_feed_step3_development_plan.md` so the planning artifact matches the approved implementation boundary.
+  - Synced the approved Step 3 plan wording in `docs/plans/code_commits_in_activity_feed/code_commits_in_activity_feed_step3_development_plan.md` so the planning artifact matches the approved implementation boundary.
 - Verification:
   - Ran `python -m unittest tests.test_site_activity_git_log_helpers`
   - Ran `python -m unittest tests.test_site_activity_page`
