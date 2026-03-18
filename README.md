@@ -38,7 +38,7 @@ Entry-Count: <n>
 
 ## Signed Posting
 
-Browser posting is not session-token auth dressed up with new wording. The compose flow generates or loads an OpenPGP keypair in the browser, signs a canonical ASCII payload client-side, and submits `payload`, `signature`, and `public_key` to the write endpoint. The server verifies the detached signature and stores the accepted record plus its signature material in the repo.
+ Browser posting is not session-token auth dressed up with new wording. The compose flow generates or loads an OpenPGP keypair in the browser, signs a canonical ASCII payload client-side, and submits `payload`, `signature`, and `public_key` to the write endpoint. The server verifies the detached signature, stores the accepted record plus its detached signature in the repo, and stores one canonical public-key file per signer fingerprint under `records/public-keys/` for reuse across later signed records.
 
 ## Local Setup
 

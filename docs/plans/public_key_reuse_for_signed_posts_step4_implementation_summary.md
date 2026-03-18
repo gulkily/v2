@@ -28,3 +28,13 @@
   - Confirmed new signed posts still render in thread/profile flows and merge-request records still load into the existing resolution/state model.
 - Notes:
   - The legacy sibling-file fallback remains in place so older repositories stay readable without migration.
+
+## Stage 4 - regression coverage and operator-facing layout docs
+- Changes:
+  - Updated [README.md](/home/wsl/v2/README.md) and [records/README.md](/home/wsl/v2/records/README.md) to document the canonical `records/public-keys/` store and the fact that signed writes now reuse one stored public key per fingerprint.
+  - Kept the Stage 2 and Stage 3 regression additions as the main fixture coverage for new writes, then validated them against older sibling-sidecar fixtures to confirm mixed-format repositories still load correctly.
+- Verification:
+  - Ran `FORUM_ENABLE_UNSIGNED_POST_FALLBACK=0 python3 -m unittest /home/wsl/v2/tests/test_public_key_store.py /home/wsl/v2/tests/test_first_post_pow_submission.py /home/wsl/v2/tests/test_profile_update_submission.py /home/wsl/v2/tests/test_merge_request_submission.py /home/wsl/v2/tests/test_thread_auto_reply.py /home/wsl/v2/tests/test_username_profile_route.py`.
+  - Confirmed 35 tests passed, including new canonical-key storage flows and legacy read fixtures that still use sibling `.pub.asc` files.
+- Notes:
+  - No historical backfill or migration was performed; compatibility comes from read-time fallback to legacy sibling key files.
