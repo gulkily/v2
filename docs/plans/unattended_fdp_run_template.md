@@ -10,6 +10,7 @@ Use this together with [unattended_fdp_guidelines.md](/home/wsl/v2/docs/plans/un
 - Checklist doc:
 - Run date:
 - Operator:
+- Branch:
 - Target loop range:
 
 ## Controlling Docs

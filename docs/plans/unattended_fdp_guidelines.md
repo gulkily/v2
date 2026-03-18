@@ -133,6 +133,15 @@ Each unattended loop should still leave behind these artifacts:
 - an implementation summary note or checklist update if the loop changed policy-adjacent behavior
 - any newly deferred questions appended to the relevant working-notes file
 
+## Branch Discipline
+
+- Run the full unattended checklist on a dedicated feature branch.
+- Create that branch before starting implementation work for the checklist whenever possible.
+- Keep all loop commits for that checklist on the same branch until the run is complete or intentionally paused.
+- Do not mix unrelated feature work into the unattended-run branch.
+- Record the branch name in the unattended run log.
+- If the run was started on the wrong branch, switch to a dedicated branch from the current HEAD and continue there rather than reopening settled loop decisions.
+
 ## Commit Discipline
 
 - Each completed loop should produce at least one commit.
@@ -168,11 +177,12 @@ For [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_
 For a ten-loop checklist:
 
 1. Lock the checklist order.
-2. Gather all controlling planning docs up front.
-3. Create one short “unattended run” note listing the default answers that apply.
-4. Execute loops in order without reopening settled questions.
-5. Commit at least once per loop, and more often when the loop has clear internal stages.
-6. After each loop, update checklist state and record only newly discovered unresolved items.
-7. Continue until a stop condition is hit or the checklist is complete.
+2. Create and switch to a dedicated feature branch for the run.
+3. Gather all controlling planning docs up front.
+4. Create one short “unattended run” note listing the default answers that apply.
+5. Execute loops in order without reopening settled questions.
+6. Commit at least once per loop, and more often when the loop has clear internal stages.
+7. After each loop, update checklist state and record only newly discovered unresolved items.
+8. Continue until a stop condition is hit or the checklist is complete.
 
 The main idea is simple: reuse the repo’s previous judgment instead of re-litigating each small decision.
