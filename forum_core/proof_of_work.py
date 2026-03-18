@@ -4,7 +4,7 @@ import hashlib
 import os
 from pathlib import Path
 
-from forum_core.identity import build_bootstrap_record_id, build_identity_id, fingerprint_from_public_key_text
+from forum_core.identity import build_bootstrap_record_id, build_identity_id, fingerprint_from_public_key_text, normalize_fingerprint
 
 
 POW_FIRST_POST_FLAG_ENV = "FORUM_ENABLE_FIRST_POST_POW"
@@ -38,9 +38,17 @@ def pow_required_for_signed_post(*, repo_root: Path, signer_fingerprint: str) ->
     return not bootstrap_path.exists()
 
 
+def pow_requirement_for_fingerprint(*, repo_root: Path, signer_fingerprint: str) -> tuple[str, bool]:
+    normalized_fingerprint = normalize_fingerprint(signer_fingerprint)
+    return normalized_fingerprint, pow_required_for_signed_post(
+        repo_root=repo_root,
+        signer_fingerprint=normalized_fingerprint,
+    )
+
+
 def pow_requirement_for_public_key(*, repo_root: Path, public_key_text: str) -> tuple[str, bool]:
     signer_fingerprint = fingerprint_from_public_key_text(public_key_text)
-    return signer_fingerprint, pow_required_for_signed_post(
+    return pow_requirement_for_fingerprint(
         repo_root=repo_root,
         signer_fingerprint=signer_fingerprint,
     )

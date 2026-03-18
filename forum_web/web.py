@@ -16,7 +16,7 @@ from forum_core.identity import identity_id_from_slug, identity_slug, short_iden
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
 from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
-from forum_core.proof_of_work import pow_requirement_for_public_key
+from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
 from forum_core.merge_requests import derive_merge_management_summary
 from forum_core.moderation import (
@@ -2182,12 +2182,20 @@ def render_api_create_reply(environ, *, default_dry_run: bool) -> tuple[str, str
 def render_api_pow_requirement(environ) -> tuple[str, bytes, str]:
     payload = read_json_request(environ)
     repo_root = get_repo_root()
-    public_key_text = read_required_text(payload, "public_key")
-
-    signer_fingerprint, required = pow_requirement_for_public_key(
-        repo_root=repo_root,
-        public_key_text=public_key_text,
-    )
+    signer_fingerprint_text = read_optional_text(payload, "signer_fingerprint")
+    public_key_text = read_optional_text(payload, "public_key")
+    if signer_fingerprint_text:
+        signer_fingerprint, required = pow_requirement_for_fingerprint(
+            repo_root=repo_root,
+            signer_fingerprint=signer_fingerprint_text,
+        )
+    elif public_key_text:
+        signer_fingerprint, required = pow_requirement_for_public_key(
+            repo_root=repo_root,
+            public_key_text=public_key_text,
+        )
+    else:
+        raise PostingError("bad_request", "pow requirement lookup requires signer_fingerprint or public_key")
     body = json.dumps(
         {
             "required": first_post_pow_enabled() and required,

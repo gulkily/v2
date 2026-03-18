@@ -404,6 +404,42 @@ process.stdout.write(signature);
         payload = json.loads(body)
         self.assertFalse(payload["required"])
 
+    def test_pow_requirement_endpoint_accepts_signer_fingerprint(self) -> None:
+        request_body = json.dumps({"signer_fingerprint": self.fingerprint.lower()}).encode("utf-8")
+
+        status, headers, body = self.request(
+            "/api/pow_requirement",
+            method="POST",
+            body=request_body,
+            extra_env={
+                "FORUM_ENABLE_FIRST_POST_POW": "1",
+                "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
+            },
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json; charset=utf-8")
+        payload = json.loads(body)
+        self.assertTrue(payload["required"])
+        self.assertEqual(payload["difficulty"], 8)
+        self.assertEqual(payload["signer_fingerprint"], self.fingerprint)
+
+    def test_pow_requirement_endpoint_rejects_missing_identity_inputs(self) -> None:
+        request_body = json.dumps({}).encode("utf-8")
+
+        status, _, body = self.request(
+            "/api/pow_requirement",
+            method="POST",
+            body=request_body,
+            extra_env={
+                "FORUM_ENABLE_FIRST_POST_POW": "1",
+                "FORUM_FIRST_POST_POW_DIFFICULTY": "8",
+            },
+        )
+
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("pow requirement lookup requires signer_fingerprint or public_key", body)
+
 
 if __name__ == "__main__":
     unittest.main()
