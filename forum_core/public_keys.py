@@ -18,19 +18,35 @@ def public_key_records_dir(repo_root: Path) -> Path:
     return repo_root / "records" / "public-keys"
 
 
-def resolve_canonical_public_key_path(repo_root: Path, fingerprint: str) -> Path:
+def resolve_legacy_public_key_path(repo_root: Path, fingerprint: str) -> Path:
     normalized = normalize_fingerprint(fingerprint).lower()
+    return public_key_records_dir(repo_root) / f"openpgp-{normalized}.asc"
+
+
+def resolve_canonical_public_key_path(repo_root: Path, fingerprint: str) -> Path:
+    normalized = normalize_fingerprint(fingerprint)
     return public_key_records_dir(repo_root) / f"openpgp-{normalized}.asc"
 
 
 def resolve_public_key_by_fingerprint(repo_root: Path, fingerprint: str) -> Path | None:
     path = resolve_canonical_public_key_path(repo_root, fingerprint)
-    return path if path.exists() else None
+    if path.exists():
+        return path
+    legacy_path = resolve_legacy_public_key_path(repo_root, fingerprint)
+    return legacy_path if legacy_path.exists() else None
 
 
 def store_or_reuse_public_key(*, repo_root: Path, public_key_text: str) -> StoredPublicKeyRef:
     fingerprint = fingerprint_from_public_key_text(public_key_text)
     path = resolve_canonical_public_key_path(repo_root, fingerprint)
+    legacy_path = resolve_legacy_public_key_path(repo_root, fingerprint)
+    if not path.exists() and legacy_path.exists():
+        legacy_path.rename(path)
+        return StoredPublicKeyRef(
+            fingerprint=fingerprint,
+            path=path,
+            created=False,
+        )
     created = not path.exists()
     if created:
         path.parent.mkdir(parents=True, exist_ok=True)

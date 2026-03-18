@@ -87,6 +87,7 @@ process.stdout.write(signature);
         self.assertEqual(first.path, expected_path)
         self.assertEqual(second.path, expected_path)
         self.assertEqual(expected_path.read_text(encoding="ascii"), self.user_keys["publicKey"])
+        self.assertEqual(expected_path.name, f"openpgp-{fingerprint}.asc")
 
     def test_signature_fingerprint_resolves_to_canonical_public_key(self) -> None:
         stored_key = store_or_reuse_public_key(repo_root=self.repo_root, public_key_text=self.user_keys["publicKey"])
@@ -98,3 +99,15 @@ process.stdout.write(signature);
             resolve_public_key_from_signature(repo_root=self.repo_root, signature_path=signature_path),
             stored_key.path,
         )
+
+    def test_store_or_reuse_public_key_promotes_legacy_lowercase_path(self) -> None:
+        fingerprint = fingerprint_from_public_key_text(self.user_keys["publicKey"])
+        legacy_path = self.repo_root / "records" / "public-keys" / f"openpgp-{fingerprint.lower()}.asc"
+        legacy_path.parent.mkdir(parents=True, exist_ok=True)
+        legacy_path.write_text(self.user_keys["publicKey"], encoding="ascii")
+
+        stored = store_or_reuse_public_key(repo_root=self.repo_root, public_key_text=self.user_keys["publicKey"])
+
+        self.assertFalse(legacy_path.exists())
+        self.assertEqual(stored.path, resolve_canonical_public_key_path(self.repo_root, fingerprint))
+        self.assertTrue(stored.path.exists())
