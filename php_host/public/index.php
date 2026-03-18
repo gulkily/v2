@@ -56,6 +56,15 @@ function forum_host_config_path(): string
     return $publicConfig;
 }
 
+function forum_render_missing_config_page(string $path): never
+{
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Missing PHP host config include.\n";
+    echo "Expected: {$path}\n";
+    exit;
+}
+
 function forum_host_config(): array
 {
     static $config = null;
@@ -65,11 +74,7 @@ function forum_host_config(): array
 
     $path = forum_host_config_path();
     if (!is_file($path)) {
-        http_response_code(500);
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Missing PHP host config include.\n";
-        echo "Expected: {$path}\n";
-        exit;
+        forum_render_missing_config_page($path);
     }
 
     $loaded = require $path;
