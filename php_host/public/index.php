@@ -59,9 +59,146 @@ function forum_host_config_path(): string
 function forum_render_missing_config_page(string $path): never
 {
     http_response_code(500);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Missing PHP host config include.\n";
-    echo "Expected: {$path}\n";
+    header('Content-Type: text/html; charset=utf-8');
+
+    $title = 'PHP host setup required';
+    $pathHtml = htmlspecialchars($path, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $commandHtml = htmlspecialchars('./forum php-host-setup /absolute/path/to/public-web-root', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+    echo <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{$title}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f3ea;
+      --panel: #fffdf8;
+      --text: #1f1a14;
+      --muted: #6f6252;
+      --accent: #8a4b14;
+      --accent-soft: #f3dfcb;
+      --border: #d8c7b2;
+      --code-bg: #f1ebe1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Times New Roman", serif;
+      background:
+        radial-gradient(circle at top, #fff8ee 0, #f6f3ea 48%, #eee5d8 100%);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    main {
+      width: min(760px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 24px 80px rgba(73, 43, 16, 0.12);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px 28px 18px;
+      background: linear-gradient(135deg, #fff6ea 0%, #f8ead8 100%);
+      border-bottom: 1px solid var(--border);
+    }
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(32px, 5vw, 46px);
+      line-height: 1.05;
+    }
+    .lede {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .body {
+      padding: 24px 28px 30px;
+      display: grid;
+      gap: 18px;
+    }
+    .card {
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fffdfa;
+    }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+    p, li {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    p { margin: 0; }
+    ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    code, pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+    }
+    pre {
+      margin: 0;
+      padding: 14px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border-radius: 12px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+    }
+    .note {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">PHP Host Configuration</p>
+      <h1>{$title}</h1>
+      <p class="lede">This PHP adapter is installed, but the required host-local config include is missing, so the forum cannot start yet.</p>
+    </section>
+    <section class="body">
+      <article class="card">
+        <h2>What is missing</h2>
+        <p>The adapter could not load <code>forum_host_config.php</code>.</p>
+      </article>
+      <article class="card">
+        <h2>Expected path</h2>
+        <pre>{$pathHtml}</pre>
+      </article>
+      <article class="card">
+        <h2>Recommended recovery</h2>
+        <p>From the application checkout, regenerate the PHP host config and publish the expected public files:</p>
+        <pre>{$commandHtml}</pre>
+      </article>
+      <article class="card note">
+        <h2>Why the site stops here</h2>
+        <p>This page indicates a deployment/configuration problem, not a normal application error. The adapter fails closed until the required host-local config include is present.</p>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
+HTML;
     exit;
 }
 

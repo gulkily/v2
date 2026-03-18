@@ -11,3 +11,18 @@
     - `Expected: /tmp/.../public/forum_host_config.php`
 - Notes:
   - This stage intentionally does not improve presentation yet; it only creates the canonical response boundary required for later stages.
+
+## Stage 2 - add polished missing-config diagnostic page
+- Changes:
+  - Upgraded the missing-config helper in [index.php](/home/wsl/v2/php_host/public/index.php) from raw plain text to a deliberate HTML diagnostic page.
+  - Added lightweight inline styling, a clear title, the missing include name, the expected path, the primary `./forum php-host-setup` recovery command, and copy that distinguishes deployment failure from application failure.
+  - Preserved explicit failure semantics: the page still returns HTTP `500` and stops request handling when the real config include is absent.
+- Verification:
+  - Ran `php -l php_host/public/index.php`.
+  - Ran the temp-copy CGI smoke test with no config present and confirmed:
+    - `Status: 500 Internal Server Error`
+    - `Content-Type: text/html; charset=utf-8`
+    - HTML output with `<title>PHP host setup required</title>`
+    - visible recovery guidance including `./forum php-host-setup /absolute/path/to/public-web-root`
+- Notes:
+  - The page styling stays fully local to the PHP adapter so this stage does not introduce a broader shared presentation layer.
