@@ -1,0 +1,7 @@
+Record-ID: merge-request-approve_merge-20260318170633-bd99e22d
+Action: approve_merge
+Requester-Identity-ID: openpgp:051ac16c93f494da06b786a9b7bbcdf3f2c76fe1
+Target-Identity-ID: openpgp:704fc067202e4d8fb5b09332efb2a96959658dbe
+Actor-Identity-ID: openpgp:704fc067202e4d8fb5b09332efb2a96959658dbe
+Timestamp: 2026-03-18T17:06:33Z
+
