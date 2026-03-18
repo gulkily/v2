@@ -19,3 +19,14 @@
   - Ran `python3 -m unittest tests.test_thread_auto_reply.ThreadAutoReplyTests.test_api_create_thread_reports_disabled_when_feature_flag_is_off`.
 - Notes:
   - This stage preserves the current immediate read-after-write behavior and limits the optimization to the existing incremental refresh path for committed writes.
+
+## Stage 3 - Add focused regression coverage for latency-sensitive create-thread behavior
+- Changes:
+  - Added a WSGI-level regression test that creates a thread through `/api/create_thread` and immediately verifies the new thread is visible on both its thread page and the board index.
+  - Re-ran the timing-log and incremental-refresh coverage so the optimized path stays tied to observable phase data and the narrowed timestamp refresh contract.
+- Verification:
+  - Ran `python3 -m unittest tests.test_thread_auto_reply.ThreadAutoReplyTests.test_create_thread_is_immediately_visible_on_thread_and_board_reads`.
+  - Ran `python3 -m unittest tests.test_thread_auto_reply.ThreadAutoReplyTests.test_api_create_thread_reports_disabled_when_feature_flag_is_off`.
+  - Ran `python3 -m unittest tests.test_post_index.PostIndexBuildTests.test_incremental_refresh_uses_touched_path_timestamps_only`.
+- Notes:
+  - Coverage stays focused on correctness and immediate visibility rather than asserting brittle absolute latency thresholds.

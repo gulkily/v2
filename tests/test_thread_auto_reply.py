@@ -186,6 +186,33 @@ process.stdout.write(signature);
         self.assertIn("post_index_refresh=", timing_message)
         self.assertIn("auto_reply=", timing_message)
 
+    def test_create_thread_is_immediately_visible_on_thread_and_board_reads(self) -> None:
+        payload_text = self.build_thread_payload(
+            post_id="thread-visible-001",
+            subject="Immediate visibility",
+            body_text="Hello from the visible path.",
+        )
+
+        status, _, body = self.request(
+            "/api/create_thread",
+            method="POST",
+            body=self.create_thread_request_body(payload_text),
+            extra_env={"FORUM_ENABLE_THREAD_AUTO_REPLY": "0"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Record-ID: thread-visible-001", body)
+
+        thread_status, _, thread_body = self.request("/threads/thread-visible-001")
+        self.assertEqual(thread_status, "200 OK")
+        self.assertIn("Immediate visibility", thread_body)
+        self.assertIn("Hello from the visible path.", thread_body)
+
+        board_status, _, board_body = self.request("/")
+        self.assertEqual(board_status, "200 OK")
+        self.assertIn("Immediate visibility", board_body)
+        self.assertIn("thread-visible-001", board_body)
+
     def test_api_create_thread_creates_auto_reply_when_feature_flag_is_on(self) -> None:
         payload_text = self.build_thread_payload(
             post_id="thread-enabled-001",
