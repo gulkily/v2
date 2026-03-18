@@ -6,6 +6,19 @@
   ${stat_html}
 </section>
 
+<section class="panel page-section">
+  <div class="section-head page-lede">
+    <h2>Signed posts</h2>
+  </div>
+  <div class="profile-links link-cluster">
+    ${post_links_html}
+  </div>
+</section>
+
+${other_username_html}
+
+${merge_suggestion_html}
+
 <details class="panel page-section">
   <summary>Technical details</summary>
   <div class="detail-grid">
@@ -28,16 +41,3 @@
   </div>
   <pre class="key-block">${public_key_text}</pre>
 </details>
-
-<section class="panel page-section">
-  <div class="section-head page-lede">
-    <h2>Signed posts</h2>
-  </div>
-  <div class="profile-links link-cluster">
-    ${post_links_html}
-  </div>
-</section>
-
-${other_username_html}
-
-${merge_suggestion_html}
