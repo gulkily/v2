@@ -112,6 +112,8 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn('id="draft-status"', body)
         self.assertIn("Requirements and limitations", body)
         self.assertIn("ASCII-only canonical text records", body)
+        self.assertIn(">Technical details<", body)
+        self.assertNotIn(">Advanced<", body)
         self.assertIn('id="task-status-input"', body)
         self.assertIn('id="task-impact-input"', body)
         self.assertIn('id="task-difficulty-input"', body)

@@ -230,6 +230,13 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("Other Users With This Name", body)
         self.assertIn("/profiles/openpgp-beta", body)
+        self.assertIn("<details", body)
+        self.assertIn(">Technical details<", body)
+
+        other_users_index = body.index("Other Users With This Name")
+        technical_details_index = body.rindex(">Technical details<")
+
+        self.assertLess(other_users_index, technical_details_index)
 
     def test_non_root_duplicate_profile_offers_direct_merge_request(self) -> None:
         status, _, body = self.get("/profiles/openpgp-beta")

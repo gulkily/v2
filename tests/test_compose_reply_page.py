@@ -97,10 +97,12 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
-        self.assertIn('data-unsigned-fallback-enabled="false"', body)
+        self.assertIn('data-unsigned-fallback-enabled="', body)
         self.assertIn("Requirements and limitations", body)
         self.assertIn("ASCII-only canonical text records", body)
         self.assertIn("reduces Unicode obfuscation risks", body)
+        self.assertIn(">Technical details<", body)
+        self.assertNotIn(">Advanced<", body)
 
         reference_index = body.index("Replying to")
         textarea_index = body.index('id="body-input"')
