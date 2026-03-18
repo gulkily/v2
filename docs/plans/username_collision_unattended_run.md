@@ -90,7 +90,7 @@ Uses:
   - Notes:
     - no new handle-decoration scheme should be introduced in this loop
 
-- [ ] Loop 4: Auto-issued merge requests for likely self-merges
+- [x] Loop 4: Auto-issued merge requests for likely self-merges
   - Goal: smooth the common same-user multi-device flow.
   - Smallest intended visible result: claiming an already-used username can auto-create or near-auto-create a merge request targeting the canonical root or root set.
   - Controlling docs:
@@ -207,7 +207,7 @@ Use one short entry per completed loop.
 - Visible result:
   - users can now open the canonical root profile for a duplicate current username and immediately see the other identities that currently share that name
 - Commits:
-  - pending
+  - `b1a8b3e` `username-collision loop 3: render duplicate username peers`
 - Tests or verification:
   - `python -m unittest tests.test_username_profile_route`
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
@@ -216,6 +216,26 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 3 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 4
+
+- Status: completed
+- What landed:
+  - added a direct `Likely Self-Merge` suggestion on non-root duplicate-name profile pages
+  - linked the suggestion straight into the existing signed merge-request action flow, targeted at the canonical username root
+  - added route regression coverage for the direct self-merge suggestion
+- Visible result:
+  - a user who lands on their non-root duplicate-name profile can request a merge with the canonical root directly from that page instead of hunting through merge management
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_username_profile_route`
+  - `python -m unittest tests.test_post_index tests.test_username_profile_route`
+  - result: `Ran 21 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 4 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -229,10 +249,11 @@ Leave empty if none.
   - Loop 1
   - Loop 2
   - Loop 3
+  - Loop 4
 - Deferred loops:
-  - Loops 4-10
+  - Loops 5-10
 - New unresolved questions:
-  - none from Loops 1-3
+  - none from Loops 1-4
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -240,6 +261,7 @@ Leave empty if none.
   - `python -m unittest tests.test_post_index`
   - `python -m unittest tests.test_post_index tests.test_username_profile_route`
   - `python -m unittest tests.test_username_profile_route`
+  - `python -m unittest tests.test_post_index tests.test_username_profile_route`
 
 ## Handoff Summary
 

@@ -62,6 +62,7 @@ from forum_web.profiles import (
     resolve_identity_display_name,
     other_users_with_username,
     resolve_profile_summary_by_username,
+    resolve_username_root,
     username_route_token,
 )
 from forum_web.repository import (
@@ -516,6 +517,34 @@ def render_profile_page(
         if other_username_peers
         else ""
     )
+    root_resolution = resolve_username_root(repo_root=get_repo_root(), username=summary.display_name)
+    merge_suggestion_html = ""
+    if root_resolution is not None and root_resolution.canonical_identity_id != summary.identity_id:
+        merge_target_summary = find_profile_summary(
+            repo_root=get_repo_root(),
+            posts=posts,
+            identity_id=root_resolution.canonical_identity_id,
+            identity_context=identity_context,
+        )
+        merge_target_label = (
+            merge_target_summary.display_name
+            if merge_target_summary is not None
+            else root_resolution.canonical_identity_id
+        )
+        merge_request_link = (
+            f'/profiles/{html.escape(identity_slug(summary.identity_id))}/merge/action?action=request_merge'
+            f'&other_identity_id={html.escape(root_resolution.canonical_identity_id)}'
+        )
+        merge_suggestion_html = (
+            '<section class="panel page-section">'
+            '<div class="section-head page-lede"><h2>Likely Self-Merge</h2></div>'
+            '<p>This identity currently shares its username with an earlier canonical root. '
+            'If this is also you, you can request a merge directly.</p>'
+            f'<div class="link-cluster"><a class="thread-chip" href="{merge_request_link}">'
+            f'request merge with {html.escape(merge_target_label)}'
+            '</a></div>'
+            '</section>'
+        )
     preferred_href = preferred_profile_href(
         repo_root=get_repo_root(),
         posts=posts,
@@ -569,6 +598,7 @@ def render_profile_page(
             for member_identity_id in summary.member_identity_ids
         ),
         post_links_html=post_links_html,
+        merge_suggestion_html=merge_suggestion_html,
     )
     return render_page(
         title=summary.display_name,

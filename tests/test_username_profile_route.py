@@ -222,6 +222,16 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         self.assertIn("Other Users With This Name", body)
         self.assertIn("/profiles/openpgp-beta", body)
 
+    def test_non_root_duplicate_profile_offers_direct_merge_request(self) -> None:
+        status, _, body = self.get("/profiles/openpgp-beta")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Likely Self-Merge", body)
+        self.assertIn(
+            "/profiles/openpgp-beta/merge/action?action=request_merge&other_identity_id=openpgp:alpha",
+            body,
+        )
+
 
 class UsernameAttributionLinkTests(unittest.TestCase):
     def setUp(self) -> None:

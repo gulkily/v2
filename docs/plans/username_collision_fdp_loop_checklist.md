@@ -33,7 +33,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: canonical root rendering, `other users with this name` section, conservative duplicate-name handling, and ordering for the other-identities list.
   - Why next: this is the first visible user-facing result of the new policy.
 
-- [ ] Loop 4: Auto-issued merge requests for likely self-merges
+- [x] Loop 4: Auto-issued merge requests for likely self-merges
   - Goal: smooth the common same-user multi-device flow.
   - Includes: automatic or near-automatic merge-request issuance when a new identity claims a username already used elsewhere, targeting the canonical root or root set.
   - Why here: once root ownership is clear in the read model, auto-request creation has a stable target.
