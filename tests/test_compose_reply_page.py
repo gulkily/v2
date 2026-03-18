@@ -97,6 +97,7 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
+        self.assertIn('data-unsigned-fallback-enabled="false"', body)
         self.assertIn("Requirements and limitations", body)
         self.assertIn("ASCII-only canonical text records", body)
         self.assertIn("reduces Unicode obfuscation risks", body)
@@ -123,6 +124,16 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('data-pow-enabled="true"', body)
         self.assertIn('data-pow-difficulty="10"', body)
+
+    def test_compose_reply_page_exposes_unsigned_fallback_flag_when_enabled(self) -> None:
+        status, _, body = self.get(
+            "/compose/reply",
+            "thread_id=root-001&parent_id=reply-001",
+            extra_env={"FORUM_ENABLE_UNSIGNED_POST_FALLBACK": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('data-unsigned-fallback-enabled="true"', body)
 
     def test_compose_reply_page_does_not_leak_hidden_parent_post(self) -> None:
         self.write_record(

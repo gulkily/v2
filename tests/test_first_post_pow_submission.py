@@ -21,6 +21,18 @@ class FirstPostPowSubmissionTests(unittest.TestCase):
         self.repo_tempdir = tempfile.TemporaryDirectory()
         self.repo_root = Path(self.repo_tempdir.name)
         (self.repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
+        (self.repo_root / "records" / "posts" / "root-001.txt").write_text(
+            dedent(
+                """
+                Post-ID: root-001
+                Board-Tags: general
+                Subject: Existing root
+
+                Existing root body.
+                """
+            ).lstrip(),
+            encoding="ascii",
+        )
         self.openpgp_module_url = (
             Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
         ).as_uri()
@@ -121,6 +133,18 @@ process.stdout.write(signature);
 
     def build_thread_payload(self, *, post_id: str) -> str:
         return self.build_thread_payload_with_pow(post_id=post_id, proof_of_work=None)
+
+    def build_reply_payload(self, *, post_id: str) -> str:
+        return dedent(
+            f"""
+            Post-ID: {post_id}
+            Board-Tags: general
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Hello from the reply path.
+            """
+        ).lstrip()
 
     def build_thread_payload_with_pow(self, *, post_id: str, proof_of_work: str | None) -> str:
         proof_header = f"Proof-Of-Work: {proof_of_work}\n" if proof_of_work else ""
@@ -228,6 +252,32 @@ process.stdout.write(signature);
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: thread-unsigned-enabled-001", body)
+
+    def test_unsigned_reply_rejected_when_fallback_flag_is_off(self) -> None:
+        payload_text = self.build_reply_payload(post_id="reply-unsigned-disabled-001")
+
+        status, _, body = self.request(
+            "/api/create_reply",
+            method="POST",
+            body=self.create_unsigned_request_body(payload_text, dry_run=False),
+        )
+
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Error-Code: bad_request", body)
+        self.assertIn("Message: signature and public_key are required", body)
+
+    def test_unsigned_reply_accepted_when_fallback_flag_is_on(self) -> None:
+        payload_text = self.build_reply_payload(post_id="reply-unsigned-enabled-001")
+
+        status, _, body = self.request(
+            "/api/create_reply",
+            method="POST",
+            body=self.create_unsigned_request_body(payload_text, dry_run=False),
+            extra_env={"FORUM_ENABLE_UNSIGNED_POST_FALLBACK": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Record-ID: reply-unsigned-enabled-001", body)
 
     def test_first_post_pow_accepts_valid_stamp(self) -> None:
         pow_stamp = self.solve_pow(post_id="thread-pow-valid-001", difficulty=8)

@@ -11,7 +11,7 @@ Reminder to self: commit after each addressed hardening step, then check off the
 ## Execution Checklist
 
 - [x] Step 1: make signing-status text and submit-mode copy deterministic
-- [ ] Step 2: add reply-path parity tests for unsigned-fallback flag off/on
+- [x] Step 2: add reply-path parity tests for unsigned-fallback flag off/on
 - [ ] Step 3: add a visible clear-saved-submission control
 - [ ] Step 4: stop treating dry-run previews as pending publish attempts
 
