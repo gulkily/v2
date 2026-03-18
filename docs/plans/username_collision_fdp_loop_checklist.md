@@ -53,7 +53,7 @@ These loops already give the repo the base needed for collision-handling work: v
   - Includes: canonical `revoke_merge` record shape, immediate effect, deterministic reference to the revoked approval or active edge, graph recomputation from remaining active edges, and updated root/other rendering after split.
   - Why here: merge ergonomics should not expand further without a recovery mechanism.
 
-- [ ] Loop 8: Revocation-aware profile and attribution readback
+- [x] Loop 8: Revocation-aware profile and attribution readback
   - Goal: make split results visible everywhere current identity state is rendered.
   - Includes: post attribution, moderation attribution, profile pages, `/user/<username>`, and notification state after revocation.
   - Why here: revocation must not exist only in the data model; readers need to see the updated state consistently.

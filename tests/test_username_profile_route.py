@@ -232,6 +232,54 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
             body,
         )
 
+    def test_revoked_merge_restores_other_users_section_on_canonical_root(self) -> None:
+        self.write_record(
+            "records/merge-requests/merge-request-001.txt",
+            """
+            Record-ID: merge-request-001
+            Action: request_merge
+            Requester-Identity-ID: openpgp:beta
+            Target-Identity-ID: openpgp:alpha
+            Actor-Identity-ID: openpgp:beta
+            Timestamp: 2026-03-18T01:10:00Z
+
+            please merge
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-002.txt",
+            """
+            Record-ID: merge-request-002
+            Action: approve_merge
+            Requester-Identity-ID: openpgp:beta
+            Target-Identity-ID: openpgp:alpha
+            Actor-Identity-ID: openpgp:alpha
+            Timestamp: 2026-03-18T01:20:00Z
+
+            approved
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-003.txt",
+            """
+            Record-ID: merge-request-003
+            Action: revoke_merge
+            Requester-Identity-ID: openpgp:beta
+            Target-Identity-ID: openpgp:alpha
+            Actor-Identity-ID: openpgp:beta
+            Timestamp: 2026-03-18T01:30:00Z
+
+            revoked
+            """,
+        )
+
+        status, _, body = self.get("/user/ilya")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("openpgp:alpha", body)
+        self.assertIn("Other Users With This Name", body)
+        self.assertIn("/profiles/openpgp-beta", body)
+
 
 class UsernameAttributionLinkTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -434,6 +482,168 @@ process.stdout.write(JSON.stringify({{
 
         self.assertEqual(status, "200 OK")
         self.assertIn('/user/ilya', body)
+
+    def test_post_attribution_falls_back_to_profile_after_revoked_merge(self) -> None:
+        self.write_record(
+            "records/profile-updates/profile-update-alpha.txt",
+            f"""
+            Record-ID: profile-update-alpha
+            Action: set_display_name
+            Source-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T04:00:00Z
+
+            Ilya
+            """,
+        )
+        self.write_record(
+            "records/profile-updates/profile-update-beta.txt",
+            f"""
+            Record-ID: profile-update-beta
+            Action: set_display_name
+            Source-Identity-ID: {self.beta_identity}
+            Timestamp: 2026-03-18T04:10:00Z
+
+            Ilya
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-010.txt",
+            f"""
+            Record-ID: merge-request-010
+            Action: request_merge
+            Requester-Identity-ID: {self.alpha_identity}
+            Target-Identity-ID: {self.beta_identity}
+            Actor-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T04:20:00Z
+
+            please merge
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-011.txt",
+            f"""
+            Record-ID: merge-request-011
+            Action: approve_merge
+            Requester-Identity-ID: {self.alpha_identity}
+            Target-Identity-ID: {self.beta_identity}
+            Actor-Identity-ID: {self.beta_identity}
+            Timestamp: 2026-03-18T04:30:00Z
+
+            approved
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-012.txt",
+            f"""
+            Record-ID: merge-request-012
+            Action: revoke_merge
+            Requester-Identity-ID: {self.alpha_identity}
+            Target-Identity-ID: {self.beta_identity}
+            Actor-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T04:40:00Z
+
+            revoked
+            """,
+        )
+        self.write_record(
+            "records/posts/root-002.txt",
+            """
+            Post-ID: root-002
+            Board-Tags: general
+            Subject: Split Hello
+
+            Split body.
+            """,
+        )
+        self.write_record("records/posts/root-002.txt.pub.asc", self.beta_public)
+
+        status, _, body = self.get("/threads/root-002")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(f'/profiles/{identity_slug(self.beta_identity)}', body)
+        self.assertNotIn('/user/ilya', body)
+
+    def test_moderation_attribution_falls_back_to_profile_after_revoked_merge(self) -> None:
+        self.write_record(
+            "records/profile-updates/profile-update-alpha.txt",
+            f"""
+            Record-ID: profile-update-alpha
+            Action: set_display_name
+            Source-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T05:00:00Z
+
+            Ilya
+            """,
+        )
+        self.write_record(
+            "records/profile-updates/profile-update-beta.txt",
+            f"""
+            Record-ID: profile-update-beta
+            Action: set_display_name
+            Source-Identity-ID: {self.beta_identity}
+            Timestamp: 2026-03-18T05:10:00Z
+
+            Ilya
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-020.txt",
+            f"""
+            Record-ID: merge-request-020
+            Action: request_merge
+            Requester-Identity-ID: {self.alpha_identity}
+            Target-Identity-ID: {self.beta_identity}
+            Actor-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T05:20:00Z
+
+            please merge
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-021.txt",
+            f"""
+            Record-ID: merge-request-021
+            Action: approve_merge
+            Requester-Identity-ID: {self.alpha_identity}
+            Target-Identity-ID: {self.beta_identity}
+            Actor-Identity-ID: {self.beta_identity}
+            Timestamp: 2026-03-18T05:30:00Z
+
+            approved
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-022.txt",
+            f"""
+            Record-ID: merge-request-022
+            Action: revoke_merge
+            Requester-Identity-ID: {self.alpha_identity}
+            Target-Identity-ID: {self.beta_identity}
+            Actor-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T05:40:00Z
+
+            revoked
+            """,
+        )
+        self.write_record(
+            "records/moderation/pin-root-001.txt",
+            """
+            Record-ID: pin-root-001
+            Action: pin
+            Target-Type: thread
+            Target-ID: root-001
+            Timestamp: 2026-03-18T05:50:00Z
+
+            Pinning the thread.
+            """,
+        )
+        self.write_record("records/moderation/pin-root-001.txt.pub.asc", self.beta_public)
+
+        status, _, body = self.get("/activity/", "view=moderation")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(f'/profiles/{identity_slug(self.beta_identity)}', body)
+        self.assertNotIn('/user/ilya', body)
 
 
 if __name__ == "__main__":

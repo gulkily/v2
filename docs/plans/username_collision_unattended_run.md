@@ -125,7 +125,7 @@ Uses:
   - Notes:
     - reference whichever prior merge approval or active edge is easiest to implement while remaining deterministic
 
-- [ ] Loop 8: Revocation-aware profile and attribution readback
+- [x] Loop 8: Revocation-aware profile and attribution readback
   - Goal: make split results visible everywhere current identity state is rendered.
   - Smallest intended visible result: profile and attribution surfaces reflect the graph after revocation.
   - Controlling docs:
@@ -287,7 +287,7 @@ Use one short entry per completed loop.
 - Visible result:
   - users can now revoke an active merge immediately from merge management, and the current graph drops that merge while keeping the original approval records in history
 - Commits:
-  - pending
+  - `63addf1` `username-collision loop 7: add one-sided merge revocation`
 - Tests or verification:
   - `python -m unittest tests.test_merge_requests tests.test_merge_request_submission tests.test_merge_management_page`
   - result: `Ran 14 tests ... OK`
@@ -295,6 +295,25 @@ Use one short entry per completed loop.
   - none
 - Checklist/doc updates:
   - marked Loop 7 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
+
+### Loop 8
+
+- Status: completed
+- What landed:
+  - added regression coverage proving that `/user/<username>` routing follows the recomputed graph after a revoke
+  - added post and moderation attribution regressions showing split identities fall back to their direct profile routes when they no longer own the canonical username root
+  - added merge-management API coverage proving revoked merges no longer count as active merge work while historical same-name matches remain visible
+- Visible result:
+  - revocation now has verified end-to-end readback across public profile routing, attribution links, and merge-management summaries
+- Commits:
+  - pending
+- Tests or verification:
+  - `python -m unittest tests.test_username_profile_route tests.test_merge_management_api`
+  - result: `Ran 13 tests ... OK`
+- New deferred questions:
+  - none
+- Checklist/doc updates:
+  - marked Loop 8 complete in [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
 
 ## Stop Conditions Hit
 
@@ -312,10 +331,11 @@ Leave empty if none.
   - Loop 5
   - Loop 6
   - Loop 7
+  - Loop 8
 - Deferred loops:
-  - Loops 8-10
+  - Loops 9-10
 - New unresolved questions:
-  - none from Loops 1-7
+  - none from Loops 1-8
 - Docs updated:
   - [username_collision_fdp_loop_checklist.md](/home/wsl/v2/docs/plans/username_collision_fdp_loop_checklist.md)
   - [username_collision_unattended_run.md](/home/wsl/v2/docs/plans/username_collision_unattended_run.md)
@@ -327,6 +347,7 @@ Leave empty if none.
   - `python -m unittest tests.test_profile_nav_asset`
   - `python -m unittest tests.test_merge_requests tests.test_merge_management_api tests.test_merge_request_submission`
   - `python -m unittest tests.test_merge_requests tests.test_merge_request_submission tests.test_merge_management_page`
+  - `python -m unittest tests.test_username_profile_route tests.test_merge_management_api`
 
 ## Handoff Summary
 

@@ -195,6 +195,52 @@ class MergeManagementApiTests(unittest.TestCase):
         self.assertIn(f"Identity-ID: {self.alpha}", body)
         self.assertIn("Member-Identity-Count: 3", body)
 
+    def test_revoked_merge_request_drops_active_merge_counts(self) -> None:
+        self.write_record(
+            "records/merge-requests/merge-request-020.txt",
+            f"""
+            Record-ID: merge-request-020
+            Action: request_merge
+            Requester-Identity-ID: {self.alpha}
+            Target-Identity-ID: {self.beta}
+            Actor-Identity-ID: {self.alpha}
+            Timestamp: 2026-03-17T22:00:00Z
+
+            """
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-021.txt",
+            f"""
+            Record-ID: merge-request-021
+            Action: approve_merge
+            Requester-Identity-ID: {self.alpha}
+            Target-Identity-ID: {self.beta}
+            Actor-Identity-ID: {self.beta}
+            Timestamp: 2026-03-17T22:05:00Z
+
+            """
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-022.txt",
+            f"""
+            Record-ID: merge-request-022
+            Action: revoke_merge
+            Requester-Identity-ID: {self.alpha}
+            Target-Identity-ID: {self.beta}
+            Actor-Identity-ID: {self.alpha}
+            Timestamp: 2026-03-17T22:10:00Z
+
+            """
+        )
+
+        status, _, body = self.get("/api/get_merge_management", f"identity_id={self.alpha}")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Approved-Request-Count: 0", body)
+        self.assertIn("Outgoing-Request-Count: 0", body)
+        self.assertIn("Incoming-Request-Count: 0", body)
+        self.assertIn("Historical-Match-Count: 1", body)
+
 
 if __name__ == "__main__":
     unittest.main()
