@@ -37,3 +37,12 @@
   - `python -m unittest tests.test_instance_info_page tests.test_request_operation_events tests.test_post_index_startup`
 - Notes:
   - The report is intentionally list-based and recent-history-focused. It does not add charts, alerts, or deep filtering in this first slice.
+
+## Stage 5 - Lock in regression coverage for operation lifecycle and integrated visibility
+- Changes:
+  - Added an explicit request-failure regression test so failed `/instance/` rendering is persisted as a failed operation event with error text.
+  - Re-ran the focused integrated suite covering lifecycle storage, request instrumentation, non-request startup work, report rendering, and existing write-path timing behavior.
+- Verification:
+  - `python -m unittest tests.test_operation_events tests.test_request_operation_events tests.test_background_operation_events tests.test_instance_info_page tests.test_post_index_startup tests.test_thread_auto_reply tests.test_profile_update_submission`
+- Notes:
+  - The first full-suite run hit one transient profile-update signing failure that did not reproduce in isolation or on rerun; the final rerun passed cleanly.

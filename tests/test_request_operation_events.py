@@ -186,6 +186,17 @@ process.stdout.write(signature);
         self.assertIn("git_commit", step_names)
         self.assertIn("post_index_refresh", step_names)
 
+    def test_request_failure_is_recorded_as_failed_operation(self) -> None:
+        with mock.patch("forum_web.web.render_instance_info_page", side_effect=RuntimeError("broken page")):
+            status, _, body = self.request("/instance/")
+
+        self.assertEqual(status, "500 Internal Server Error")
+        self.assertIn("broken page", body)
+        operations = load_recent_operations(self.repo_root)
+        failed_operation = next(event for event in operations if event.operation_name == "GET /instance/")
+        self.assertEqual(failed_operation.state, "failed")
+        self.assertEqual(failed_operation.error_text, "broken page")
+
 
 if __name__ == "__main__":
     unittest.main()
