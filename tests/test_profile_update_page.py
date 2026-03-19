@@ -94,6 +94,69 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertNotIn(f'/profiles/{PROFILE_SLUG}/update', body)
         self.assertNotIn(">update username<", body)
 
+    def test_profile_page_keeps_username_update_link_when_only_linked_peer_has_claim(self) -> None:
+        other_identity_id = "openpgp:fedcba9876543210"
+        other_slug = "openpgp-fedcba9876543210"
+        self.write_record(
+            f"records/identity/identity-{other_slug}.txt",
+            f"""
+            Post-ID: identity-{other_slug}
+            Board-Tags: identity
+            Subject: identity bootstrap
+            Identity-ID: {other_identity_id}
+            Signer-Fingerprint: FEDCBA9876543210
+            Bootstrap-By-Post: other-root
+            Bootstrap-By-Thread: other-root
+
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            second
+            -----END PGP PUBLIC KEY BLOCK-----
+            """,
+        )
+        self.write_record(
+            "records/profile-updates/profile-update-other.txt",
+            f"""
+            Record-ID: profile-update-other
+            Action: set_display_name
+            Source-Identity-ID: {other_identity_id}
+            Timestamp: 2026-03-18T12:00:00Z
+
+            SharedName
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-001.txt",
+            f"""
+            Record-ID: merge-request-001
+            Action: request_merge
+            Requester-Identity-ID: {IDENTITY_ID}
+            Target-Identity-ID: {other_identity_id}
+            Actor-Identity-ID: {IDENTITY_ID}
+            Timestamp: 2026-03-18T12:10:00Z
+
+            please merge
+            """,
+        )
+        self.write_record(
+            "records/merge-requests/merge-request-002.txt",
+            f"""
+            Record-ID: merge-request-002
+            Action: approve_merge
+            Requester-Identity-ID: {IDENTITY_ID}
+            Target-Identity-ID: {other_identity_id}
+            Actor-Identity-ID: {other_identity_id}
+            Timestamp: 2026-03-18T12:11:00Z
+
+            approved
+            """,
+        )
+
+        status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
+        self.assertIn(">update username<", body)
+
     def test_profile_update_page_renders_identity_context(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/update")
 

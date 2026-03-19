@@ -17,3 +17,12 @@
   - `python -m unittest tests.test_profile_update_page tests.test_merge_management_page`
 - Notes:
   - The update page itself is unchanged; this stage only removes dead-end entry points from the public read surfaces.
+
+## Stage 3 - lock in linked-identity affordance visibility behavior
+- Changes:
+  - Extended [test_profile_update_page.py](/home/wsl/v2/tests/test_profile_update_page.py) with a mixed linked-identity regression proving that another member identity's visible claim does not hide `update username` for the still-eligible profile being rendered.
+  - Reused the spent-claim regressions from Stage 2 so the test suite now covers both sides of the rule: hide the link when the current profile is ineligible, keep it when only a linked peer is spent.
+- Verification:
+  - `python -m unittest tests.test_profile_update_page tests.test_merge_management_page`
+- Notes:
+  - No production logic changed in this stage; it locks in the intended profile-scoped eligibility behavior for linked identities.
