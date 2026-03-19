@@ -108,3 +108,7 @@ things that need to be folded into the dev process:
 	- the resulting zen value can then be stored in the database and displayed on the thread page, allowing users to quickly assess the zen quality of a thread before reading it.
 
 - add a queue system for async processes
+
+- fix display of thread titles wherever they're presented as the slug rather than the title
+
+- user directory
