@@ -57,3 +57,6 @@ Merge approval UX idea for later:
   - first-seen chronology
   - recent posts
   - a plain warning that approval affects the whole resolved set and may require later revocation if it was a mistake
+
+- team charter
+	- how to protect the team/community
