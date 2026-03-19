@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 import subprocess
 import time
@@ -21,6 +22,7 @@ from forum_web.profiles import (
 
 POST_INDEX_SCHEMA_VERSION = 3
 PhaseTimingCallback = Callable[[str, float], None]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -827,16 +829,31 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
         expected_count = len(list(records_posts_dir(repo_root).glob("*.txt")))
         indexed_head = get_index_metadata(index.connection, "indexed_head") or None
         indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
+        indexed_schema_version = get_index_metadata(index.connection, "indexed_schema_version")
         try:
             indexed_count = int(indexed_count_text)
         except ValueError:
             indexed_count = -1
         current_head = current_repo_head(repo_root)
-        if (
-            indexed_count != expected_count
-            or indexed_head != current_head
-            or not index_schema_is_current(index.connection)
-        ):
+        count_mismatch = indexed_count != expected_count
+        head_mismatch = indexed_head != current_head
+        schema_mismatch = not index_schema_is_current(index.connection)
+        if count_mismatch or head_mismatch or schema_mismatch:
+            logger.warning(
+                "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
+                "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
+                "expected_schema_version=%r",
+                repo_root,
+                count_mismatch,
+                indexed_count,
+                expected_count,
+                head_mismatch,
+                indexed_head,
+                current_head,
+                schema_mismatch,
+                indexed_schema_version,
+                str(POST_INDEX_SCHEMA_VERSION),
+            )
             rebuild_post_index(repo_root, index=index)
         return index
 
