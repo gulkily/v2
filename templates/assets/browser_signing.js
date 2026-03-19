@@ -822,6 +822,12 @@ async function main() {
     }
   }
 
+  if (commandName === "update_profile" && state.displayName) {
+    state.displayName.addEventListener("focus", () => {
+      state.displayName.select();
+    });
+  }
+
   function scheduleDraftSave() {
     if (!draftContext || !canStoreDraft) {
       return;

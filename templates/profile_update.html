@@ -1,10 +1,5 @@
 <section class="panel page-section">
   ${breadcrumb_html}
-  <div class="detail-grid">
-    <p><strong>Current display name:</strong> <code>${current_display_name}</code></p>
-    <p><strong>Resolved Identity-ID:</strong> <code>${identity_id}</code></p>
-    <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
-  </div>
   <p class="compose-instructions">Enter a new display name and sign it with your local key to claim one username for this signer identity. After that first accepted claim, later username changes from the same key will be rejected.</p>
 </section>
 
@@ -19,7 +14,7 @@
 >
   <form id="profile-update-form" class="field-stack">
     <label class="field-stack" for="display-name-input">
-      <span>New username / display name</span>
+      <span>Choose a username:</span>
       <input id="display-name-input" name="display_name" type="text" maxlength="80" value="${display_name_value}" required>
     </label>
     <div class="action-row">
@@ -35,7 +30,12 @@
 </section>
 
 <details class="panel compose-details page-section">
-  <summary>Advanced</summary>
+  <summary>Technical details</summary>
+  <div class="detail-grid">
+    <p><strong>Current display name:</strong> <code>${current_display_name}</code></p>
+    <p><strong>Resolved Identity-ID:</strong> <code>${identity_id}</code></p>
+    <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
+  </div>
   <div class="compose-grid">
     <section class="compose-card">
       <div class="section-head page-lede">

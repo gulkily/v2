@@ -241,6 +241,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn(IDENTITY_ID, body)
         self.assertIn("claim one username for this signer identity", body)
         self.assertIn("later username changes from the same key will be rejected", body)
+        self.assertIn("Choose a username:", body)
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
         self.assertIn('data-dry-run="false"', body)
@@ -251,8 +252,8 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="clear-pending-submission-button"', body)
         self.assertIn("Submit update", body)
         self.assertNotIn("Sign and submit", body)
-        self.assertNotIn(">Technical details<", body)
-        self.assertIn(">Advanced<", body)
+        self.assertIn(">Technical details<", body)
+        self.assertNotIn(">Advanced<", body)
 
 
 if __name__ == "__main__":
