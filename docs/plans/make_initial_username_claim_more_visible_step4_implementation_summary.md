@@ -16,3 +16,12 @@
   - `python -m unittest tests.test_profile_update_page`
 - Notes:
   - The CTA reuses the existing update route and does not change the existing one-claim eligibility rule.
+
+## Stage 3 - lock in linked-identity CTA visibility behavior
+- Changes:
+  - Extended [test_profile_update_page.py](/home/wsl/v2/tests/test_profile_update_page.py) with a linked-identity regression proving that another member identity's spent claim does not suppress the prominent header CTA for the still-eligible profile being rendered.
+  - Reused the earlier spent/ineligible profile assertions so the profile-page suite now covers both sides of the CTA rule: hide it when the viewed profile is ineligible, keep it when only a linked peer is spent.
+- Verification:
+  - `python -m unittest tests.test_profile_update_page`
+- Notes:
+  - No production logic changed in this stage; it locks in the intended profile-scoped CTA visibility behavior.
