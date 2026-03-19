@@ -29,6 +29,7 @@ from forum_core.merge_requests import (
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
     ResolvedDisplayName,
+    has_visible_profile_update_for_source_identity,
     profile_update_sort_key,
     profile_update_records_dir,
     load_profile_update_records,
@@ -75,6 +76,19 @@ class UsernameRootResolution:
 class UsernamePeerSummary:
     canonical_identity_id: str
     display_name: str
+
+
+def profile_can_update_username(
+    *,
+    summary: ProfileSummary,
+    identity_context: IdentityContext,
+) -> bool:
+    if identity_context.canonical_identity_id(summary.identity_id) is None:
+        return False
+    return not has_visible_profile_update_for_source_identity(
+        source_identity_id=summary.identity_id,
+        profile_updates=list(identity_context.profile_update_records),
+    )
 
 
 def identity_records_dir(repo_root: Path) -> Path:
