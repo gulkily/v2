@@ -1,0 +1,11 @@
+## Stage 1 - Bootstrap-safe CLI entry and dependency boundary
+- Changes:
+  - Added an `install` subcommand to the existing `./forum` task surface for first-run package installation into the user profile.
+  - Made `forum_core.runtime_env` tolerate a missing `python-dotenv` import so bootstrap-only command paths can still run.
+  - Added an explicit runtime dependency check for `start` and `test` so they stop with a clear `./forum install` hint instead of silently running without required packages.
+- Verification:
+  - Ran `python3 -S scripts/forum_tasks.py help` and confirmed the CLI help loads without site-packages.
+  - Ran `python3 -S scripts/forum_tasks.py start` and confirmed it exits with `Missing required Python module \`python-dotenv\`. Run \`./forum install\` first.`
+  - Ran `python3 -S - <<'PY' ... importlib.util.find_spec('dotenv') ... PY` and confirmed the smoke environment had no `dotenv`.
+- Notes:
+  - `PYTHONNOUSERSITE=1` was insufficient here because this machine also has a system-wide `dotenv`; `python3 -S` was needed to simulate a truly clean import path.

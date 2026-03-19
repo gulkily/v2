@@ -10,10 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REQUIREMENTS_PATH = REPO_ROOT / "requirements.txt"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from forum_core.runtime_env import (
+    dotenv_available,
     get_missing_env_defaults,
     load_repo_env,
     notify_missing_env_defaults,
@@ -49,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("help", help="Show help output.")
+    subparsers.add_parser("install", help="Install required Python packages into the user profile.")
     subparsers.add_parser("env-sync", help="Append missing .env settings from .env.example.")
     php_host_parser = subparsers.add_parser(
         "php-host-setup",
@@ -85,6 +88,8 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 
     if args.command in (None, "help"):
         return parser, None
+    if args.command == "install":
+        return parser, TaskRequest(command="install")
     if args.command == "env-sync":
         return parser, TaskRequest(command="env-sync")
     if args.command == "php-host-setup":
@@ -104,6 +109,8 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 
 
 def run_task(request: TaskRequest) -> int:
+    if request.command == "install":
+        return run_install()
     if request.command == "env-sync":
         return run_env_sync()
     if request.command == "php-host-setup":
@@ -114,6 +121,38 @@ def run_task(request: TaskRequest) -> int:
         return run_tests(request.test_pattern)
     print(f"Unknown command: {request.command}", file=sys.stderr)
     return 1
+
+
+def run_install() -> int:
+    if not REQUIREMENTS_PATH.exists():
+        print(f"Missing requirements file: {REQUIREMENTS_PATH}", file=sys.stderr)
+        return 1
+
+    command = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--user",
+        "-r",
+        str(REQUIREMENTS_PATH),
+    ]
+    print("Installing Python requirements into the user profile...")
+    result = subprocess.run(command, check=False, cwd=REPO_ROOT)
+    if result.returncode != 0:
+        return result.returncode
+    print("Installation complete. Next steps: `./forum env-sync` then `./forum start`.")
+    return 0
+
+
+def ensure_runtime_dependencies() -> bool:
+    if dotenv_available():
+        return True
+    print(
+        "Missing required Python module `python-dotenv`. Run `./forum install` first.",
+        file=sys.stderr,
+    )
+    return False
 
 
 def run_env_sync() -> int:
@@ -142,6 +181,8 @@ def run_env_sync() -> int:
 
 
 def run_start() -> int:
+    if not ensure_runtime_dependencies():
+        return 1
     command = [sys.executable, str(REPO_ROOT / "scripts/run_read_only.py")]
     return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
 
@@ -187,6 +228,8 @@ def run_php_host_setup(request: TaskRequest) -> int:
 
 
 def run_tests(test_pattern: str | None = None) -> int:
+    if not ensure_runtime_dependencies():
+        return 1
     load_repo_env(repo_root=REPO_ROOT)
     notify_missing_env_defaults(repo_root=REPO_ROOT)
     command = [sys.executable, "-m", "unittest", "discover", "-s", "tests"]

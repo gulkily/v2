@@ -4,7 +4,10 @@ import logging
 import re
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv as _load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - exercised through CLI bootstrap flow
+    _load_dotenv = None
 
 
 _ACTIVE_ASSIGNMENT_RE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
@@ -168,6 +171,12 @@ def notify_missing_env_defaults(
     return True
 
 
+def dotenv_available() -> bool:
+    return _load_dotenv is not None
+
+
 def load_repo_env(*, repo_root: Path | None = None, override: bool = False) -> bool:
     env_path, _ = repo_env_paths(repo_root)
-    return bool(load_dotenv(dotenv_path=env_path, override=override))
+    if _load_dotenv is None:
+        return False
+    return bool(_load_dotenv(dotenv_path=env_path, override=override))
