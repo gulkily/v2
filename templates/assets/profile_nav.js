@@ -77,9 +77,11 @@ export async function enhanceProfileNav(
     const notificationCount = await mergeNotificationCountForIdentity(identityId, fetchImpl);
     navLink.setAttribute("href", notificationCount > 0 ? `${href}/merge` : href);
     navLink.textContent = notificationCount > 0 ? `My profile (${notificationCount})` : "My profile";
-    navLink.hidden = false;
+    navLink.removeAttribute("aria-disabled");
+    navLink.removeAttribute("tabindex");
+    navLink.setAttribute("data-profile-nav-state", "resolved");
   } catch (_error) {
-    navLink.hidden = true;
+    navLink.setAttribute("data-profile-nav-state", "unresolved");
   }
 }
 

@@ -121,10 +121,15 @@ const generated = await openpgp.generateKey({{
 const publicKey = await openpgp.readKey({{ armoredKey: generated.publicKey }});
 const fingerprint = publicKey.getFingerprint().toLowerCase();
 const navLink = {{
-  hidden: true,
+  attributes: {{}},
   textContent: "My profile",
   setAttribute(name, value) {{
+    this.attributes[name] = value;
     this[name] = value;
+  }},
+  removeAttribute(name) {{
+    delete this.attributes[name];
+    delete this[name];
   }},
 }};
 const doc = {{
@@ -154,7 +159,9 @@ const fetchImpl = async () => ({{
 
 await enhanceProfileNav(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
-  hidden: navLink.hidden,
+  ariaDisabled: navLink["aria-disabled"] || "",
+  tabindex: navLink.tabindex || "",
+  state: navLink["data-profile-nav-state"] || "",
   href: navLink.href,
   textContent: navLink.textContent,
   fingerprint,
@@ -162,7 +169,9 @@ process.stdout.write(JSON.stringify({{
 """
         payload = json.loads(self.run_node(script))
 
-        self.assertFalse(payload["hidden"])
+        self.assertEqual(payload["ariaDisabled"], "")
+        self.assertEqual(payload["tabindex"], "")
+        self.assertEqual(payload["state"], "resolved")
         self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}/merge")
         self.assertEqual(payload["textContent"], "My profile (3)")
 
