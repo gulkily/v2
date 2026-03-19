@@ -75,6 +75,18 @@ def render_site_footer() -> str:
     )
 
 
+def render_username_claim_cta_html() -> str:
+    return (
+        '<section class="site-username-claim panel" data-username-claim-cta hidden>'
+        '<div class="site-username-claim-copy">'
+        '<p class="site-username-claim-kicker">Account setup</p>'
+        '<p class="site-username-claim-text">Your saved signing key can still claim a username for this account.</p>'
+        "</div>"
+        '<a class="thread-chip site-username-claim-link" data-username-claim-link href="">Choose your username</a>'
+        "</section>"
+    )
+
+
 def render_page(
     *,
     title: str,
@@ -86,6 +98,7 @@ def render_page(
     page_script_html: str = "",
     page_shell_class: str = "",
     page_header_html: str | None = None,
+    page_banner_html: str = "",
     page_footer_html: str = "",
 ) -> str:
     base = load_template("base.html")
@@ -98,10 +111,17 @@ def render_page(
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()
-    page_script_html = render_profile_nav_script_tag() + page_script_html
+    if not page_banner_html:
+        page_banner_html = render_username_claim_cta_html()
+    page_script_html = (
+        render_profile_nav_script_tag()
+        + render_username_claim_cta_script_tag()
+        + page_script_html
+    )
     return base.substitute(
         title=html.escape(title),
         page_header_html=page_header_html,
+        page_banner_html=page_banner_html,
         content_html=content_html,
         page_footer_html=page_footer_html,
         page_script_html=page_script_html,
@@ -116,3 +136,7 @@ def load_asset_text(name: str) -> str:
 
 def render_profile_nav_script_tag() -> str:
     return '<script type="module" src="/assets/profile_nav.js"></script>'
+
+
+def render_username_claim_cta_script_tag() -> str:
+    return '<script type="module" src="/assets/username_claim_cta.js"></script>'

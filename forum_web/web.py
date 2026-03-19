@@ -61,7 +61,6 @@ from forum_web.profiles import (
     resolve_username_claim_cta_state,
     load_identity_context,
     profile_can_update_username,
-    profile_username_claim_callout_text,
     profile_usernames,
     resolve_identity_display_name,
     other_users_with_username,
@@ -641,13 +640,6 @@ def render_profile_page(
         hero_kicker="Profile View",
         hero_title=summary.display_name,
         hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
-        hero_action_html=(
-            f'<p class="site-header-text"><a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
-            f'{html.escape(profile_username_claim_callout_text(summary=summary, identity_context=identity_context))}'
-            "</a></p>"
-            if profile_username_claim_callout_text(summary=summary, identity_context=identity_context)
-            else ""
-        ),
         content_html=content,
         page_script_html=profile_script_html,
     )
@@ -2663,6 +2655,12 @@ def application(environ, start_response):
 
         if path == "/assets/profile_nav.js":
             body = load_asset_text("profile_nav.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/username_claim_cta.js":
+            body = load_asset_text("username_claim_cta.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

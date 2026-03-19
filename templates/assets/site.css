@@ -56,6 +56,40 @@ body {
   margin-bottom: 1rem;
 }
 
+.site-username-claim {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-color: rgba(45, 91, 115, 0.28);
+  background: linear-gradient(135deg, rgba(45, 91, 115, 0.1), rgba(236, 228, 200, 0.78));
+}
+
+.site-username-claim-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.site-username-claim-kicker {
+  margin: 0;
+  color: var(--accent);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.site-username-claim-text {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.site-username-claim-link {
+  white-space: nowrap;
+}
+
 .site-header-band,
 .site-header-main,
 .site-header-page-intro,
@@ -897,6 +931,7 @@ button:disabled {
   .site-header-main,
   .site-header-page-intro,
   .site-footer-inner,
+  .site-username-claim,
   .panel {
     padding: 1rem;
   }
@@ -906,7 +941,8 @@ button:disabled {
   }
 
   .site-header-main,
-  .site-footer-inner {
+  .site-footer-inner,
+  .site-username-claim {
     grid-template-columns: 1fr;
     flex-direction: column;
   }
