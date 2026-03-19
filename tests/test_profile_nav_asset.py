@@ -175,6 +175,72 @@ process.stdout.write(JSON.stringify({{
         self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}/merge")
         self.assertEqual(payload["textContent"], "My profile (3)")
 
+    def test_profile_nav_asset_leaves_unresolved_slot_stable_without_stored_key(self) -> None:
+        asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
+        vendor_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+        ).as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+const loaderSource = await fs.readFile(new URL({json.dumps((Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js").as_uri())}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const rewrittenAssetSource = assetSource.replace(
+  "./openpgp_loader.js",
+  loaderModuleUrl,
+);
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
+const {{ enhanceProfileNav }} = await import(assetModuleUrl);
+
+const navLink = {{
+  attributes: {{
+    "aria-disabled": "true",
+    "data-profile-nav-state": "unresolved",
+    tabindex: "-1",
+  }},
+  textContent: "My profile",
+  href: "",
+  setAttribute(name, value) {{
+    this.attributes[name] = value;
+    this[name] = value;
+  }},
+  removeAttribute(name) {{
+    delete this.attributes[name];
+    delete this[name];
+  }},
+}};
+const doc = {{
+  querySelector(selector) {{
+    return selector === "[data-profile-nav-link]" ? navLink : null;
+  }},
+}};
+const storage = {{
+  getItem() {{
+    return "";
+  }},
+}};
+
+await enhanceProfileNav(doc, storage, async () => ({{ ok: false, text: async () => "" }}));
+process.stdout.write(JSON.stringify({{
+  ariaDisabled: navLink.attributes["aria-disabled"] || "",
+  tabindex: navLink.attributes.tabindex || "",
+  state: navLink.attributes["data-profile-nav-state"] || "",
+  href: navLink.href,
+  textContent: navLink.textContent,
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertEqual(payload["ariaDisabled"], "true")
+        self.assertEqual(payload["tabindex"], "-1")
+        self.assertEqual(payload["state"], "unresolved")
+        self.assertEqual(payload["href"], "")
+        self.assertEqual(payload["textContent"], "My profile")
+
 
 if __name__ == "__main__":
     unittest.main()

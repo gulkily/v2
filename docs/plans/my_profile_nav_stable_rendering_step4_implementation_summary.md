@@ -17,3 +17,12 @@
   - `python -m unittest tests.test_profile_nav_asset tests.test_board_index_page`
 - Notes:
   - Users without a stored key continue to see the unresolved stable slot from Stage 1; the next stage will lock that base-state behavior in more explicitly.
+
+## Stage 3 - Lock in stable-slot regression coverage
+- Changes:
+  - Added a no-stored-key asset regression test so the unresolved `My profile` slot remains stable, non-interactive, and unchanged when browser identity data is unavailable.
+  - Re-ran the focused nav suite so the shared-header and asset behaviors are covered together.
+- Verification:
+  - `python -m unittest tests.test_profile_nav_asset tests.test_board_index_page`
+- Notes:
+  - Coverage stays intentionally narrow: it proves the initial stable slot, the resolved enhancement path, and the no-key fallback without introducing browser-visual or pixel-level tests.
