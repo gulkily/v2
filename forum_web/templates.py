@@ -24,7 +24,10 @@ def render_primary_nav(*, aria_label: str = "Primary") -> str:
         f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
         for path, label in links
     )
-    items += '<a href="" data-profile-nav-link hidden>My profile</a>'
+    items += (
+        '<a href="" data-profile-nav-link data-profile-nav-state="unresolved" '
+        'aria-disabled="true" tabindex="-1">My profile</a>'
+    )
     return f'<nav class="site-header-nav" aria-label="{html.escape(aria_label)}">{items}</nav>'
 
 
