@@ -33,6 +33,7 @@ def render_site_header(
     hero_kicker: str,
     hero_title: str,
     hero_text: str,
+    hero_action_html: str = "",
     include_page_intro: bool = True,
 ) -> str:
     intro_html = ""
@@ -42,6 +43,7 @@ def render_site_header(
             f'<p class="site-header-kicker">{html.escape(hero_kicker)}</p>'
             f'<h1 class="site-header-heading">{html.escape(hero_title)}</h1>'
             f'<p class="site-header-text">{html.escape(hero_text)}</p>'
+            f"{hero_action_html}"
             "</div>"
         )
     return (
@@ -79,6 +81,7 @@ def render_page(
     hero_kicker: str,
     hero_title: str,
     hero_text: str,
+    hero_action_html: str = "",
     content_html: str,
     page_script_html: str = "",
     page_shell_class: str = "",
@@ -91,6 +94,7 @@ def render_page(
             hero_kicker=hero_kicker,
             hero_title=hero_title,
             hero_text=hero_text,
+            hero_action_html=hero_action_html,
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()

@@ -73,8 +73,11 @@ class ProfileUpdatePageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
-        self.assertIn("update username", body)
         self.assertIn("You can still claim one username for this profile.", body)
+        self.assertIn(
+            f'<a class="thread-chip" href="/profiles/{PROFILE_SLUG}/update">You can still claim one username for this profile.</a>',
+            body,
+        )
 
     def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
         self.write_record(
@@ -157,8 +160,11 @@ class ProfileUpdatePageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
-        self.assertIn(">update username<", body)
         self.assertIn("You can still claim one username for this profile.", body)
+        self.assertIn(
+            f'<a class="thread-chip" href="/profiles/{PROFILE_SLUG}/update">You can still claim one username for this profile.</a>',
+            body,
+        )
 
     def test_profile_update_page_renders_identity_context(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/update")

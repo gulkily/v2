@@ -638,13 +638,13 @@ def render_profile_page(
         title=summary.display_name,
         hero_kicker="Profile View",
         hero_title=summary.display_name,
-        hero_text=(
-            "This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile."
-            + (
-                " " + profile_username_claim_callout_text(summary=summary, identity_context=identity_context)
-                if profile_username_claim_callout_text(summary=summary, identity_context=identity_context)
-                else ""
-            )
+        hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
+        hero_action_html=(
+            f'<p class="site-header-text"><a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
+            f'{html.escape(profile_username_claim_callout_text(summary=summary, identity_context=identity_context))}'
+            "</a></p>"
+            if profile_username_claim_callout_text(summary=summary, identity_context=identity_context)
+            else ""
         ),
         content_html=content,
         page_script_html=profile_script_html,
