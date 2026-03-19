@@ -59,6 +59,7 @@ from forum_web.profiles import (
     find_profile_summary,
     load_identity_context,
     profile_can_update_username,
+    profile_username_claim_callout_text,
     profile_usernames,
     resolve_identity_display_name,
     other_users_with_username,
@@ -637,7 +638,14 @@ def render_profile_page(
         title=summary.display_name,
         hero_kicker="Profile View",
         hero_title=summary.display_name,
-        hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
+        hero_text=(
+            "This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile."
+            + (
+                " " + profile_username_claim_callout_text(summary=summary, identity_context=identity_context)
+                if profile_username_claim_callout_text(summary=summary, identity_context=identity_context)
+                else ""
+            )
+        ),
         content_html=content,
         page_script_html=profile_script_html,
     )

@@ -91,6 +91,16 @@ def profile_can_update_username(
     )
 
 
+def profile_username_claim_callout_text(
+    *,
+    summary: ProfileSummary,
+    identity_context: IdentityContext,
+) -> str:
+    if not profile_can_update_username(summary=summary, identity_context=identity_context):
+        return ""
+    return "You can still claim one username for this profile."
+
+
 def identity_records_dir(repo_root: Path) -> Path:
     return repo_root / "records" / "identity"
 
