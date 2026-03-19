@@ -27,3 +27,13 @@
   - `python -m unittest tests.test_background_operation_events tests.test_post_index_startup tests.test_operation_events`
 - Notes:
   - This stage stays intentionally narrow: it covers the post-index readiness and rebuild paths first rather than attempting exhaustive instrumentation of every maintenance helper.
+
+## Stage 4 - Add a lightweight recent-operations report to the instance page
+- Changes:
+  - Extended `/instance/` so it now renders a recent slow operations panel backed by the shared recent-event store.
+  - Added report rendering helpers for operation name, state, duration, metadata, failure text, and named timing steps.
+  - Added focused page coverage that exercises the report panel through the normal `/instance/` route.
+- Verification:
+  - `python -m unittest tests.test_instance_info_page tests.test_request_operation_events tests.test_post_index_startup`
+- Notes:
+  - The report is intentionally list-based and recent-history-focused. It does not add charts, alerts, or deep filtering in this first slice.

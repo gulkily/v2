@@ -14,6 +14,13 @@ from wsgiref.util import setup_testing_defaults
 from forum_core.instance_info import load_instance_info, render_public_value
 from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
+from forum_core.operation_events import (
+    bind_operation,
+    complete_operation,
+    fail_operation,
+    load_recent_operations,
+    start_operation,
+)
 from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
@@ -27,7 +34,6 @@ from forum_core.moderation import (
     post_is_hidden,
     thread_is_hidden,
 )
-from forum_core.operation_events import bind_operation, complete_operation, fail_operation, start_operation
 from forum_cgi.identity_links import submit_identity_link
 from forum_cgi.merge_requests import submit_merge_request
 from forum_cgi.moderation import submit_moderation
@@ -1068,6 +1074,7 @@ def render_instance_info_page() -> str:
         commit_id=html.escape(render_public_value(info.commit_id)),
         commit_date=html.escape(render_public_value(info.commit_date)),
         source_path=html.escape(str(info.source_path.relative_to(repo_root))),
+        recent_operations_html=render_recent_operations_panel(repo_root),
     )
     return render_page(
         title="Project Information",
@@ -1075,6 +1082,54 @@ def render_instance_info_page() -> str:
         hero_title="Project information",
         hero_text="One public page for the project assumptions, public instance facts, and the reasons behind the plain-text constraints used here.",
         content_html=content,
+    )
+
+
+def render_recent_operations_panel(repo_root: Path) -> str:
+    operations = load_recent_operations(repo_root, limit=10)
+    if not operations:
+        entries_html = '<article class="post-card"><p class="post-link">No recent operations have been recorded yet.</p></article>'
+    else:
+        entries_html = "".join(render_recent_operation_card(operation) for operation in operations)
+    return (
+        '<section class="panel page-section">'
+        '<div class="section-head page-lede">'
+        '<h2>Recent slow operations</h2>'
+        '<p>Recent request, startup, and maintenance operations recorded with named timing steps.</p>'
+        "</div>"
+        f"{entries_html}"
+        "</section>"
+    )
+
+
+def render_recent_operation_card(operation) -> str:
+    duration_text = (
+        f"{operation.total_duration_ms:.2f} ms" if operation.total_duration_ms is not None else "running"
+    )
+    metadata_html = "".join(
+        f'<span class="thread-chip">{html.escape(key)}: {html.escape(value)}</span>'
+        for key, value in sorted(operation.metadata.items())
+    )
+    steps_html = "".join(
+        f"<li><strong>{html.escape(step.name)}</strong> <span>{step.duration_ms:.2f} ms</span></li>"
+        for step in operation.steps
+    )
+    if not steps_html:
+        steps_html = "<li>No named timing steps recorded.</li>"
+    error_html = (
+        f'<p class="status-note">Failure: {html.escape(operation.error_text)}</p>'
+        if operation.error_text
+        else ""
+    )
+    return (
+        '<article class="post-card">'
+        f'<p class="post-link">{html.escape(operation.operation_name)}</p>'
+        f'<p class="thread-meta">{html.escape(operation.operation_kind)} · {html.escape(operation.state)} · {html.escape(duration_text)}</p>'
+        f'<p class="thread-meta">started {html.escape(operation.started_at)}</p>'
+        f"{error_html}"
+        f'<p class="thread-meta">{metadata_html}</p>'
+        f"<ul>{steps_html}</ul>"
+        "</article>"
     )
 
 

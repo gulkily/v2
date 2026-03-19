@@ -106,6 +106,17 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("records/instance/public.txt", body)
         self.assertIn("Project information", body)
 
+    def test_instance_info_page_renders_recent_operations_panel(self) -> None:
+        self.get("/")
+
+        status, _, body = self.get("/instance/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Recent slow operations", body)
+        self.assertIn("GET /instance/", body)
+        self.assertIn("method: GET", body)
+        self.assertIn("path: /instance/", body)
+
 
 if __name__ == "__main__":
     unittest.main()
