@@ -78,16 +78,35 @@ class UsernamePeerSummary:
     display_name: str
 
 
+@dataclass(frozen=True)
+class UsernameClaimCtaState:
+    identity_id: str
+    can_claim_username: bool
+    update_href: str
+
+
+def identity_can_claim_username(
+    *,
+    identity_id: str,
+    identity_context: IdentityContext,
+) -> bool:
+    canonical_identity_id = identity_context.canonical_identity_id(identity_id)
+    if canonical_identity_id is None:
+        return False
+    return not has_visible_profile_update_for_source_identity(
+        source_identity_id=identity_id,
+        profile_updates=list(identity_context.profile_update_records),
+    )
+
+
 def profile_can_update_username(
     *,
     summary: ProfileSummary,
     identity_context: IdentityContext,
 ) -> bool:
-    if identity_context.canonical_identity_id(summary.identity_id) is None:
-        return False
-    return not has_visible_profile_update_for_source_identity(
-        source_identity_id=summary.identity_id,
-        profile_updates=list(identity_context.profile_update_records),
+    return identity_can_claim_username(
+        identity_id=summary.identity_id,
+        identity_context=identity_context,
     )
 
 
@@ -99,6 +118,38 @@ def profile_username_claim_callout_text(
     if not profile_can_update_username(summary=summary, identity_context=identity_context):
         return ""
     return "You can still claim one username for this profile."
+
+
+def resolve_username_claim_cta_state(
+    *,
+    repo_root: Path,
+    posts: list[Post],
+    identity_id: str,
+    identity_context: IdentityContext,
+) -> UsernameClaimCtaState | None:
+    if identity_context.canonical_identity_id(identity_id) is None:
+        return None
+    summary = find_profile_summary(
+        repo_root=repo_root,
+        posts=posts,
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    if summary is None:
+        return None
+    can_claim_username = identity_can_claim_username(
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    return UsernameClaimCtaState(
+        identity_id=identity_id,
+        can_claim_username=can_claim_username,
+        update_href=(
+            f"/profiles/{summary.identity_id.replace(':', '-')}/update"
+            if can_claim_username
+            else ""
+        ),
+    )
 
 
 def identity_records_dir(repo_root: Path) -> Path:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from forum_core.moderation import ModerationRecord
 from forum_core.identity import ProfileSummary, render_profile_summary_text
 from forum_core.merge_requests import MergeManagementSummary
+from forum_web.profiles import UsernameClaimCtaState
 from forum_web.repository import Post, Thread, is_task_root, root_thread_type
 
 
@@ -10,7 +11,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
     lines = [
         "FORUM-API/1",
         "Mode: mixed",
-        "Available-Commands: list_index get_thread get_post get_profile get_merge_management get_moderation_log call_llm create_thread create_reply moderate link_identity merge_request update_profile",
+        "Available-Commands: list_index get_thread get_post get_profile get_username_claim_cta get_merge_management get_moderation_log call_llm create_thread create_reply moderate link_identity merge_request update_profile",
         f"Post-Count: {post_count}",
         f"Thread-Count: {thread_count}",
         f"Board-Tags: {' '.join(board_tags)}",
@@ -28,6 +29,7 @@ def render_api_home_text(*, post_count: int, thread_count: int, board_tags: list
         "/api/get_thread?thread_id=<thread-id>",
         "/api/get_post?post_id=<post-id>",
         "/api/get_profile?identity_id=<identity-id>",
+        "/api/get_username_claim_cta?identity_id=<identity-id>",
         "/api/get_merge_management?identity_id=<identity-id>",
         "/api/get_moderation_log?limit=<decimal>&before=<record-id-or-empty>",
     ]
@@ -56,6 +58,7 @@ def render_llms_text() -> str:
         "- GET /api/get_thread?thread_id=<thread-id>",
         "- GET /api/get_post?post_id=<post-id>",
         "- GET /api/get_profile?identity_id=<identity-id>",
+        "- GET /api/get_username_claim_cta?identity_id=<identity-id>",
         "- GET /api/get_merge_management?identity_id=<identity-id>",
         "- GET /api/get_moderation_log?limit=<decimal>&before=<record-id-or-empty>",
         "- POST /api/create_thread",
@@ -180,6 +183,17 @@ def render_merge_management_text(summary: MergeManagementSummary) -> str:
     lines.extend(["", "Approved-Requests:"])
     for state in summary.approved_requests:
         lines.append("\t".join([state.requester_identity_id, state.target_identity_id, state.latest_request_record_id]))
+    return "\n".join(lines) + "\n"
+
+
+def render_username_claim_cta_text(state: UsernameClaimCtaState) -> str:
+    lines = [
+        "Command: get_username_claim_cta",
+        f"Identity-ID: {state.identity_id}",
+        f"Can-Claim-Username: {'yes' if state.can_claim_username else 'no'}",
+    ]
+    if state.update_href:
+        lines.append(f"Update-Href: {state.update_href}")
     return "\n".join(lines) + "\n"
 
 

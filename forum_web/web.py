@@ -54,9 +54,11 @@ from forum_web.api_text import (
     render_post_text,
     render_profile_text,
     render_thread_text,
+    render_username_claim_cta_text,
 )
 from forum_web.profiles import (
     find_profile_summary,
+    resolve_username_claim_cta_state,
     load_identity_context,
     profile_can_update_username,
     profile_username_claim_callout_text,
@@ -1997,6 +1999,23 @@ def render_api_get_merge_management(identity_id: str | None) -> tuple[str, str]:
     return "200 OK", render_merge_management_text(summary)
 
 
+def render_api_get_username_claim_cta(identity_id: str | None) -> tuple[str, str]:
+    if not identity_id:
+        return "400 Bad Request", render_bad_request_text("missing required query parameter: identity_id")
+
+    repo_root = get_repo_root()
+    posts, _, _, _, _, identity_context = load_repository_state()
+    state = resolve_username_claim_cta_state(
+        repo_root=repo_root,
+        posts=posts,
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    if state is None:
+        return "404 Not Found", render_not_found_text("identity", identity_id)
+    return "200 OK", render_username_claim_cta_text(state)
+
+
 def render_api_get_moderation_log(limit: int, before: str | None) -> tuple[str, str]:
     _, _, _, moderation_records, _, _ = load_repository_state()
     try:
@@ -2419,6 +2438,14 @@ def application(environ, start_response):
         if path == "/api/get_profile":
             identity_id = query_params.get("identity_id", [""])[0].strip() or None
             status, body_text = render_api_get_profile(identity_id)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/get_username_claim_cta":
+            identity_id = query_params.get("identity_id", [""])[0].strip() or None
+            status, body_text = render_api_get_username_claim_cta(identity_id)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
