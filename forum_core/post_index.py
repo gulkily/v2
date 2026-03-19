@@ -9,7 +9,7 @@ from typing import Callable
 
 from forum_core.identity import normalize_fingerprint, short_identity_label
 from forum_core.merge_requests import derive_approved_merge_links
-from forum_core.operation_events import emit_operation_timing
+from forum_core.operation_events import emit_operation_timing, tracked_operation
 from forum_web.repository import Post, load_posts
 from forum_web.profiles import (
     IdentityContext,
@@ -762,71 +762,83 @@ def rebuild_post_index(
     *,
     timing_callback: PhaseTimingCallback | None = None,
 ) -> IndexBuildResult:
-    def record_timing(phase_name: str, started_at: float) -> None:
-        emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
+    with tracked_operation(
+        repo_root,
+        operation_kind="maintenance",
+        operation_name="post_index_rebuild",
+        metadata={"entry_point": "rebuild_post_index"},
+    ):
+        def record_timing(phase_name: str, started_at: float) -> None:
+            emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
 
-    owned_index = index is None
-    active_index = index or open_post_index(repo_root)
-    started_at = time.perf_counter()
-    posts = load_posts(records_posts_dir(repo_root))
-    record_timing("post_index_load_posts", started_at)
-    started_at = time.perf_counter()
-    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
-    record_timing("post_index_load_identity_context", started_at)
-    started_at = time.perf_counter()
-    timestamps_by_post_id = post_commit_timestamps(repo_root)
-    record_timing("post_index_commit_timestamps", started_at)
-    started_at = time.perf_counter()
-    commit_order = repo_commit_order(repo_root)
-    clear_post_index(active_index.connection)
-    for post in posts:
-        upsert_indexed_post(
-            active_index.connection,
-            post=post,
+        owned_index = index is None
+        active_index = index or open_post_index(repo_root)
+        started_at = time.perf_counter()
+        posts = load_posts(records_posts_dir(repo_root))
+        record_timing("post_index_load_posts", started_at)
+        started_at = time.perf_counter()
+        identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+        record_timing("post_index_load_identity_context", started_at)
+        started_at = time.perf_counter()
+        timestamps_by_post_id = post_commit_timestamps(repo_root)
+        record_timing("post_index_commit_timestamps", started_at)
+        started_at = time.perf_counter()
+        commit_order = repo_commit_order(repo_root)
+        clear_post_index(active_index.connection)
+        for post in posts:
+            upsert_indexed_post(
+                active_index.connection,
+                post=post,
+                repo_root=repo_root,
+                timestamps=timestamps_by_post_id.get(post.post_id, PostCommitTimestamps(created_at=None, updated_at=None)),
+                identity_context=identity_context,
+            )
+        record_timing("post_index_upsert_all_posts", started_at)
+        started_at = time.perf_counter()
+        upsert_identity_members(active_index.connection, identity_context=identity_context)
+        upsert_active_merge_edges(active_index.connection, identity_context=identity_context)
+        claim_rows = current_username_claim_rows(
             repo_root=repo_root,
-            timestamps=timestamps_by_post_id.get(post.post_id, PostCommitTimestamps(created_at=None, updated_at=None)),
             identity_context=identity_context,
+            commit_order=commit_order,
         )
-    record_timing("post_index_upsert_all_posts", started_at)
-    started_at = time.perf_counter()
-    upsert_identity_members(active_index.connection, identity_context=identity_context)
-    upsert_active_merge_edges(active_index.connection, identity_context=identity_context)
-    claim_rows = current_username_claim_rows(
-        repo_root=repo_root,
-        identity_context=identity_context,
-        commit_order=commit_order,
-    )
-    upsert_current_username_claims(active_index.connection, claim_rows=claim_rows)
-    upsert_username_roots(active_index.connection, claim_rows=claim_rows)
-    indexed_head = current_repo_head(repo_root)
-    set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
-    set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
-    set_index_metadata(active_index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
-    started_at = time.perf_counter()
-    active_index.connection.commit()
-    record_timing("post_index_commit_sqlite", started_at)
-    if owned_index:
-        active_index.connection.close()
-    return IndexBuildResult(post_count=len(posts), indexed_head=indexed_head)
+        upsert_current_username_claims(active_index.connection, claim_rows=claim_rows)
+        upsert_username_roots(active_index.connection, claim_rows=claim_rows)
+        indexed_head = current_repo_head(repo_root)
+        set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
+        set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
+        set_index_metadata(active_index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+        started_at = time.perf_counter()
+        active_index.connection.commit()
+        record_timing("post_index_commit_sqlite", started_at)
+        if owned_index:
+            active_index.connection.close()
+        return IndexBuildResult(post_count=len(posts), indexed_head=indexed_head)
 
 
 def ensure_post_index_current(repo_root: Path) -> PostIndex:
-    index = open_post_index(repo_root)
-    expected_count = len(list(records_posts_dir(repo_root).glob("*.txt")))
-    indexed_head = get_index_metadata(index.connection, "indexed_head") or None
-    indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
-    try:
-        indexed_count = int(indexed_count_text)
-    except ValueError:
-        indexed_count = -1
-    current_head = current_repo_head(repo_root)
-    if (
-        indexed_count != expected_count
-        or indexed_head != current_head
-        or not index_schema_is_current(index.connection)
+    with tracked_operation(
+        repo_root,
+        operation_kind="startup",
+        operation_name="post_index_ready_check",
+        metadata={"entry_point": "ensure_post_index_current"},
     ):
-        rebuild_post_index(repo_root, index=index)
-    return index
+        index = open_post_index(repo_root)
+        expected_count = len(list(records_posts_dir(repo_root).glob("*.txt")))
+        indexed_head = get_index_metadata(index.connection, "indexed_head") or None
+        indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
+        try:
+            indexed_count = int(indexed_count_text)
+        except ValueError:
+            indexed_count = -1
+        current_head = current_repo_head(repo_root)
+        if (
+            indexed_count != expected_count
+            or indexed_head != current_head
+            or not index_schema_is_current(index.connection)
+        ):
+            rebuild_post_index(repo_root, index=index)
+        return index
 
 
 def refresh_post_index_after_commit(

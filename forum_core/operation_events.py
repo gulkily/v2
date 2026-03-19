@@ -269,6 +269,33 @@ def bind_operation(handle: OperationHandle) -> Iterator[OperationHandle]:
         _CURRENT_OPERATION.reset(token)
 
 
+@contextmanager
+def tracked_operation(
+    repo_root: Path,
+    *,
+    operation_kind: str,
+    operation_name: str,
+    metadata: dict[str, str] | None = None,
+) -> Iterator[OperationHandle | None]:
+    existing = current_operation()
+    if existing is not None:
+        yield None
+        return
+    handle = start_operation(
+        repo_root,
+        operation_kind=operation_kind,
+        operation_name=operation_name,
+        metadata=metadata,
+    )
+    with bind_operation(handle):
+        try:
+            yield handle
+        except Exception as exc:
+            fail_operation(handle, error_text=str(exc))
+            raise
+        complete_operation(handle)
+
+
 def record_current_operation_step(name: str, duration_ms: float) -> None:
     handle = current_operation()
     if handle is None:

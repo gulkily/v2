@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from forum_web import web
-from forum_core.post_index import open_post_index
+from forum_core.post_index import POST_INDEX_SCHEMA_VERSION, open_post_index
 
 
 class PostIndexStartupTests(unittest.TestCase):
@@ -84,7 +84,15 @@ class PostIndexStartupTests(unittest.TestCase):
             with mock.patch("forum_core.post_index.load_identity_context") as mock_context_loader:
                 mock_context = mock.Mock()
                 mock_context.canonical_identity_id.return_value = "openpgp:author"
-                mock_context.resolved_display_name.return_value = mock.Mock(display_name="Author Name")
+                mock_context.resolved_display_name.return_value = mock.Mock(
+                    display_name="Author Name",
+                    record_id="profile-update-001",
+                    source_identity_id="openpgp:author",
+                )
+                mock_context.merge_request_states = {}
+                mock_context.profile_update_records = ()
+                mock_context.resolution = mock.Mock()
+                mock_context.resolution.members_by_canonical_identity_id = {"openpgp:author": ("openpgp:author",)}
                 mock_context_loader.return_value = mock_context
                 with mock.patch("forum_core.post_index.resolve_identity_display_name", return_value="Author Name"):
                     with mock.patch("forum_core.post_index.load_posts") as mock_load_posts:
@@ -115,7 +123,7 @@ class PostIndexStartupTests(unittest.TestCase):
                 ("openpgp:author",),
             ).fetchone()
             self.assertIsNotNone(schema_version)
-            self.assertEqual(schema_version["value"], "2")
+            self.assertEqual(schema_version["value"], str(POST_INDEX_SCHEMA_VERSION))
             self.assertIsNotNone(author_row)
             self.assertEqual(author_row["display_name"], "Author Name")
         finally:
