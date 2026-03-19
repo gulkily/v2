@@ -45,8 +45,10 @@ Entry-Count: <n>
 1. Install Python dependencies:
 
 ```bash
-python3 -m pip install -r requirements.txt
+./forum install
 ```
+
+If you prefer a repo-local virtual environment instead of a user-profile install, use `./forum install --target venv`.
 
 2. Sync the repo-root environment file:
 
@@ -65,6 +67,7 @@ python3 -m pip install -r requirements.txt
 ## Common Commands
 
 - `./forum help`
+- `./forum install`
 - `./forum env-sync`
 - `./forum start`
 - `./forum test`

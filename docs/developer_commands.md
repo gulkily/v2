@@ -4,6 +4,9 @@ Use `./forum` as the short repo-root command for common local tasks.
 
 ## Common tasks
 - `./forum help`: show the available subcommands.
+- `./forum install`: install required Python packages into the user profile.
+- `./forum install --target venv`: install into a repo-local `.venv`.
+- `./forum install --target current`: install into the current Python environment.
 - `./forum env-sync`: append missing `.env` settings from `.env.example` without overwriting existing values.
 - `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
 - `./forum start`: run the local read-only forum server.
@@ -19,6 +22,8 @@ The command contract is intentionally small: future backends such as Perl should
 - `cgi-bin/create_thread.py` and `cgi-bin/create_reply.py`: direct write-command entrypoints for lower-level testing and parity work.
 
 ## Runtime environment
+- `./forum install` is the canonical first-run bootstrap command for a clean shell account.
+- The default install target is the user profile; use `--target venv` for a repo-local `.venv` or `--target current` for the current Python environment.
 - Repo-root `.env` is loaded automatically for the main local server path, direct WSGI import path, CGI write entrypoints, and `./forum test`.
 - Run `./forum env-sync` after pulling changes that add new keys to `.env.example`.
 - Restart the relevant process after changing `.env`.
@@ -44,7 +49,7 @@ The command contract is intentionally small: future backends such as Perl should
 - The PHP adapter keeps the existing `/api/create_thread` and `/api/create_reply` routes intact rather than introducing PHP-specific write endpoints.
 
 ## Dedalus baseline
-1. Install dependencies with `python3 -m pip install -r requirements.txt`.
+1. Install dependencies with `./forum install`.
 2. Run `./forum env-sync` and set `DEDALUS_API_KEY=...` in the repo-root `.env`.
 3. Start the local server with `./forum start`.
 4. Call the baseline LLM endpoint:
@@ -59,7 +64,7 @@ curl -s http://127.0.0.1:8000/api/call_llm \
 The response is `text/plain` and includes the command name, model, and generated output.
 
 ## Thread auto reply
-1. Install dependencies with `python3 -m pip install -r requirements.txt`.
+1. Install dependencies with `./forum install`.
 2. Run `./forum env-sync`.
 3. Set `DEDALUS_API_KEY=...` and `FORUM_ENABLE_THREAD_AUTO_REPLY=1` in the repo-root `.env`.
 4. Optionally set `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH=...` and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH=...` if you want the assistant signing keys somewhere specific. If you leave them unset, the server will try to create them under `records/system/`.

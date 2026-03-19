@@ -49,6 +49,20 @@ class ForumTasksTests(unittest.TestCase):
         self.assertIsNotNone(request)
         self.assertEqual(request.command, "env-sync")
 
+    def test_parse_task_args_accepts_install_with_default_target(self) -> None:
+        _, request = self.module.parse_task_args(["install"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "install")
+        self.assertEqual(request.install_target, "user")
+
+    def test_parse_task_args_accepts_install_with_explicit_target(self) -> None:
+        _, request = self.module.parse_task_args(["install", "--target", "venv"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "install")
+        self.assertEqual(request.install_target, "venv")
+
     def test_run_env_sync_creates_env_from_example(self) -> None:
         self.write_example("# FORUM_HOST=127.0.0.1\nFORUM_PORT=8000\n")
 
@@ -76,6 +90,71 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(stderr.getvalue(), "")
         self.assertIn("No missing .env settings found. Nothing to sync.", stdout.getvalue())
+
+    def test_run_install_for_target_uses_user_profile_by_default(self) -> None:
+        requirements_path = self.repo_root / "requirements.txt"
+        requirements_path.write_text("python-dotenv>=1,<2\n", encoding="utf-8")
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], check: bool, cwd: Path) -> mock.Mock:
+            del check
+            self.assertEqual(cwd, self.repo_root)
+            calls.append(command)
+            return mock.Mock(returncode=0)
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with mock.patch.object(self.module, "REPO_ROOT", self.repo_root):
+            with mock.patch.object(self.module, "REQUIREMENTS_PATH", requirements_path):
+                with mock.patch.object(self.module.subprocess, "run", side_effect=fake_run):
+                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                        exit_code = self.module.run_install_for_target("user")
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(
+            calls,
+            [[sys.executable, "-m", "pip", "install", "--user", "-r", str(requirements_path)]],
+        )
+        self.assertIn("user profile", stdout.getvalue())
+
+    def test_run_install_for_target_can_create_repo_local_venv(self) -> None:
+        requirements_path = self.repo_root / "requirements.txt"
+        requirements_path.write_text("python-dotenv>=1,<2\n", encoding="utf-8")
+        venv_dir = self.repo_root / ".venv"
+        venv_python = venv_dir / "bin" / "python3"
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], check: bool, cwd: Path) -> mock.Mock:
+            del check
+            self.assertEqual(cwd, self.repo_root)
+            calls.append(command)
+            if command[:3] == [sys.executable, "-m", "venv"]:
+                venv_python.parent.mkdir(parents=True, exist_ok=True)
+                venv_python.write_text("", encoding="utf-8")
+            return mock.Mock(returncode=0)
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with mock.patch.object(self.module, "REPO_ROOT", self.repo_root):
+            with mock.patch.object(self.module, "REQUIREMENTS_PATH", requirements_path):
+                with mock.patch.object(self.module, "VENV_DIR", venv_dir):
+                    with mock.patch.object(self.module, "VENV_PYTHON", venv_python):
+                        with mock.patch.object(self.module.subprocess, "run", side_effect=fake_run):
+                            with redirect_stdout(stdout), redirect_stderr(stderr):
+                                exit_code = self.module.run_install_for_target("venv")
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(
+            calls,
+            [
+                [sys.executable, "-m", "venv", str(venv_dir)],
+                [str(venv_python), "-m", "pip", "install", "-r", str(requirements_path)],
+            ],
+        )
+        self.assertIn("Creating repo-local virtual environment", stdout.getvalue())
+        self.assertIn("repo-local virtual environment", stdout.getvalue())
 
     def test_parse_task_args_accepts_php_host_setup(self) -> None:
         _, request = self.module.parse_task_args(["php-host-setup", "/tmp/public"])

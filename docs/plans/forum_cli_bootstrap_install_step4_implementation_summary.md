@@ -21,3 +21,17 @@
   - Ran `./forum help` and confirmed the canonical wrapper still exposes `install` through the normal CLI flow.
 - Notes:
   - A plain `import scripts.forum_tasks` smoke check was not reliable on this machine because an unrelated installed `scripts` package shadows the repo directory name on `sys.path`.
+
+## Stage 3 - Tests, docs, and final verification
+- Changes:
+  - Added focused CLI tests for default and explicit install-target parsing plus user-profile and repo-local `.venv` install command execution paths.
+  - Added runtime-env coverage for the missing-`python-dotenv` fallback path.
+  - Updated `README.md` and `docs/developer_commands.md` so the canonical first-run setup flow starts with `./forum install` and documents `user`, `venv`, and `current` install targets.
+- Verification:
+  - Ran `python3 -m unittest /home/wsl/v2/tests/test_forum_tasks.py /home/wsl/v2/tests/test_runtime_env.py`.
+  - Ran `./forum help`.
+  - Ran `python3 -S scripts/forum_tasks.py help`.
+  - Ran `python3 -S scripts/forum_tasks.py install -h`.
+  - Ran `python3 -S scripts/forum_tasks.py start` and confirmed it prints the install hint instead of crashing at import time.
+- Notes:
+  - The final documented bootstrap flow now starts from `./forum install`, with `--target venv` available for operators who prefer an isolated repo-local interpreter.

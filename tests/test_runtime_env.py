@@ -78,6 +78,16 @@ class RuntimeEnvTests(unittest.TestCase):
             self.assertEqual(os.environ["FORUM_HOST"], "127.0.0.1")
             self.assertEqual(os.environ["FORUM_PORT"], "9000")
 
+    def test_load_repo_env_returns_false_when_python_dotenv_is_unavailable(self) -> None:
+        self.write_env("FORUM_HOST=127.0.0.1\n")
+
+        with mock.patch.object(runtime_env, "_load_dotenv", None):
+            with mock.patch.dict(os.environ, {}, clear=True):
+                loaded = runtime_env.load_repo_env(repo_root=self.repo_root, override=False)
+
+        self.assertFalse(loaded)
+        self.assertNotIn("FORUM_HOST", os.environ)
+
     def test_notify_missing_env_defaults_logs_once(self) -> None:
         self.write_env("FORUM_HOST=127.0.0.1\n")
         self.write_example(
