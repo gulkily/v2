@@ -9,6 +9,7 @@ from typing import Callable
 
 from forum_core.identity import normalize_fingerprint, short_identity_label
 from forum_core.merge_requests import derive_approved_merge_links
+from forum_core.operation_events import emit_operation_timing
 from forum_web.repository import Post, load_posts
 from forum_web.profiles import (
     IdentityContext,
@@ -762,8 +763,7 @@ def rebuild_post_index(
     timing_callback: PhaseTimingCallback | None = None,
 ) -> IndexBuildResult:
     def record_timing(phase_name: str, started_at: float) -> None:
-        if timing_callback is not None:
-            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+        emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
 
     owned_index = index is None
     active_index = index or open_post_index(repo_root)
@@ -837,8 +837,7 @@ def refresh_post_index_after_commit(
     timing_callback: PhaseTimingCallback | None = None,
 ) -> None:
     def record_timing(phase_name: str, started_at: float) -> None:
-        if timing_callback is not None:
-            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+        emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
 
     db_exists = post_index_path(repo_root).exists()
     if not db_exists:
@@ -930,8 +929,7 @@ def refresh_identity_metadata_from_context(
     timing_callback: PhaseTimingCallback | None = None,
 ) -> None:
     def record_timing(phase_name: str, started_at: float) -> None:
-        if timing_callback is not None:
-            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+        emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
     index.connection.execute("DELETE FROM authors")

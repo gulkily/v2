@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forum_core.identity import build_identity_id
+from forum_core.operation_events import emit_operation_timing
 from forum_core.profile_updates import (
     ProfileUpdateRecord,
     has_visible_profile_update_for_source_identity,
@@ -169,7 +170,7 @@ def submit_profile_update(
     started_at = time.perf_counter()
     payload_text = ensure_ascii_text(payload_text, field_name="payload")
     record = parse_profile_update_payload(payload_text)
-    record_timing("parse_profile_update", (time.perf_counter() - started_at) * 1000.0)
+    emit_operation_timing(record_timing, "parse_profile_update", (time.perf_counter() - started_at) * 1000.0)
 
     if require_signature and (signature_text is None or public_key_text is None):
         raise PostingError("bad_request", "signature and public_key are required")
@@ -182,12 +183,12 @@ def submit_profile_update(
         signature_text=signature_text,
         public_key_text=public_key_text,
     )
-    record_timing("verify_detached_signature", (time.perf_counter() - started_at) * 1000.0)
+    emit_operation_timing(record_timing, "verify_detached_signature", (time.perf_counter() - started_at) * 1000.0)
     signer_identity_id = build_identity_id(signer_fingerprint)
 
     started_at = time.perf_counter()
     validate_profile_update_record(record, repo_root, signer_identity_id=signer_identity_id)
-    record_timing("validate_profile_update", (time.perf_counter() - started_at) * 1000.0)
+    emit_operation_timing(record_timing, "validate_profile_update", (time.perf_counter() - started_at) * 1000.0)
     ensure_profile_update_record_id_available(record, repo_root)
 
     signature_path = str(

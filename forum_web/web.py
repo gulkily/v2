@@ -27,6 +27,7 @@ from forum_core.moderation import (
     post_is_hidden,
     thread_is_hidden,
 )
+from forum_core.operation_events import bind_operation, complete_operation, fail_operation, start_operation
 from forum_cgi.identity_links import submit_identity_link
 from forum_cgi.merge_requests import submit_merge_request
 from forum_cgi.moderation import submit_moderation
@@ -2291,7 +2292,7 @@ def render_api_update_profile(environ, *, default_dry_run: bool) -> tuple[str, s
     return "200 OK", render_profile_update_result(result)
 
 
-def application(environ, start_response):
+def _dispatch_application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
@@ -2814,6 +2815,28 @@ def application(environ, start_response):
         headers = [("Content-Type", "text/plain; charset=utf-8")]
         start_response(exc.status, headers)
         return [body]
+
+
+def application(environ, start_response):
+    setup_testing_defaults(environ)
+    path = environ.get("PATH_INFO", "/")
+    method = environ.get("REQUEST_METHOD", "GET").upper()
+    repo_root = get_repo_root()
+    try:
+        handle = start_operation(
+            repo_root,
+            operation_kind="request",
+            operation_name=f"{method} {path}",
+            metadata={"method": method, "path": path},
+        )
+        with bind_operation(handle):
+            try:
+                response = _dispatch_application(environ, start_response)
+            except Exception as exc:
+                fail_operation(handle, error_text=str(exc))
+                raise
+            complete_operation(handle)
+            return response
     except Exception as exc:  # pragma: no cover - manual smoke checks cover this path
         body = (
             "<!doctype html><title>Server Error</title>"

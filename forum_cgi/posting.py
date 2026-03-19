@@ -10,6 +10,7 @@ from typing import Callable
 
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
+from forum_core.operation_events import emit_operation_timing
 from forum_core.post_index import refresh_post_index_after_commit
 from forum_core.public_keys import store_or_reuse_public_key, store_or_reuse_public_key_for_fingerprint
 from forum_web.repository import Post, index_posts, load_posts, parse_post_text
@@ -210,8 +211,7 @@ def store_post(
                 public_key_text=normalized_public_key_text,
             )
         )
-        if timing_callback is not None:
-            timing_callback("store_public_key", (time.perf_counter() - started_at) * 1000.0)
+        emit_operation_timing(timing_callback, "store_public_key", (time.perf_counter() - started_at) * 1000.0)
         public_key_path = stored_public_key.path
         if stored_public_key.created:
             paths.append(public_key_path)
@@ -222,8 +222,7 @@ def store_post(
             identity_bootstrap_path,
             ensure_ascii_text(identity_bootstrap_text, field_name="identity_bootstrap"),
         )
-        if timing_callback is not None:
-            timing_callback("store_identity_bootstrap", (time.perf_counter() - started_at) * 1000.0)
+        emit_operation_timing(timing_callback, "store_identity_bootstrap", (time.perf_counter() - started_at) * 1000.0)
         paths.append(stored_identity_bootstrap_path)
 
     commit_id = commit_post(
@@ -252,8 +251,7 @@ def commit_post(
     timing_callback: PhaseTimingCallback | None = None,
 ) -> str:
     def record_timing(phase_name: str, started_at: float) -> None:
-        if timing_callback is not None:
-            timing_callback(phase_name, (time.perf_counter() - started_at) * 1000.0)
+        emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
 
     env = os.environ.copy()
     env.setdefault("GIT_AUTHOR_NAME", "Forum CGI")
