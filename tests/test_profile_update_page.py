@@ -75,6 +75,25 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
         self.assertIn("update username", body)
 
+    def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
+        self.write_record(
+            "records/profile-updates/profile-update-alpha.txt",
+            f"""
+            Record-ID: profile-update-alpha
+            Action: set_display_name
+            Source-Identity-ID: {IDENTITY_ID}
+            Timestamp: 2026-03-18T00:00:00Z
+
+            ClaimedName
+            """,
+        )
+
+        status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn(f'/profiles/{PROFILE_SLUG}/update', body)
+        self.assertNotIn(">update username<", body)
+
     def test_profile_update_page_renders_identity_context(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/update")
 

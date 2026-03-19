@@ -58,6 +58,7 @@ from forum_web.api_text import (
 from forum_web.profiles import (
     find_profile_summary,
     load_identity_context,
+    profile_can_update_username,
     profile_usernames,
     resolve_identity_display_name,
     other_users_with_username,
@@ -594,13 +595,17 @@ def render_profile_page(
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
         profile_action_html=(
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
-            "update username"
-            "</a>"
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
-            "manage merges"
-            "</a>"
-        ),
+            (
+                f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
+                "update username"
+                "</a>"
+            )
+            if profile_can_update_username(summary=summary, identity_context=identity_context)
+            else ""
+        )
+        + f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
+        "manage merges"
+        "</a>",
         stat_html=(
             '<div class="stat-grid">'
             f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
@@ -1290,6 +1295,11 @@ def render_merge_management_page(identity_id: str) -> str:
         profile_slug=html.escape(profile_slug),
         identity_id=html.escape(summary.identity_id),
         display_name=html.escape(summary.display_name),
+        update_link_html=(
+            f'<a class="thread-chip" href="/profiles/{html.escape(profile_slug)}/update">update username</a>'
+            if profile_can_update_username(summary=summary, identity_context=identity_context)
+            else ""
+        ),
         historical_match_html=render_match_rows(),
         outgoing_request_html=render_state_rows(management_summary.outgoing_requests, action_mode="none"),
         incoming_request_html=render_state_rows(management_summary.incoming_requests, action_mode="incoming"),

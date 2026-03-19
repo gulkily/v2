@@ -176,6 +176,13 @@ class MergeManagementPageTests(unittest.TestCase):
         self.assertIn(f"/profiles/{PROFILE_SLUG}/merge", body)
         self.assertIn("manage merges", body)
 
+    def test_merge_management_page_hides_username_update_link_after_visible_claim(self) -> None:
+        status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/merge")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn(f"/profiles/{PROFILE_SLUG}/update", body)
+        self.assertNotIn(">update username<", body)
+
     def test_merge_management_page_renders_matches_and_incoming_actions(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/merge")
 
