@@ -18,3 +18,13 @@ Verification:
 Verification:
 - `python -m unittest tests.test_board_index_page tests.test_profile_update_page tests.test_username_claim_cta_asset tests.test_username_claim_cta_api`
 - `python -m compileall forum_web templates/assets`
+
+## Stage 3 - lock in regression coverage across routes and client states
+- Extended [test_compose_thread_page.py](/home/wsl/v2/tests/test_compose_thread_page.py) so the shared CTA mount and script are required on another major page type beyond the profile and board index.
+- Extended [test_llm_api.py](/home/wsl/v2/tests/test_llm_api.py) so the API discovery surface now has to advertise `get_username_claim_cta` alongside the existing read/write commands.
+- Extended [test_username_claim_cta_asset.py](/home/wsl/v2/tests/test_username_claim_cta_asset.py) with the no-stored-key case, proving the client does not even fetch CTA state when the browser has no saved key material.
+- No production logic changed in this stage; it locks in the intended shared-page and client-hydration behavior against future regressions.
+
+Verification:
+- `python -m unittest tests.test_compose_thread_page tests.test_llm_api tests.test_username_claim_cta_asset tests.test_board_index_page tests.test_profile_update_page tests.test_username_claim_cta_api`
+- `python -m compileall forum_web templates/assets tests`

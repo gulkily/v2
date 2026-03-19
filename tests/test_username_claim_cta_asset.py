@@ -249,6 +249,82 @@ process.stdout.write(JSON.stringify({{
         self.assertTrue(payload["hidden"])
         self.assertEqual(payload["href"], "")
 
+    def test_username_claim_cta_asset_keeps_banner_hidden_without_stored_key(self) -> None:
+        asset_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "username_claim_cta.js"
+        ).as_uri()
+        profile_nav_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js"
+        ).as_uri()
+        loader_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js"
+        ).as_uri()
+        vendor_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+        ).as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+const loaderSource = await fs.readFile(new URL({json.dumps(loader_url)}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
+const profileNavSource = await fs.readFile(new URL({json.dumps(profile_nav_url)}), "utf8");
+const rewrittenProfileNavSource = profileNavSource.replace(
+  "./openpgp_loader.js",
+  loaderModuleUrl,
+);
+const profileNavModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenProfileNavSource).toString("base64")}}`;
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const rewrittenAssetSource = assetSource.replace(
+  "./profile_nav.js",
+  profileNavModuleUrl,
+);
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
+const {{ enhanceUsernameClaimCta }} = await import(assetModuleUrl);
+
+const link = {{
+  href: "",
+  setAttribute(name, value) {{
+    this[name] = value;
+  }},
+}};
+const root = {{
+  hidden: true,
+  querySelector(selector) {{
+    return selector === "[data-username-claim-link]" ? link : null;
+  }},
+}};
+const doc = {{
+  querySelector(selector) {{
+    return selector === "[data-username-claim-cta]" ? root : null;
+  }},
+}};
+const storage = {{
+  getItem() {{
+    return "";
+  }},
+}};
+let fetchCalls = 0;
+const fetchImpl = async () => {{
+  fetchCalls += 1;
+  return {{ ok: true, async text() {{ return ""; }} }};
+}};
+
+await enhanceUsernameClaimCta(doc, storage, fetchImpl);
+process.stdout.write(JSON.stringify({{
+  hidden: root.hidden,
+  href: link.href,
+  fetchCalls,
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertTrue(payload["hidden"])
+        self.assertEqual(payload["href"], "")
+        self.assertEqual(payload["fetchCalls"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

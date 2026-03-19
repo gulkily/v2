@@ -51,6 +51,8 @@ class LLMApiTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("call_llm", body)
         self.assertIn("/api/call_llm", body)
+        self.assertIn("get_username_claim_cta", body)
+        self.assertIn("/api/get_username_claim_cta?identity_id=<identity-id>", body)
 
     def test_api_call_llm_returns_plain_text_result(self) -> None:
         request_body = json.dumps({"prompt": "Reply with ready."}).encode("utf-8")
