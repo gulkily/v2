@@ -11,6 +11,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS_PATH = REPO_ROOT / "requirements.txt"
+VENV_DIR = REPO_ROOT / ".venv"
+VENV_PYTHON = VENV_DIR / "bin" / "python3"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -35,6 +37,7 @@ from forum_core.php_host_setup import (
 @dataclass(frozen=True)
 class TaskRequest:
     command: str
+    install_target: str | None = None
     test_pattern: str | None = None
     public_web_root: str | None = None
     app_root: str | None = None
@@ -51,7 +54,16 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("help", help="Show help output.")
-    subparsers.add_parser("install", help="Install required Python packages into the user profile.")
+    install_parser = subparsers.add_parser(
+        "install",
+        help="Install required Python packages for this checkout.",
+    )
+    install_parser.add_argument(
+        "--target",
+        choices=("user", "venv", "current"),
+        default="user",
+        help="Install target: user profile (default), repo-local .venv, or the current Python environment.",
+    )
     subparsers.add_parser("env-sync", help="Append missing .env settings from .env.example.")
     php_host_parser = subparsers.add_parser(
         "php-host-setup",
@@ -89,7 +101,7 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
     if args.command in (None, "help"):
         return parser, None
     if args.command == "install":
-        return parser, TaskRequest(command="install")
+        return parser, TaskRequest(command="install", install_target=args.target)
     if args.command == "env-sync":
         return parser, TaskRequest(command="env-sync")
     if args.command == "php-host-setup":
@@ -110,7 +122,7 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
 
 def run_task(request: TaskRequest) -> int:
     if request.command == "install":
-        return run_install()
+        return run_install_for_target(request.install_target or "user")
     if request.command == "env-sync":
         return run_env_sync()
     if request.command == "php-host-setup":
@@ -123,26 +135,43 @@ def run_task(request: TaskRequest) -> int:
     return 1
 
 
-def run_install() -> int:
+def run_install_for_target(install_target: str) -> int:
     if not REQUIREMENTS_PATH.exists():
         print(f"Missing requirements file: {REQUIREMENTS_PATH}", file=sys.stderr)
         return 1
+    if install_target == "venv":
+        python_executable = ensure_repo_venv()
+        target_label = f"repo-local virtual environment at {VENV_DIR}"
+        command = [str(python_executable), "-m", "pip", "install", "-r", str(REQUIREMENTS_PATH)]
+    elif install_target == "current":
+        target_label = "current Python environment"
+        command = [sys.executable, "-m", "pip", "install", "-r", str(REQUIREMENTS_PATH)]
+    else:
+        target_label = "user profile"
+        command = [sys.executable, "-m", "pip", "install", "--user", "-r", str(REQUIREMENTS_PATH)]
 
-    command = [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "--user",
-        "-r",
-        str(REQUIREMENTS_PATH),
-    ]
-    print("Installing Python requirements into the user profile...")
+    print(f"Installing Python requirements into the {target_label}...")
     result = subprocess.run(command, check=False, cwd=REPO_ROOT)
     if result.returncode != 0:
         return result.returncode
     print("Installation complete. Next steps: `./forum env-sync` then `./forum start`.")
     return 0
+
+
+def ensure_repo_venv() -> Path:
+    if VENV_PYTHON.exists():
+        print(f"Using existing repo-local virtual environment: {VENV_DIR}")
+        return VENV_PYTHON
+
+    print(f"Creating repo-local virtual environment: {VENV_DIR}")
+    result = subprocess.run(
+        [sys.executable, "-m", "venv", str(VENV_DIR)],
+        check=False,
+        cwd=REPO_ROOT,
+    )
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    return VENV_PYTHON
 
 
 def ensure_runtime_dependencies() -> bool:
