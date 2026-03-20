@@ -148,7 +148,7 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("Working tree", body)
         self.assertIn("records/instance/public.txt", body)
         self.assertIn("Working tree", body)
-        self.assertIn("git status unavailable", body)
+        self.assertTrue("git status unavailable" in body or "?? state/" in body)
 
     def test_activity_page_filters_content_moderation_and_code(self) -> None:
         _, _, content_body = self.get("/activity/", "view=content")

@@ -326,6 +326,27 @@ def load_recent_operations(repo_root: Path, *, limit: int = 20) -> tuple[Operati
     return tuple(_row_to_operation_event(row) for row in rows)
 
 
+def load_recent_slow_operations(
+    repo_root: Path,
+    *,
+    limit: int = 20,
+    min_duration_ms: float = 2000.0,
+) -> tuple[OperationEvent, ...]:
+    with _connect(repo_root) as connection:
+        rows = connection.execute(
+            """
+            SELECT operation_id, operation_kind, operation_name, state, started_at, updated_at,
+                   ended_at, total_duration_ms, error_text, metadata_json, steps_json
+            FROM operation_events
+            WHERE total_duration_ms > ?
+            ORDER BY started_at DESC
+            LIMIT ?
+            """,
+            (float(min_duration_ms), limit),
+        ).fetchall()
+    return tuple(_row_to_operation_event(row) for row in rows)
+
+
 def _row_to_operation_event(row: sqlite3.Row) -> OperationEvent:
     steps = json.loads(row["steps_json"])
     metadata = json.loads(row["metadata_json"])

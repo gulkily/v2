@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
@@ -19,6 +20,8 @@ from forum_core.operation_events import (
     complete_operation,
     fail_operation,
     load_recent_operations,
+    load_recent_slow_operations,
+    record_current_operation_step,
     start_operation,
 )
 from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts
@@ -861,9 +864,16 @@ def render_activity_event_card(event: ActivityEvent, *, posts_index: dict[str, P
 
 def render_site_activity_page(*, view_mode: str) -> str:
     repo_root = get_repo_root()
+    started_at = time.perf_counter()
     posts, _, _, _, _, identity_context = load_repository_state()
+    record_current_operation_step("activity_load_repository_state", (time.perf_counter() - started_at) * 1000.0)
+
+    started_at = time.perf_counter()
     posts_index = build_posts_index(posts, repo_root)
     events = load_activity_events(repo_root, mode=view_mode)
+    record_current_operation_step("activity_load_events", (time.perf_counter() - started_at) * 1000.0)
+
+    started_at = time.perf_counter()
     event_cards = "".join(
         render_activity_event_card(
             event,
@@ -872,9 +882,13 @@ def render_site_activity_page(*, view_mode: str) -> str:
         )
         for event in events
     )
+    record_current_operation_step("activity_render_event_cards", (time.perf_counter() - started_at) * 1000.0)
     if not event_cards:
         event_cards = '<article class="post-card"><p class="post-link">No activity matches this filter yet.</p></article>'
+
+    started_at = time.perf_counter()
     git_summary = git_status_summary(repo_root)
+    record_current_operation_step("activity_git_status_summary", (time.perf_counter() - started_at) * 1000.0)
     git_worktree_value = git_summary.get("git_worktree") or git_summary.get("worktree") or "git status unavailable"
     intro_text = (
         "Browse one combined reverse-chronological timeline of content, moderation, and code changes. "
@@ -1086,9 +1100,9 @@ def render_instance_info_page() -> str:
 
 
 def render_recent_operations_panel(repo_root: Path) -> str:
-    operations = load_recent_operations(repo_root, limit=10)
+    operations = load_recent_slow_operations(repo_root, limit=10)
     if not operations:
-        entries_html = '<article class="post-card"><p class="post-link">No recent operations have been recorded yet.</p></article>'
+        entries_html = '<article class="post-card"><p class="post-link">No recent slow operations have been recorded yet.</p></article>'
     else:
         entries_html = "".join(render_recent_operation_card(operation) for operation in operations)
     return (
@@ -2876,13 +2890,17 @@ def application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
     method = environ.get("REQUEST_METHOD", "GET").upper()
+    query_params = parse_qs(environ.get("QUERY_STRING", ""))
     repo_root = get_repo_root()
     try:
+        metadata = {"method": method, "path": path}
+        if path == "/activity/":
+            metadata["view"] = activity_filter_mode_from_request(query_params.get("view", [None])[0])
         handle = start_operation(
             repo_root,
             operation_kind="request",
             operation_name=f"{method} {path}",
-            metadata={"method": method, "path": path},
+            metadata=metadata,
         )
         with bind_operation(handle):
             try:

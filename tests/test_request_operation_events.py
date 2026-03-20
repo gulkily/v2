@@ -122,10 +122,10 @@ process.stdout.write(signature);
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def request(self, path: str, *, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], str]:
+    def request(self, path: str, *, method: str = "GET", body: bytes = b"", query_string: str = "") -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": method,
             "CONTENT_LENGTH": str(len(body)),
             "wsgi.input": BytesIO(body),
@@ -154,6 +154,20 @@ process.stdout.write(signature);
         instance_operation = next(event for event in operations if event.operation_name == "GET /instance/")
         self.assertEqual(instance_operation.state, "completed")
         self.assertEqual(instance_operation.metadata["path"], "/instance/")
+
+    def test_activity_request_records_view_metadata_and_timing_steps(self) -> None:
+        status, _, _ = self.request("/activity/", query_string="view=code")
+
+        self.assertEqual(status, "200 OK")
+        operations = load_recent_operations(self.repo_root)
+        activity_operation = next(event for event in operations if event.operation_name == "GET /activity/")
+        self.assertEqual(activity_operation.state, "completed")
+        self.assertEqual(activity_operation.metadata["view"], "code")
+        step_names = tuple(step.name for step in activity_operation.steps)
+        self.assertIn("activity_load_repository_state", step_names)
+        self.assertIn("activity_load_events", step_names)
+        self.assertIn("activity_render_event_cards", step_names)
+        self.assertIn("activity_git_status_summary", step_names)
 
     def test_create_thread_request_persists_phase_timings_in_request_record(self) -> None:
         payload_text = dedent(

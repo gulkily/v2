@@ -12,6 +12,7 @@ from forum_core.operation_events import (
     current_operation,
     fail_operation,
     load_recent_operations,
+    load_recent_slow_operations,
     operation_events_path,
     record_current_operation_step,
     start_operation,
@@ -97,6 +98,53 @@ class OperationEventsTests(unittest.TestCase):
         operations = load_recent_operations(self.repo_root)
         self.assertEqual(len(operations), 1)
         self.assertEqual(operations[0].operation_name, "GET /new")
+
+    def test_load_recent_slow_operations_filters_by_threshold_and_recency(self) -> None:
+        first = start_operation(
+            self.repo_root,
+            operation_kind="request",
+            operation_name="GET /older-slow",
+        )
+        complete_operation(first)
+        second = start_operation(
+            self.repo_root,
+            operation_kind="request",
+            operation_name="GET /recent-fast",
+        )
+        complete_operation(second)
+        third = start_operation(
+            self.repo_root,
+            operation_kind="request",
+            operation_name="GET /recent-slow",
+        )
+        complete_operation(third)
+
+        import sqlite3
+
+        connection = sqlite3.connect(operation_events_path(self.repo_root))
+        try:
+            connection.execute(
+                "UPDATE operation_events SET total_duration_ms = ?, started_at = ?, updated_at = ?, ended_at = ? WHERE operation_id = ?",
+                (2500.0, "2026-03-18T10:00:00Z", "2026-03-18T10:00:01Z", "2026-03-18T10:00:02Z", first.operation_id),
+            )
+            connection.execute(
+                "UPDATE operation_events SET total_duration_ms = ?, started_at = ?, updated_at = ?, ended_at = ? WHERE operation_id = ?",
+                (1200.0, "2026-03-19T10:00:00Z", "2026-03-19T10:00:01Z", "2026-03-19T10:00:02Z", second.operation_id),
+            )
+            connection.execute(
+                "UPDATE operation_events SET total_duration_ms = ?, started_at = ?, updated_at = ?, ended_at = ? WHERE operation_id = ?",
+                (2600.0, "2026-03-19T12:00:00Z", "2026-03-19T12:00:01Z", "2026-03-19T12:00:02Z", third.operation_id),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        operations = load_recent_slow_operations(self.repo_root, limit=10, min_duration_ms=2000.0)
+
+        self.assertEqual(
+            tuple(operation.operation_name for operation in operations),
+            ("GET /recent-slow", "GET /older-slow"),
+        )
 
 
 if __name__ == "__main__":

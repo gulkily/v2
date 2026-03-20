@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
+from forum_core.operation_events import operation_events_path, start_operation, complete_operation
 from forum_web.web import application
 
 
@@ -107,15 +109,31 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("Project information", body)
 
     def test_instance_info_page_renders_recent_operations_panel(self) -> None:
-        self.get("/")
+        slow_handle = start_operation(
+            self.repo_root,
+            operation_kind="request",
+            operation_name="GET /activity/",
+            metadata={"method": "GET", "path": "/activity/", "view": "code"},
+        )
+        complete_operation(slow_handle)
+        connection = sqlite3.connect(operation_events_path(self.repo_root))
+        try:
+            connection.execute(
+                "UPDATE operation_events SET total_duration_ms = ?, started_at = ?, updated_at = ?, ended_at = ? WHERE operation_id = ?",
+                (2500.0, "2026-03-20T02:00:00Z", "2026-03-20T02:00:01Z", "2026-03-20T02:00:02Z", slow_handle.operation_id),
+            )
+            connection.commit()
+        finally:
+            connection.close()
 
         status, _, body = self.get("/instance/")
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Recent slow operations", body)
-        self.assertIn("GET /instance/", body)
+        self.assertIn("GET /activity/", body)
         self.assertIn("method: GET", body)
-        self.assertIn("path: /instance/", body)
+        self.assertIn("path: /activity/", body)
+        self.assertIn("view: code", body)
 
 
 if __name__ == "__main__":
