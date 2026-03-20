@@ -168,7 +168,7 @@ def activity_filter_mode_from_request(raw_mode: str | None) -> str:
     mode = (raw_mode or "").strip().lower()
     if mode in {"content", "moderation", "code"}:
         return mode
-    return "all"
+    return "content"
 
 
 def parse_activity_sort_timestamp(raw_value: str) -> datetime:

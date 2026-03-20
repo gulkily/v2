@@ -129,13 +129,13 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         self.assertEqual(len(resolved), 1)
         self.assertEqual(resolved[0].post_id, "root-010")
 
-    def test_activity_filter_mode_defaults_to_all(self) -> None:
-        self.assertEqual(activity_filter_mode_from_request(None), "all")
-        self.assertEqual(activity_filter_mode_from_request(""), "all")
+    def test_activity_filter_mode_defaults_to_content(self) -> None:
+        self.assertEqual(activity_filter_mode_from_request(None), "content")
+        self.assertEqual(activity_filter_mode_from_request(""), "content")
         self.assertEqual(activity_filter_mode_from_request("content"), "content")
         self.assertEqual(activity_filter_mode_from_request("moderation"), "moderation")
         self.assertEqual(activity_filter_mode_from_request("code"), "code")
-        self.assertEqual(activity_filter_mode_from_request("unknown"), "all")
+        self.assertEqual(activity_filter_mode_from_request("unknown"), "content")
 
     def test_classify_commit_activity_distinguishes_content_moderation_and_code(self) -> None:
         content_commit = mock.Mock(files=("records/posts/root-001.txt",))
@@ -215,9 +215,9 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
             ]
             events = load_activity_events(self.repo_root, mode="all", limit=5)
 
-        self.assertEqual([event.kind for event in events], ["moderation", "content"])
-        self.assertEqual(events[0].moderation_record.record_id, "pin-root-001")
-        self.assertEqual(events[1].commit.subject, "Add root-001")
+        self.assertEqual([event.kind for event in events], ["content", "moderation"])
+        self.assertEqual(events[0].commit.subject, "Add root-001")
+        self.assertEqual(events[1].moderation_record.record_id, "pin-root-001")
 
     def test_load_activity_events_filters_by_kind(self) -> None:
         self.write_record(
