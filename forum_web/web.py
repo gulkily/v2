@@ -2173,6 +2173,8 @@ def render_api_get_profile(identity_id: str | None) -> tuple[str, str]:
 
 
 def render_api_get_merge_management(identity_id: str | None) -> tuple[str, str]:
+    if not merge_feature_enabled():
+        return "404 Not Found", render_not_found_text("feature", "account merge")
     if not identity_id:
         return "400 Bad Request", render_bad_request_text("missing required query parameter: identity_id")
 
@@ -2462,6 +2464,8 @@ def render_api_link_identity(environ, *, default_dry_run: bool) -> tuple[str, st
 
 
 def render_api_merge_request(environ, *, default_dry_run: bool) -> tuple[str, str]:
+    if not merge_feature_enabled():
+        return "404 Not Found", render_not_found_text("feature", "account merge")
     payload = read_json_request(environ)
     repo_root = get_repo_root()
     result = submit_merge_request(

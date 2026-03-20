@@ -20,3 +20,16 @@
   - `python -m pytest tests/test_profile_nav_asset.py`
 - Notes:
   - this stage gates only web surfaces and nav behavior; merge APIs remain for Stage 3 so the final release posture is not complete yet
+
+## Stage 3 - Gate merge APIs and restore explicit flag-on regression coverage
+- Changes:
+  - made `/api/get_merge_management` and `/api/merge_request` return missing-resource behavior while the merge flag is off
+  - updated merge-specific API tests to assert default-off unavailability and explicit flag-on behavior
+  - restored explicit flag-on coverage for merge pages and self-merge suggestion UI so the feature still works when developers enable it locally
+- Verification:
+  - `python -m pytest tests/test_merge_management_api.py`
+  - `python -m pytest tests/test_merge_request_submission.py`
+  - `python -m pytest tests/test_merge_management_page.py`
+  - `python -m pytest tests/test_username_profile_route.py`
+- Notes:
+  - underlying merge records and merge-aware identity resolution remain intact; this stage only changes release visibility and endpoint availability

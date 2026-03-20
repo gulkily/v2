@@ -200,7 +200,7 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def get(self, path: str) -> tuple[str, dict[str, str], str]:
+    def get(self, path: str, *, extra_env: dict[str, str] | None = None) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
             "QUERY_STRING": "",
@@ -214,7 +214,10 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
             response["status"] = status
             response["headers"] = headers
 
-        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
+        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
+        if extra_env:
+            env.update(extra_env)
+        with mock.patch.dict(os.environ, env):
             body = b"".join(application(environ, start_response)).decode("utf-8")
 
         return response["status"], dict(response["headers"]), body
@@ -254,6 +257,21 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         self.assertNotIn("not me", body)
         self.assertNotIn("/assets/profile_merge_suggestion.js", body)
         self.assertNotIn("/profiles/openpgp-beta/merge/action?action=request_merge", body)
+
+    def test_non_root_duplicate_profile_offers_direct_merge_request_when_feature_enabled(self) -> None:
+        status, _, body = self.get(
+            "/profiles/openpgp-beta",
+            extra_env={"FORUM_ENABLE_ACCOUNT_MERGE": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Likely Self-Merge", body)
+        self.assertIn("not me", body)
+        self.assertIn("/assets/profile_merge_suggestion.js", body)
+        self.assertIn(
+            "/profiles/openpgp-beta/merge/action?action=request_merge&other_identity_id=openpgp:alpha",
+            body,
+        )
 
     def test_revoked_merge_restores_other_users_section_on_canonical_root(self) -> None:
         self.write_record(

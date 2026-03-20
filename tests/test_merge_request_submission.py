@@ -16,6 +16,8 @@ from forum_web.web import application
 
 
 class MergeRequestSubmissionTests(unittest.TestCase):
+    MERGE_ENV = {"FORUM_ENABLE_ACCOUNT_MERGE": "1"}
+
     def setUp(self) -> None:
         self.repo_tempdir = tempfile.TemporaryDirectory()
         self.repo_root = Path(self.repo_tempdir.name)
@@ -166,7 +168,12 @@ process.stdout.write(signature);
             }
         ).encode("utf-8")
 
-        status, _, body = self.request("/api/merge_request", method="POST", body=request_body)
+        status, _, body = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=request_body,
+            extra_env=self.MERGE_ENV,
+        )
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Action: request_merge", body)
@@ -192,7 +199,12 @@ process.stdout.write(signature);
             }
         ).encode("utf-8")
 
-        approve_status, _, approve_response = self.request("/api/merge_request", method="POST", body=approve_body)
+        approve_status, _, approve_response = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=approve_body,
+            extra_env=self.MERGE_ENV,
+        )
 
         self.assertEqual(approve_status, "200 OK")
         self.assertIn("Action: approve_merge", approve_response)
@@ -223,7 +235,12 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        request_status, _, _ = self.request("/api/merge_request", method="POST", body=request_body)
+        request_status, _, _ = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=request_body,
+            extra_env=self.MERGE_ENV,
+        )
         self.assertEqual(request_status, "200 OK")
 
         moderator_payload = dedent(
@@ -250,7 +267,10 @@ process.stdout.write(signature);
             "/api/merge_request",
             method="POST",
             body=moderator_body,
-            extra_env={"FORUM_MODERATOR_FINGERPRINTS": self.moderator["fingerprint"]},
+            extra_env={
+                "FORUM_MODERATOR_FINGERPRINTS": self.moderator["fingerprint"],
+                **self.MERGE_ENV,
+            },
         )
 
         self.assertEqual(moderator_status, "200 OK")
@@ -311,7 +331,12 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        request_status, _, _ = self.request("/api/merge_request", method="POST", body=request_body)
+        request_status, _, _ = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=request_body,
+            extra_env=self.MERGE_ENV,
+        )
         self.assertEqual(request_status, "200 OK")
 
         approve_payload = dedent(
@@ -335,7 +360,12 @@ process.stdout.write(signature);
             }
         ).encode("utf-8")
 
-        approve_status, _, approve_response = self.request("/api/merge_request", method="POST", body=approve_body)
+        approve_status, _, approve_response = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=approve_body,
+            extra_env=self.MERGE_ENV,
+        )
 
         self.assertEqual(approve_status, "200 OK")
         self.assertIn("Action: approve_merge", approve_response)
@@ -367,7 +397,12 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        request_status, _, _ = self.request("/api/merge_request", method="POST", body=request_body)
+        request_status, _, _ = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=request_body,
+            extra_env=self.MERGE_ENV,
+        )
         self.assertEqual(request_status, "200 OK")
 
         approve_payload = dedent(
@@ -390,7 +425,12 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        approve_status, _, _ = self.request("/api/merge_request", method="POST", body=approve_body)
+        approve_status, _, _ = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=approve_body,
+            extra_env=self.MERGE_ENV,
+        )
         self.assertEqual(approve_status, "200 OK")
 
         revoke_payload = dedent(
@@ -414,7 +454,12 @@ process.stdout.write(signature);
             }
         ).encode("utf-8")
 
-        revoke_status, _, revoke_response = self.request("/api/merge_request", method="POST", body=revoke_body)
+        revoke_status, _, revoke_response = self.request(
+            "/api/merge_request",
+            method="POST",
+            body=revoke_body,
+            extra_env=self.MERGE_ENV,
+        )
 
         self.assertEqual(revoke_status, "200 OK")
         self.assertIn("Action: revoke_merge", revoke_response)
@@ -423,6 +468,13 @@ process.stdout.write(signature);
         self.assertEqual(len(states), 1)
         self.assertTrue(states[0].revoked)
         self.assertFalse(states[0].active_merge)
+
+    def test_api_merge_request_is_unavailable_by_default(self) -> None:
+        status, _, body = self.request("/api/merge_request", method="POST", body=json.dumps({}).encode("utf-8"))
+
+        self.assertEqual(status, "404 Not Found")
+        self.assertIn("Resource: feature", body)
+        self.assertIn("Identifier: account merge", body)
 
 
 if __name__ == "__main__":

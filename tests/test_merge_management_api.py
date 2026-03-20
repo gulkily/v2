@@ -97,7 +97,13 @@ class MergeManagementApiTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
+    def get(
+        self,
+        path: str,
+        query_string: str = "",
+        *,
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
             "QUERY_STRING": query_string,
@@ -111,10 +117,20 @@ class MergeManagementApiTests(unittest.TestCase):
             response["status"] = status
             response["headers"] = headers
 
-        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
+        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
+        if extra_env:
+            env.update(extra_env)
+        with mock.patch.dict(os.environ, env):
             body = b"".join(application(environ, start_response)).decode("utf-8")
 
         return response["status"], dict(response["headers"]), body
+
+    def test_get_merge_management_is_unavailable_by_default(self) -> None:
+        status, _, body = self.get("/api/get_merge_management", f"identity_id={self.alpha}")
+
+        self.assertEqual(status, "404 Not Found")
+        self.assertIn("Resource: feature", body)
+        self.assertIn("Identifier: account merge", body)
 
     def test_get_merge_management_lists_history_match_and_pending_request(self) -> None:
         self.write_record(
@@ -131,7 +147,11 @@ class MergeManagementApiTests(unittest.TestCase):
             """,
         )
 
-        status, _, body = self.get("/api/get_merge_management", f"identity_id={self.alpha}")
+        status, _, body = self.get(
+            "/api/get_merge_management",
+            f"identity_id={self.alpha}",
+            extra_env={"FORUM_ENABLE_ACCOUNT_MERGE": "1"},
+        )
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Historical-Match-Count: 1", body)
@@ -233,7 +253,11 @@ class MergeManagementApiTests(unittest.TestCase):
             """
         )
 
-        status, _, body = self.get("/api/get_merge_management", f"identity_id={self.alpha}")
+        status, _, body = self.get(
+            "/api/get_merge_management",
+            f"identity_id={self.alpha}",
+            extra_env={"FORUM_ENABLE_ACCOUNT_MERGE": "1"},
+        )
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Approved-Request-Count: 0", body)

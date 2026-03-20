@@ -150,7 +150,13 @@ class MergeManagementPageTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
+    def get(
+        self,
+        path: str,
+        query_string: str = "",
+        *,
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
             "QUERY_STRING": query_string,
@@ -164,7 +170,10 @@ class MergeManagementPageTests(unittest.TestCase):
             response["status"] = status
             response["headers"] = headers
 
-        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
+        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
+        if extra_env:
+            env.update(extra_env)
+        with mock.patch.dict(os.environ, env):
             body = b"".join(application(environ, start_response)).decode("utf-8")
 
         return response["status"], dict(response["headers"]), body
@@ -175,6 +184,16 @@ class MergeManagementPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertNotIn(f"/profiles/{PROFILE_SLUG}/merge", body)
         self.assertNotIn("manage merges", body)
+
+    def test_profile_page_links_to_merge_management_when_feature_enabled(self) -> None:
+        status, _, body = self.get(
+            f"/profiles/{PROFILE_SLUG}",
+            extra_env={"FORUM_ENABLE_ACCOUNT_MERGE": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(f"/profiles/{PROFILE_SLUG}/merge", body)
+        self.assertIn("manage merges", body)
 
     def test_merge_management_page_hides_username_update_link_after_visible_claim(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/merge")
@@ -193,6 +212,25 @@ class MergeManagementPageTests(unittest.TestCase):
         )
 
         self.assertEqual(status, "404 Not Found")
+
+    def test_merge_pages_render_when_feature_enabled(self) -> None:
+        status, _, body = self.get(
+            f"/profiles/{PROFILE_SLUG}/merge",
+            extra_env={"FORUM_ENABLE_ACCOUNT_MERGE": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Manage identity merges", body)
+
+        action_status, _, action_body = self.get(
+            f"/profiles/{PROFILE_SLUG}/merge/action",
+            f"action=approve_merge&requester_identity_id={OTHER_IDENTITY_ID}&target_identity_id={IDENTITY_ID}",
+            extra_env={"FORUM_ENABLE_ACCOUNT_MERGE": "1"},
+        )
+
+        self.assertEqual(action_status, "200 OK")
+        self.assertIn('id="merge-request-app"', action_body)
+        self.assertIn("/assets/merge_request_signing.js", action_body)
 
 
 if __name__ == "__main__":
