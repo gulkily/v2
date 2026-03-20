@@ -9,3 +9,13 @@
   - Ran `python3 -m unittest tests.test_forum_tasks -k git_recover`.
 - Notes:
   - This stage intentionally stops at command wiring plus healthy-state handling; specific broken-state diagnosis and repairs land in later stages.
+
+## Stage 2 - Diagnose supported broken states
+- Changes:
+  - Expanded [`scripts/forum_git_recover.py`](/home/wsl/v2/scripts/forum_git_recover.py) into a structured diagnosis model with ordered issue reporting for the supported high-likelihood states.
+  - Added real disposable-repo coverage in [`tests/test_forum_git_recover.py`](/home/wsl/v2/tests/test_forum_git_recover.py) for healthy state, detached `HEAD`, rebase marker, merge marker, missing upstream, incorrect upstream, wrong branch, ahead/behind/diverged tracking, and staged/tracked/untracked local changes.
+- Verification:
+  - Ran `python3 -m unittest tests.test_forum_git_recover`.
+  - Ran `python3 -m unittest tests.test_forum_tasks`.
+- Notes:
+  - This stage is diagnosis-only: the command can now classify the targeted states, but `--apply` still refuses to perform repairs until the later repair stages land.
