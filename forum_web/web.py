@@ -243,26 +243,27 @@ def maybe_render_reindex_feedback_page(
     )
     if not readiness.requires_rebuild or readiness.current_head is None or not has_existing_index_state:
         return None
-    logger.warning(
-        "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
-        "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
-        "expected_schema_version=%r background_refresh=%s",
-        repo_root,
-        readiness.count_mismatch,
-        readiness.indexed_post_count,
-        readiness.expected_post_count,
-        readiness.head_mismatch,
-        readiness.indexed_head,
-        readiness.current_head,
-        readiness.schema_mismatch,
-        readiness.indexed_schema_version,
-        "3",
-        True,
-    )
     target_path = path
     if query_string:
         target_path = f"{target_path}?{query_string}"
     rebuild_started = start_background_post_index_refresh(repo_root, mark_startup_ready=mark_startup_ready)
+    if rebuild_started:
+        logger.warning(
+            "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
+            "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
+            "expected_schema_version=%r background_refresh=%s",
+            repo_root,
+            readiness.count_mismatch,
+            readiness.indexed_post_count,
+            readiness.expected_post_count,
+            readiness.head_mismatch,
+            readiness.indexed_head,
+            readiness.current_head,
+            readiness.schema_mismatch,
+            readiness.indexed_schema_version,
+            "3",
+            True,
+        )
     return render_post_index_refresh_page(target_path=target_path, rebuild_started=rebuild_started)
 
 
