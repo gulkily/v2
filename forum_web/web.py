@@ -986,7 +986,7 @@ def render_thread(thread_id: str) -> str:
 
     locked = moderation_state.locks_thread(thread_id)
     reply_link_html = (
-        f'<p><a class="thread-chip" href="/compose/reply?thread_id={html.escape(thread.root.post_id)}&parent_id={html.escape(thread.root.post_id)}">compose a signed reply</a></p>'
+        f'<p><a class="thread-chip" href="/compose/reply?thread_id={html.escape(thread.root.post_id)}&parent_id={html.escape(thread.root.post_id)}">compose a reply</a></p>'
         if not locked
         else '<p class="status-note">This thread is locked by moderation. New replies are disabled.</p>'
     )
@@ -1151,6 +1151,18 @@ def render_instance_info_page() -> str:
         hero_kicker="Project Info",
         hero_title="Project information",
         hero_text="One public page for the project assumptions, public instance facts, and the reasons behind the plain-text constraints used here.",
+        content_html=content,
+    )
+
+
+def render_recent_operations_page() -> str:
+    repo_root = get_repo_root()
+    content = render_recent_operations_panel(repo_root)
+    return render_page(
+        title="Recent Slow Operations",
+        hero_kicker="Operations",
+        hero_title="Recent slow operations",
+        hero_text="Recent request, startup, and maintenance operations recorded with named timing steps.",
         content_html=content,
     )
 
