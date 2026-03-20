@@ -21,3 +21,12 @@
   - `python -m pytest tests/test_account_key_page.py`
 - Notes:
   - compose and merge-signing flows still keep inline key controls because they are action-oriented signing surfaces, not passive key-viewing surfaces
+
+## Stage 3 - Add regression coverage for the shared key viewer asset
+- Changes:
+  - added a focused asset test for `profile_key_viewer.js`
+  - verified both the new account-page DOM targets and the legacy profile-target fallback behavior used during the transition
+- Verification:
+  - `python -m pytest tests/test_profile_key_viewer_asset.py`
+- Notes:
+  - this stage is test-only and locks in the generalized viewer contract without changing user-visible behavior
