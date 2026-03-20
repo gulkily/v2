@@ -557,7 +557,7 @@ def render_profile_page(
         )
     root_resolution = resolve_username_root(repo_root=get_repo_root(), username=summary.display_name)
     merge_suggestion_html = ""
-    profile_script_html = ""
+    profile_script_html = '<script type="module" src="/assets/profile_key_viewer.js"></script>'
     if root_resolution is not None and root_resolution.canonical_identity_id != summary.identity_id:
         merge_target_summary = find_profile_summary(
             repo_root=get_repo_root(),
@@ -586,7 +586,7 @@ def render_profile_page(
             '</a><button class="thread-chip" type="button" data-dismiss-merge-suggestion hidden>not me</button></div>'
             '</section>'
         )
-        profile_script_html = '<script type="module" src="/assets/profile_merge_suggestion.js"></script>'
+        profile_script_html += '<script type="module" src="/assets/profile_merge_suggestion.js"></script>'
     preferred_href = preferred_profile_href(
         repo_root=get_repo_root(),
         posts=posts,
@@ -2850,6 +2850,12 @@ def _dispatch_application(environ, start_response):
 
         if path == "/assets/profile_merge_suggestion.js":
             body = load_asset_text("profile_merge_suggestion.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/profile_key_viewer.js":
+            body = load_asset_text("profile_key_viewer.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

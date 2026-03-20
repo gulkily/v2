@@ -546,7 +546,9 @@ textarea.key-display {
 }
 
 #private-key-input,
-#public-key-output {
+#public-key-output,
+#profile-private-key-output,
+#profile-public-key-output {
   width: min(100%, calc(64ch + 1.5rem + 2px));
   max-width: calc(64ch + 1.5rem + 2px);
 }
