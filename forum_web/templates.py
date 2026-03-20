@@ -22,6 +22,14 @@ def merge_feature_enabled(env: dict[str, str] | None = None) -> bool:
     return raw_value in {"1", "true", "yes", "on"}
 
 
+def site_title(env: dict[str, str] | None = None) -> str:
+    source_env = os.environ if env is None else env
+    configured = source_env.get("FORUM_SITE_TITLE", "").strip()
+    if configured:
+        return configured
+    return "Forum Reader"
+
+
 def load_template(name: str) -> Template:
     template_path = TEMPLATE_DIR / name
     return Template(template_path.read_text(encoding="utf-8"))
@@ -76,7 +84,7 @@ def render_site_header(
         '<div class="site-header-lockup">'
         '<p class="site-header-mark">(*)</p>'
         '<div class="site-header-copy">'
-        '<p class="site-header-title"><a href="/">Forum Reader</a></p>'
+        f'<p class="site-header-title"><a href="/">{html.escape(site_title())}</a></p>'
         '<p class="site-header-tagline">calm threads from canonical text records</p>'
         "</div>"
         "</div>"
@@ -138,6 +146,7 @@ def render_page(
         page_banner_html = render_username_claim_cta_html()
     page_script_html = (
         render_profile_nav_script_tag()
+        + render_copy_field_script_tag()
         + render_username_claim_cta_script_tag()
         + page_script_html
     )
@@ -159,6 +168,10 @@ def load_asset_text(name: str) -> str:
 
 def render_profile_nav_script_tag() -> str:
     return '<script type="module" src="/assets/profile_nav.js"></script>'
+
+
+def render_copy_field_script_tag() -> str:
+    return '<script type="module" src="/assets/copy_field.js"></script>'
 
 
 def render_username_claim_cta_script_tag() -> str:

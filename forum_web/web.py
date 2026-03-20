@@ -96,6 +96,7 @@ from forum_web.templates import (
     render_page,
     render_profile_nav_script_tag,
     render_site_header,
+    site_title,
 )
 
 load_repo_env()
@@ -604,15 +605,6 @@ def render_profile_page(
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
         profile_action_html=(
-            (
-                f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/update">'
-                "update username"
-                "</a>"
-            )
-            if profile_can_update_username(summary=summary, identity_context=identity_context)
-            else ""
-        )
-        + (
             f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
             "manage merges"
             "</a>"
@@ -697,7 +689,7 @@ def render_board_index() -> str:
     context = build_board_index_page_context(posts, threads, moderation_state, repo_root=repo_root)
     content = load_template("board_index.html").substitute(context)
     return render_page(
-        title="Forum Reader",
+        title=site_title(),
         hero_kicker="",
         hero_title="",
         hero_text="",

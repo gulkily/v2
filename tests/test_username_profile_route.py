@@ -245,6 +245,9 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         self.assertNotIn('id="profile-private-key-output"', body)
         self.assertNotIn('id="profile-public-key-output"', body)
         self.assertNotIn('/assets/profile_key_viewer.js', body)
+        self.assertIn('id="profile-public-key-block"', body)
+        self.assertIn('data-copy-source="#profile-public-key-block"', body)
+        self.assertIn('/assets/copy_field.js', body)
 
         other_users_index = body.index("Other Users With This Name")
         technical_details_index = body.rindex(">Technical details<")

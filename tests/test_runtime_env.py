@@ -84,9 +84,10 @@ class RuntimeEnvTests(unittest.TestCase):
         with mock.patch.object(runtime_env, "_load_dotenv", None):
             with mock.patch.dict(os.environ, {}, clear=True):
                 loaded = runtime_env.load_repo_env(repo_root=self.repo_root, override=False)
+                env_snapshot = dict(os.environ)
 
         self.assertFalse(loaded)
-        self.assertNotIn("FORUM_HOST", os.environ)
+        self.assertNotIn("FORUM_HOST", env_snapshot)
 
     def test_notify_missing_env_defaults_logs_once(self) -> None:
         self.write_env("FORUM_HOST=127.0.0.1\n")
@@ -116,6 +117,7 @@ class RuntimeEnvTests(unittest.TestCase):
 
         self.assertTrue(status["example_found"])
         self.assertIn("DEDALUS_API_KEY", status["missing_keys"])
+        self.assertIn("FORUM_SITE_TITLE", status["missing_keys"])
         self.assertIn("FORUM_ENABLE_THREAD_AUTO_REPLY", status["missing_keys"])
         self.assertIn("FORUM_ENABLE_ACCOUNT_MERGE", status["missing_keys"])
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from pathlib import PurePosixPath
 
 from forum_core.identity import (
     IdentityBootstrap,
@@ -36,6 +37,13 @@ from forum_core.profile_updates import (
     resolve_current_display_name,
 )
 from forum_web.repository import Post
+
+
+def format_bootstrap_path(path_text: str) -> str:
+    path = PurePosixPath(path_text)
+    if len(path.parts) <= 2:
+        return path_text
+    return str(PurePosixPath(*path.parts[-2:]))
 
 
 @dataclass(frozen=True)
@@ -242,7 +250,7 @@ def find_profile_summary(
         bootstrap_record_id=bootstrap.record_id,
         bootstrap_post_id=bootstrap.bootstrap_post_id,
         bootstrap_thread_id=bootstrap.bootstrap_thread_id,
-        bootstrap_path=str(bootstrap.path.relative_to(repo_root)),
+        bootstrap_path=format_bootstrap_path(str(bootstrap.path.relative_to(repo_root))),
         member_identity_ids=member_identity_ids,
         post_ids=tuple(post.post_id for post in matching_posts),
         thread_ids=thread_ids,

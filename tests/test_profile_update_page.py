@@ -240,7 +240,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('href="/account/key/"', body)
         self.assertIn('/assets/browser_signing.js', body)
         self.assertIn('id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"', body)
-        self.assertIn('id="public-key-output" class="technical-textarea key-display" rows="8" spellcheck="false" wrap="off" readonly', body)
+        self.assertIn('id="public-key-output" class="technical-textarea key-display profile-public-key-textarea" rows="8" spellcheck="false" wrap="off" readonly', body)
         self.assertIn('id="payload-output"', body)
         self.assertIn('id="clear-pending-submission-button"', body)
         self.assertIn("Submit update", body)

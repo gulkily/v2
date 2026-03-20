@@ -1,4 +1,8 @@
 <section class="panel page-section">
+  <div class="section-head page-lede">
+    <h1>${profile_heading}</h1>
+    <p>Public profile for <code>${profile_subhead}</code>.</p>
+  </div>
   <div class="action-row link-cluster">
     ${profile_action_html}
   </div>
@@ -21,22 +25,25 @@ ${merge_suggestion_html}
 <details class="panel page-section">
   <summary>Technical details</summary>
   <div class="detail-grid">
-    <p><strong>Current display name:</strong> <code>${display_name}</code></p>
-    <p><strong>Display-name source:</strong> <code>${display_name_source}</code></p>
-    <p><strong>Fallback label:</strong> <code>${fallback_display_name}</code></p>
-    <p><strong>Public username route:</strong> ${username_route_html}</p>
-    <p><strong>Resolved Identity-ID:</strong> <code>${bootstrap_identity_id}</code></p>
-    <p><strong>Bootstrap Identity-ID:</strong> <code>${bootstrap_source_identity_id}</code></p>
-    <p><strong>Fingerprint:</strong> <code>${bootstrap_fingerprint}</code></p>
-    <p><strong>Bootstrap source post:</strong> <a href="/posts/${bootstrap_post_id}">${bootstrap_post_id}</a></p>
-    <p><strong>Bootstrap source thread:</strong> <a href="/threads/${bootstrap_thread_id}">${bootstrap_thread_id}</a></p>
-    <p><strong>Bootstrap path:</strong> <code>${bootstrap_path}</code></p>
-  </div>
-  <div class="profile-links link-cluster">
-    ${username_links_html}
+    <div class="detail-row"><strong class="detail-label">Current display name:</strong><code class="detail-value">${display_name}</code></div>
+    <div class="detail-row"><strong class="detail-label">Display-name source:</strong><code class="detail-value">${display_name_source}</code></div>
+    <div class="detail-row"><strong class="detail-label">Fallback label:</strong><code class="detail-value">${fallback_display_name}</code></div>
+    <div class="detail-row"><strong class="detail-label">Public username route:</strong><span class="detail-value">${username_route_html}</span></div>
+    <div class="detail-row"><strong class="detail-label">Resolved Identity-ID:</strong><code class="detail-value detail-value--truncate">${bootstrap_identity_id}</code></div>
+    <div class="detail-row"><strong class="detail-label">Bootstrap Identity-ID:</strong><code class="detail-value detail-value--truncate">${bootstrap_source_identity_id}</code></div>
+    <div class="detail-row"><strong class="detail-label">Fingerprint:</strong><code class="detail-value">${bootstrap_fingerprint}</code></div>
+    <div class="detail-row"><strong class="detail-label">Bootstrap source post:</strong><a class="detail-value" href="/posts/${bootstrap_post_id}">${bootstrap_post_id}</a></div>
+    <div class="detail-row"><strong class="detail-label">Bootstrap source thread:</strong><a class="detail-value" href="/threads/${bootstrap_thread_id}">${bootstrap_thread_id}</a></div>
+    <div class="detail-row"><strong class="detail-label">Bootstrap path:</strong><code class="detail-value detail-value--truncate">${bootstrap_path}</code></div>
   </div>
   <div class="profile-links link-cluster">
     ${member_identity_html}
   </div>
-  <pre class="key-block">${public_key_text}</pre>
+  <section class="key-display-panel">
+    <strong class="detail-label">Public key:</strong>
+    <div class="copy-textarea-wrap copy-textarea-wrap--full">
+      <button class="copy-textarea-button" type="button" data-copy-source="#profile-public-key-block">copy</button>
+      <textarea id="profile-public-key-block" class="technical-textarea key-display profile-public-key-textarea" rows="10" spellcheck="false" wrap="off" readonly>${public_key_text}</textarea>
+    </div>
+  </section>
 </details>

@@ -44,7 +44,10 @@
       </label>
       <label class="field-stack" for="public-key-output">
         <span>ASCII-armored public key</span>
-        <textarea id="public-key-output" class="technical-textarea key-display" rows="8" spellcheck="false" wrap="off" readonly></textarea>
+        <div class="copy-textarea-wrap copy-textarea-wrap--full">
+          <button class="copy-textarea-button" type="button" data-copy-source="#public-key-output">copy</button>
+          <textarea id="public-key-output" class="technical-textarea key-display profile-public-key-textarea" rows="8" spellcheck="false" wrap="off" readonly></textarea>
+        </div>
       </label>
     </section>
 
