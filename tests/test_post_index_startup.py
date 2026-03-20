@@ -142,10 +142,11 @@ class PostIndexStartupTests(unittest.TestCase):
             head_mismatch=True,
             schema_mismatch=False,
         )
-        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
-            with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True) as mock_start:
-                with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
-                    status, _, body = self.request("/")
+        with self.assertLogs("forum_web.web", level="WARNING") as captured_logs:
+            with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+                with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True) as mock_start:
+                    with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                        status, _, body = self.request("/")
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Refreshing forum data", body)
@@ -153,6 +154,7 @@ class PostIndexStartupTests(unittest.TestCase):
         self.assertNotIn("recent slow operations", body)
         self.assertNotIn('/assets/site.css', body)
         self.assertNotIn('/assets/username_claim_cta.js', body)
+        self.assertTrue(any("post index rebuild triggered for" in message for message in captured_logs.output))
         mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
         mock_startup.assert_not_called()
 
