@@ -169,6 +169,17 @@ process.stdout.write(signature);
         self.assertIn("activity_git_status_summary", step_names)
         self.assertNotIn("activity_load_repository_state", step_names)
 
+    def test_content_activity_request_still_records_repository_load_step(self) -> None:
+        status, _, _ = self.request("/activity/", query_string="view=content")
+
+        self.assertEqual(status, "200 OK")
+        operations = load_recent_operations(self.repo_root)
+        activity_operation = next(event for event in operations if event.operation_name == "GET /activity/")
+        self.assertEqual(activity_operation.metadata["view"], "content")
+        step_names = tuple(step.name for step in activity_operation.steps)
+        self.assertIn("activity_load_repository_state", step_names)
+        self.assertIn("activity_build_posts_index", step_names)
+
     def test_create_thread_request_persists_phase_timings_in_request_record(self) -> None:
         payload_text = dedent(
             """
