@@ -24,6 +24,7 @@
   - Added a retry-link regression test to ensure the wait page preserves the original query string.
   - Tightened the wait-page preflight so it only activates for existing stale git-backed index state, not cold-start index creation.
   - Switched the background worker to run a direct rebuild and log failures so request tests do not leave noisy uncaught thread errors behind.
+  - Replaced the wait page with a self-contained HTML response that uses inline styling and inline retry logic instead of depending on the shared CSS and JS asset pipeline.
 - Verification:
   - `python -m unittest tests.test_post_index_startup tests.test_post_index.PostIndexSchemaTests tests.test_board_index_page tests.test_username_profile_route`
 - Notes:

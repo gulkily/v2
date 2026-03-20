@@ -177,36 +177,45 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
         if rebuild_started
         else "Forum data is already being refreshed for this page. The page will retry automatically in a moment."
     )
-    content = (
-        '<section class="panel page-section">'
-        '<div class="section-head page-lede">'
-        '<h2>Refreshing forum data</h2>'
-        f'<p>{html.escape(status_text)}</p>'
+    return (
+        "<!doctype html>"
+        '<html lang="en">'
+        "<head>"
+        '<meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        "<title>Refreshing forum data</title>"
+        "<style>"
+        "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
+        ".wrap{min-height:100vh;display:grid;place-items:center;padding:1.5rem;}"
+        ".card{width:min(38rem,100%);background:#fbfaf5;border:1px solid rgba(82,101,96,.18);"
+        "box-shadow:0 14px 34px rgba(31,42,40,.1);padding:1.25rem 1.2rem;border-radius:.35rem;}"
+        ".kicker{margin:0 0 .45rem;color:#2d5b73;font:0.78rem 'Courier New',Courier,monospace;"
+        "letter-spacing:.08em;text-transform:uppercase;}"
+        "h1{margin:.1rem 0 .65rem;font:2rem Georgia,'Times New Roman',serif;}"
+        "p{margin:.55rem 0;line-height:1.5;}"
+        ".meta{color:#5f6b67;font-size:.96rem;}"
+        ".actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem;}"
+        ".actions a{display:inline-block;padding:.5rem .75rem;border:1px solid rgba(82,101,96,.22);"
+        "color:#1f2a28;text-decoration:none;background:#fffaf1;}"
+        "</style>"
+        '<meta http-equiv="refresh" content="1;url=' + html.escape(target_path, quote=True) + '">'
+        "</head>"
+        "<body>"
+        '<main class="wrap"><section class="card">'
+        '<p class="kicker">Preparing Page</p>'
+        "<h1>Refreshing forum data</h1>"
+        f"<p>{html.escape(status_text)}</p>"
+        '<p class="meta">If this takes longer than expected, you can check the recent slow operations view for the same rebuild.</p>'
+        '<div class="actions">'
+        f'<a href="{html.escape(target_path)}">retry now</a>'
+        '<a href="/operations/slow/">recent slow operations</a>'
         "</div>"
-        '<p class="thread-meta">If this takes longer than expected, you can check the recent slow operations view for the same rebuild.</p>'
-        '<div class="action-row link-cluster">'
-        f'<a class="thread-chip" href="{html.escape(target_path)}">retry now</a>'
-        '<a class="thread-chip" href="/operations/slow/">recent slow operations</a>'
-        "</div>"
-        "</section>"
-    )
-    return render_page(
-        title="Refreshing forum data",
-        hero_kicker="",
-        hero_title="",
-        hero_text="",
-        content_html=content,
-        page_header_html=render_site_header(
-            hero_kicker="",
-            hero_title="",
-            hero_text="",
-            include_page_intro=False,
-        ),
-        page_script_html=(
-            "<script>"
-            f'window.setTimeout(function () {{ window.location.replace({json.dumps(target_path)}); }}, 1200);'
-            "</script>"
-        ),
+        "</section></main>"
+        "<script>"
+        f'window.setTimeout(function () {{ window.location.replace({json.dumps(target_path)}); }}, 1200);'
+        "</script>"
+        "</body>"
+        "</html>"
     )
 
 
