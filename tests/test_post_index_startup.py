@@ -24,10 +24,10 @@ class PostIndexStartupTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def request(self, path: str) -> tuple[str, dict[str, str], str]:
+    def request(self, path: str, *, query_string: str = "") -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": "GET",
             "CONTENT_LENGTH": "0",
             "wsgi.input": BytesIO(b""),
@@ -177,6 +177,28 @@ class PostIndexStartupTests(unittest.TestCase):
         self.assertIn("/profiles/openpgp-alpha", body)
         mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=False)
         mock_startup.assert_called_once_with(self.repo_root)
+
+    def test_refresh_page_retry_link_preserves_query_string(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+        web._INDEX_STARTUP_READY_ROOTS.add(self.repo_root.resolve())
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=1,
+            indexed_head="old-head",
+            current_head="new-head",
+            indexed_schema_version=str(POST_INDEX_SCHEMA_VERSION),
+            count_mismatch=False,
+            head_mismatch=True,
+            schema_mismatch=False,
+        )
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True):
+                with mock.patch("forum_web.web.ensure_runtime_post_index_startup"):
+                    status, _, body = self.request("/profiles/openpgp-alpha", query_string="self=1")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('/profiles/openpgp-alpha?self=1', body)
 
 
 if __name__ == "__main__":

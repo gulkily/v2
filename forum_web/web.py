@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import os
 import re
 import subprocess
@@ -25,7 +26,7 @@ from forum_core.operation_events import (
     record_current_operation_step,
     start_operation,
 )
-from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts, post_index_readiness
+from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts, post_index_readiness, rebuild_post_index
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
@@ -102,6 +103,7 @@ from forum_web.templates import (
 
 load_repo_env()
 notify_missing_env_defaults()
+logger = logging.getLogger(__name__)
 _INDEX_STARTUP_READY_ROOTS: set[Path] = set()
 _INDEX_REBUILD_IN_PROGRESS_ROOTS: set[Path] = set()
 _INDEX_REBUILD_LOCK = threading.Lock()
@@ -151,9 +153,11 @@ def start_background_post_index_refresh(repo_root: Path, *, mark_startup_ready: 
 
     def run_refresh() -> None:
         try:
-            ensure_post_index_current(resolved_root)
+            rebuild_post_index(resolved_root)
             if mark_startup_ready:
                 _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
+        except Exception:
+            logger.exception("background post-index refresh failed for %s", resolved_root)
         finally:
             with _INDEX_REBUILD_LOCK:
                 _INDEX_REBUILD_IN_PROGRESS_ROOTS.discard(resolved_root)
@@ -214,7 +218,12 @@ def maybe_render_reindex_feedback_page(
     mark_startup_ready: bool,
 ) -> str | None:
     readiness = post_index_readiness(repo_root)
-    if not readiness.requires_rebuild:
+    has_existing_index_state = (
+        readiness.indexed_head is not None
+        or readiness.indexed_schema_version is not None
+        or readiness.indexed_post_count > 0
+    )
+    if not readiness.requires_rebuild or readiness.current_head is None or not has_existing_index_state:
         return None
     target_path = path
     if query_string:
