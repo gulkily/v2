@@ -614,8 +614,7 @@ button:disabled {
   background: rgba(255, 249, 240, 0.72);
 }
 
-.compose-panel,
-.compose-details {
+.compose-panel {
   padding: 1rem;
 }
 
@@ -626,14 +625,14 @@ button:disabled {
   padding: 0.7rem 0.75rem;
 }
 
-.compose-details summary {
+details.panel.page-section > summary {
   cursor: pointer;
   color: var(--accent);
   font-weight: 600;
   margin-bottom: 1rem;
 }
 
-.compose-details[open] summary {
+details.panel.page-section[open] > summary {
   margin-bottom: 1rem;
 }
 
