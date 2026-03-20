@@ -69,6 +69,7 @@ If you prefer a repo-local virtual environment instead of a user-profile install
 - `./forum help`
 - `./forum install`
 - `./forum env-sync`
+- `./forum git-recover`
 - `./forum start`
 - `./forum test`
 

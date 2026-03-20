@@ -39,3 +39,13 @@
   - Ran `python3 -m unittest tests.test_forum_git_recover tests.test_forum_tasks`.
 - Notes:
   - The command still does not offer a destructive opt-in flag in this slice; operators must clean up or intentionally discard risky local state themselves before rerunning `--apply`.
+
+## Stage 5 - Document and verify the operator workflow
+- Changes:
+  - Updated [`docs/developer_commands.md`](/home/wsl/v2/docs/developer_commands.md) to document `./forum git-recover`, `--apply`, the supported clean auto-repair states, and the guarded refusal cases.
+  - Updated [`README.md`](/home/wsl/v2/README.md) so `git-recover` appears in the common command list.
+- Verification:
+  - Ran `python3 -m unittest tests.test_forum_git_recover tests.test_forum_tasks`.
+  - Ran `./forum git-recover` from the current feature branch and confirmed it reports the branch/upstream/dirty-worktree blockers through the normal CLI path.
+- Notes:
+  - The CLI smoke run was intentionally executed from the active feature branch, so the non-healthy diagnosis was the expected result.
