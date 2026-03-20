@@ -135,11 +135,10 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("Add reply", body)
         self.assertIn("Add root", body)
         self.assertTrue(body.index("Add reply") < body.index("Add root"))
-        self.assertIn(self.latest_commit_short(), body)
-        self.assertIn("Working tree", body)
-        self.assertIn("records/instance/public.txt", body)
-        self.assertIn("Working tree", body)
-        self.assertTrue("git status unavailable" in body or "?? state/" in body)
+        self.assertNotIn(self.latest_commit_short(), body)
+        self.assertNotIn("Repository snapshot", body)
+        self.assertNotIn("Working tree", body)
+        self.assertNotIn("records/instance/public.txt", body)
         self.assertNotIn("pin thread", body)
         self.assertNotIn("Add ui helper", body)
         self.assertNotIn("One filtered timeline for repository content, moderation, and code activity on this instance.", body)
@@ -158,6 +157,7 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertNotIn("pin thread", default_body)
         self.assertNotIn("Add ui helper", default_body)
         self.assertIn("Add reply", content_body)
+        self.assertIn("Content commit", content_body)
         self.assertNotIn("pin thread", content_body)
         self.assertNotIn("Add ui helper", content_body)
         self.assertIn("pin thread", moderation_body)
@@ -177,6 +177,32 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertEqual(status, "302 Found")
         self.assertEqual(headers["Location"], "/activity/?view=moderation")
         self.assertEqual(body, "")
+
+    def test_activity_page_renders_pagination_links_per_view(self) -> None:
+        for index in range(15):
+            self.write_record(
+                f"records/posts/root-{index + 100}.txt",
+                f"""
+                Post-ID: root-{index + 100}
+                Board-Tags: general
+                Subject: Root {index + 100}
+
+                Body {index + 100}.
+                """,
+            )
+            self.commit_record(f"records/posts/root-{index + 100}.txt", f"Add root {index + 100}")
+
+        _, _, page_one = self.get("/activity/", "view=content")
+        _, _, page_two = self.get("/activity/", "view=content&page=2")
+
+        self.assertIn('href="/activity/?view=content&page=2"', page_one)
+        self.assertIn("older activity", page_one)
+        self.assertNotIn("newer activity", page_one)
+        self.assertIn('href="/activity/?view=content&page=1"', page_two)
+        self.assertIn("newer activity", page_two)
+        self.assertIn("Add root 114", page_one)
+        self.assertNotIn("Add root 102", page_one)
+        self.assertIn("Add root 102", page_two)
 
 
 if __name__ == "__main__":

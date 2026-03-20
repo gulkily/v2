@@ -977,6 +977,19 @@ def render_activity_filter_nav(*, current_mode: str) -> str:
     return "".join(parts)
 
 
+def render_activity_pagination_nav(*, current_mode: str, page: int, has_next_page: bool) -> str:
+    parts: list[str] = []
+    if page > 1:
+        parts.append(
+            f'<a class="thread-chip" href="/activity/?view={html.escape(current_mode)}&page={page - 1}">newer activity</a>'
+        )
+    if has_next_page:
+        parts.append(
+            f'<a class="thread-chip" href="/activity/?view={html.escape(current_mode)}&page={page + 1}">older activity</a>'
+        )
+    return "".join(parts)
+
+
 def render_activity_event_card(
     event: ActivityEvent,
     *,
@@ -1000,7 +1013,7 @@ def render_activity_event_card(
     )
 
 
-def render_site_activity_page(*, view_mode: str) -> str:
+def render_site_activity_page(*, view_mode: str, page: int) -> str:
     repo_root = get_repo_root()
     posts: list[Post] = []
     identity_context = None
@@ -1015,7 +1028,7 @@ def render_site_activity_page(*, view_mode: str) -> str:
         record_current_operation_step("activity_build_posts_index", (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
-    activity_result = load_activity_events(repo_root, mode=view_mode)
+    activity_result = load_activity_events(repo_root, mode=view_mode, page=page)
     record_current_operation_step("activity_load_events", (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
@@ -1046,6 +1059,11 @@ def render_site_activity_page(*, view_mode: str) -> str:
         filter_nav_html=render_activity_filter_nav(current_mode=view_mode),
         activity_intro_text=html.escape(intro_text),
         event_cards_html=event_cards,
+        pagination_html=render_activity_pagination_nav(
+            current_mode=view_mode,
+            page=activity_result.page,
+            has_next_page=activity_result.has_next_page,
+        ),
     )
     return render_page(
         title="Repository History",
@@ -2795,7 +2813,8 @@ def _dispatch_application(environ, start_response):
 
         if path == "/activity/":
             view_mode = activity_filter_mode_from_request(query_params.get("view", [""])[0])
-            body = render_site_activity_page(view_mode=view_mode).encode("utf-8")
+            page = activity_page_from_request(query_params.get("page", [""])[0])
+            body = render_site_activity_page(view_mode=view_mode, page=page).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
@@ -3164,6 +3183,7 @@ def application(environ, start_response):
         metadata = {"method": method, "path": path}
         if path == "/activity/":
             metadata["view"] = activity_filter_mode_from_request(query_params.get("view", [None])[0])
+            metadata["page"] = activity_page_from_request(query_params.get("page", [None])[0])
         handle = start_operation(
             repo_root,
             operation_kind="request",
