@@ -1113,13 +1113,6 @@ def render_post(post_id: str) -> str:
     else:
         reply_link_html = f'<p><a class="thread-chip" href="/compose/reply?thread_id={html.escape(thread_target)}&parent_id={html.escape(post.post_id)}">reply to this post</a></p>'
     content = load_template("post.html").substitute(
-        breadcrumb_html=render_breadcrumb(
-            [
-                ('/', 'board index'),
-                ('/threads/' + thread_target, post_display_label(thread_root) if thread_root is not None else thread_target),
-                ('/posts/' + post.post_id, post_display_label(post)),
-            ]
-        ),
         post_heading=html.escape(heading),
         reply_link_html=reply_link_html,
         post_card_html=render_post_card(
@@ -1132,9 +1125,15 @@ def render_post(post_id: str) -> str:
     )
     return render_page(
         title=heading,
-        hero_kicker="Post Permalink",
-        hero_title=heading,
-        hero_text="This permalink shows one canonical post in isolation while preserving links back to the thread and board index.",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
         content_html=content,
     )
 
