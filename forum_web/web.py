@@ -1059,13 +1059,15 @@ def render_thread(thread_id: str) -> str:
 
 def render_post(post_id: str) -> str:
     posts, _, _, _, moderation_state, identity_context = load_repository_state()
-    post = index_posts(posts).get(post_id)
+    posts_index = index_posts(posts)
+    post = posts_index.get(post_id)
     if post is None:
         raise LookupError(f"unknown post: {post_id}")
     if thread_is_hidden(moderation_state, post.root_thread_id):
         raise LookupError(f"unknown post: {post_id}")
 
     thread_target = post.root_thread_id
+    thread_root = posts_index.get(thread_target)
     heading = post.subject or post.post_id
     hidden = post_is_hidden(moderation_state, post.post_id, thread_target)
     locked = moderation_state.locks_thread(thread_target)
@@ -1079,8 +1081,8 @@ def render_post(post_id: str) -> str:
         breadcrumb_html=render_breadcrumb(
             [
                 ('/', 'board index'),
-                ('/threads/' + thread_target, thread_target),
-                ('/posts/' + post.post_id, post.post_id),
+                ('/threads/' + thread_target, post_display_label(thread_root) if thread_root is not None else thread_target),
+                ('/posts/' + post.post_id, post_display_label(post)),
             ]
         ),
         post_heading=html.escape(heading),
@@ -1696,6 +1698,12 @@ def first_line(body: str) -> str:
     return body.splitlines()[0] if body.splitlines() else ""
 
 
+def post_display_label(post: Post) -> str:
+    if post.is_root:
+        return post.subject or post.post_id
+    return post.subject or first_line(post.body) or post.post_id
+
+
 def render_post_link_chip(post_id: str, posts_index: dict[str, Post]) -> str:
     post = posts_index.get(post_id)
     label = post_id
@@ -1703,10 +1711,10 @@ def render_post_link_chip(post_id: str, posts_index: dict[str, Post]) -> str:
     if post is not None:
         if post.is_root:
             chip_class += " thread-chip--thread"
-            label = post.subject or post_id
+            label = post_display_label(post)
         else:
             chip_class += " thread-chip--reply"
-            label = post.subject or first_line(post.body) or post_id
+            label = post_display_label(post)
     return f'<a class="{chip_class}" href="/posts/{html.escape(post_id)}">{html.escape(label)}</a>'
 
 

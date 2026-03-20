@@ -172,6 +172,9 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertNotIn('<p class="post-relation">', body)
         self.assertIn("Mar 16, 2026 at 09:30", body)
         self.assertNotIn(">permalink<", body)
+        self.assertIn('href="/threads/T01">Example task thread</a>', body)
+        self.assertIn('href="/posts/reply-20260316093045-follow-up-note-12345678">Follow-up task note.</a>', body)
+        self.assertNotIn('href="/posts/reply-20260316093045-follow-up-note-12345678">reply-20260316093045-follow-up-note-12345678</a>', body)
 
     def test_task_detail_page_shows_mark_done_action(self) -> None:
         status, _, body = self.get("/planning/tasks/T01")
