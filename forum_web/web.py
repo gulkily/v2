@@ -701,22 +701,34 @@ def render_board_index_thread_rows(threads, moderation_state) -> str:
 def render_board_index_thread_row(rank: int, thread, moderation_state) -> str:
     subject = thread.root.subject or "Untitled thread"
     preview = first_line(thread.root.body) or "No preview available."
-    tags_html = " ".join(f'[{html.escape(tag)}]' for tag in thread.root.board_tags)
-    meta_parts = [
-        f"{visible_reply_count(thread, moderation_state)} repl{'y' if visible_reply_count(thread, moderation_state) == 1 else 'ies'}",
-        html.escape(thread.root.post_id),
-    ]
+    visible_tags = [tag for tag in thread.root.board_tags if tag]
+    if visible_tags == ["general"]:
+        visible_tags = []
+    tags_html = " ".join(f'[{html.escape(tag)}]' for tag in visible_tags)
+    reply_count = visible_reply_count(thread, moderation_state)
+    meta_parts = []
+    if reply_count > 0:
+        meta_parts.append(f"{reply_count} repl{'y' if reply_count == 1 else 'ies'}")
     if root_thread_type(thread.root):
         meta_parts.append(html.escape(root_thread_type(thread.root)))
     meta_text = " · ".join(meta_parts)
+    tags_line_html = ""
+    if tags_html:
+        tags_line_html = f'<p class="board-index-thread-tags">{tags_html}</p>'
+    preview_html = ""
+    if preview.strip() != subject.strip():
+        preview_html = f'<p>{html.escape(preview)}</p>'
+    meta_html = ""
+    if meta_text:
+        meta_html = f'<p class="thread-meta">{meta_text}</p>'
     return (
         '<article class="board-index-thread-row">'
         f'<p class="board-index-thread-rank">{rank}.</p>'
         '<div class="board-index-thread-main">'
         f'<h3><a href="/threads/{html.escape(thread.root.post_id)}">{html.escape(subject)}</a></h3>'
-        f'<p class="board-index-thread-tags">{tags_html}</p>'
-        f'<p>{html.escape(preview)}</p>'
-        f'<p class="thread-meta">{meta_text}</p>'
+        f"{tags_line_html}"
+        f"{preview_html}"
+        f"{meta_html}"
         "</div>"
         "</article>"
     )

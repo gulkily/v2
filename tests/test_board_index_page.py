@@ -53,6 +53,16 @@ class BoardIndexPageTests(unittest.TestCase):
             Reply body.
             """,
         )
+        self.write_record(
+            "records/posts/root-003.txt",
+            """
+            Post-ID: root-003
+            Board-Tags: general
+            Subject: Same words
+
+            Same words
+            """,
+        )
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -181,6 +191,19 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertNotIn('/activity/?view=moderation', body)
         self.assertNotIn('moderation activity', body)
         self.assertNotIn('/planning/task-priorities/', body)
+
+    def test_board_index_suppresses_default_listing_metadata(self) -> None:
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn(">root-001<", body)
+        self.assertNotIn(">root-002<", body)
+        self.assertNotIn(">root-003<", body)
+        self.assertIn("[general] [meta]", body)
+        self.assertNotIn(">Same words</a></h3><p class=\"board-index-thread-tags\">[general]</p>", body)
+        self.assertNotIn(">Same words</a></h3><p>Same words</p>", body)
+        self.assertNotIn("0 replies", body)
+        self.assertIn("1 reply", body)
 
     def test_board_index_orders_threads_by_commit_recency_when_index_is_available(self) -> None:
         self.init_git_repo()
