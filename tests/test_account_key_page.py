@@ -45,11 +45,13 @@ class AccountKeyPageTests(unittest.TestCase):
         self.assertIn("Key material", body)
         self.assertIn("browser-stored signing key available on this device", body)
         self.assertIn('id="key-material-status"', body)
-        self.assertIn('id="key-private-key-output" class="technical-textarea" rows="10" spellcheck="false" wrap="off" readonly', body)
+        self.assertIn('id="generate-key-button" type="button">Generate New Key</button>', body)
+        self.assertIn('id="import-key-button" type="button">Import Key</button>', body)
+        self.assertIn('id="key-private-key-output" class="technical-textarea" rows="10" spellcheck="false" wrap="off"></textarea>', body)
         self.assertIn('id="key-public-key-output" class="technical-textarea key-display" rows="8" spellcheck="false" wrap="off" readonly', body)
         self.assertIn('/assets/profile_key_viewer.js', body)
+        self.assertIn('/assets/account_key_actions.js', body)
 
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -664,7 +664,10 @@ def render_account_key_page() -> str:
         hero_title="",
         hero_text="",
         content_html=content,
-        page_script_html='<script type="module" src="/assets/profile_key_viewer.js"></script>',
+        page_script_html=(
+            '<script type="module" src="/assets/profile_key_viewer.js"></script>'
+            '<script type="module" src="/assets/account_key_actions.js"></script>'
+        ),
         page_header_html=render_site_header(
             hero_kicker="",
             hero_title="",
@@ -2880,6 +2883,12 @@ def _dispatch_application(environ, start_response):
 
         if path == "/assets/profile_key_viewer.js":
             body = load_asset_text("profile_key_viewer.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/account_key_actions.js":
+            body = load_asset_text("account_key_actions.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]

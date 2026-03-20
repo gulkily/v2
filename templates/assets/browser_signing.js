@@ -1224,6 +1224,7 @@ if (typeof document !== "undefined") {
 }
 
 export {
+  ensureLocalKeys,
   formatSigningStatus,
   normalizeComposeAscii,
   pendingSubmissionStorageKey,
