@@ -237,6 +237,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
         self.assertIn('data-dry-run="false"', body)
+        self.assertIn('href="/account/key/"', body)
         self.assertIn('/assets/browser_signing.js', body)
         self.assertIn('id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"', body)
         self.assertIn('id="public-key-output" class="technical-textarea key-display" rows="8" spellcheck="false" wrap="off" readonly', body)

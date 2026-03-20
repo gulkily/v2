@@ -188,6 +188,7 @@ class MergeManagementPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Manage identity merges", body)
+        self.assertIn('href="/account/key/"', body)
         self.assertIn(OTHER_IDENTITY_ID, body)
         self.assertIn("Last activity", body)
         self.assertIn("Visible posts", body)
@@ -209,6 +210,7 @@ class MergeManagementPageTests(unittest.TestCase):
         self.assertIn('data-action="approve_merge"', body)
         self.assertIn(f'data-requester-identity-id="{OTHER_IDENTITY_ID}"', body)
         self.assertIn(f'data-target-identity-id="{IDENTITY_ID}"', body)
+        self.assertIn('href="/account/key/"', body)
         self.assertIn("/assets/merge_request_signing.js", body)
 
 

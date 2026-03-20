@@ -557,7 +557,7 @@ def render_profile_page(
         )
     root_resolution = resolve_username_root(repo_root=get_repo_root(), username=summary.display_name)
     merge_suggestion_html = ""
-    profile_script_html = '<script type="module" src="/assets/profile_key_viewer.js"></script>'
+    profile_script_html = ""
     if root_resolution is not None and root_resolution.canonical_identity_id != summary.identity_id:
         merge_target_summary = find_profile_summary(
             repo_root=get_repo_root(),
