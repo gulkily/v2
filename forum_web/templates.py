@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import html
+import os
 from pathlib import Path
 from string import Template
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
+
+
+def env_flag_enabled(name: str, *, default: bool = False) -> bool:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_template(name: str) -> Template:
@@ -40,6 +48,7 @@ def render_site_header(
     include_page_intro: bool = True,
 ) -> str:
     intro_html = ""
+    header_band_html = ""
     if include_page_intro:
         intro_html = (
             '<div class="site-header-page-intro">'
@@ -49,9 +58,13 @@ def render_site_header(
             f"{hero_action_html}"
             "</div>"
         )
+    if env_flag_enabled("FORUM_ENABLE_KINDNESS_HEADER", default=False):
+        header_band_html = (
+            '<div class="site-header-band"><p>Kindness first. Clear navigation, readable text, and calm visual rhythm.</p></div>'
+        )
     return (
         '<header class="site-header site-header--page">'
-        '<div class="site-header-band"><p>Kindness first. Clear navigation, readable text, and calm visual rhythm.</p></div>'
+        f"{header_band_html}"
         '<div class="site-header-main">'
         '<div class="site-header-lockup">'
         '<p class="site-header-mark">(*)</p>'

@@ -124,6 +124,40 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertTrue(body.index("/threads/root-001") < body.index("posts loaded"))
         self.assertNotIn('class="front-header"', body)
         self.assertNotIn('class="front-layout"', body)
+        self.assertNotIn("Kindness first.", body)
+
+    def test_board_index_kindness_header_flag_defaults_off_and_can_be_enabled(self) -> None:
+        _, _, default_body = self.get("/")
+
+        self.assertNotIn('class="site-header-band"', default_body)
+        self.assertNotIn("Kindness first.", default_body)
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "FORUM_REPO_ROOT": str(self.repo_root),
+                "FORUM_ENABLE_KINDNESS_HEADER": "1",
+            },
+            clear=False,
+        ):
+            environ = {
+                "PATH_INFO": "/",
+                "QUERY_STRING": "",
+                "REQUEST_METHOD": "GET",
+                "CONTENT_LENGTH": "0",
+                "wsgi.input": BytesIO(b""),
+            }
+            response: dict[str, object] = {}
+
+            def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+                response["status"] = status
+                response["headers"] = headers
+
+            enabled_body = b"".join(application(environ, start_response)).decode("utf-8")
+
+        self.assertEqual(response["status"], "200 OK")
+        self.assertIn('class="site-header-band"', enabled_body)
+        self.assertIn("Kindness first.", enabled_body)
 
     def test_board_index_preserves_key_destination_links(self) -> None:
         status, _, body = self.get("/")
