@@ -145,6 +145,9 @@ class UsernameProfileRouteTests(unittest.TestCase):
         self.assertIn("Ilya", body)
         self.assertIn("/user/ilya-alt", body)
         self.assertNotIn("/user/ilya</a>", body)
+        self.assertNotIn("Profile View", body)
+        self.assertNotIn("This profile view is derived", body)
+        self.assertNotIn('class="breadcrumb"', body)
 
     def test_old_username_route_does_not_resolve_after_rename(self) -> None:
         status, _, _ = self.get("/user/ilya")
@@ -497,6 +500,51 @@ process.stdout.write(JSON.stringify({{
         self.assertEqual(status, "200 OK")
         self.assertIn('/user/ilya-alt', body)
         self.assertNotIn(f'/profiles/{identity_slug(self.alpha_identity)}', body)
+
+    def test_profile_signed_posts_uses_readable_labels_for_threads_and_replies(self) -> None:
+        self.write_record(
+            "records/profile-updates/profile-update-alpha.txt",
+            f"""
+            Record-ID: profile-update-alpha
+            Action: set_display_name
+            Source-Identity-ID: {self.alpha_identity}
+            Timestamp: 2026-03-18T02:00:00Z
+
+            Ilya
+            """,
+        )
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Hello
+
+            Root body.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: general
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Reply first line.
+            Reply second line.
+            """,
+        )
+        self.write_record("records/posts/root-001.txt.pub.asc", self.alpha_public)
+        self.write_record("records/posts/reply-001.txt.pub.asc", self.alpha_public)
+
+        status, _, body = self.get(f"/profiles/{identity_slug(self.alpha_identity)}")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('class="thread-chip thread-chip--thread" href="/posts/root-001">Hello</a>', body)
+        self.assertNotIn('href="/posts/root-001">root-001</a>', body)
+        self.assertIn('class="thread-chip thread-chip--reply" href="/posts/reply-001">Reply first line.</a>', body)
+        self.assertNotIn('href="/posts/reply-001">reply-001</a>', body)
 
     def test_moderation_attribution_prefers_username_route_for_canonical_root(self) -> None:
         self.write_record(

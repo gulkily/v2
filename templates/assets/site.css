@@ -293,6 +293,14 @@ body {
   color: var(--muted);
 }
 
+.thread-chip--thread {
+  font-weight: 700;
+}
+
+.thread-chip--reply {
+  font-weight: 400;
+}
+
 .thread-chip-active {
   border-color: rgba(139, 94, 52, 0.34);
   background: rgba(240, 220, 191, 0.92);

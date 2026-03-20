@@ -502,8 +502,9 @@ def render_profile_page(
     identity_context,
     route_path: str,
 ) -> str:
+    posts_index = index_posts(posts)
     post_links_html = "".join(
-        f'<a class="thread-chip" href="/posts/{html.escape(post_id)}">{html.escape(post_id)}</a>'
+        render_post_link_chip(post_id, posts_index)
         for post_id in summary.post_ids
     ) or '<p>No visible signed posts are currently associated with this identity.</p>'
     usernames = profile_usernames(
@@ -598,12 +599,6 @@ def render_profile_page(
         else "<span>no unambiguous current username route</span>"
     )
     content = load_template("profile.html").substitute(
-        breadcrumb_html=render_breadcrumb(
-            [
-                ("/", "board index"),
-                (route_path, summary.display_name),
-            ]
-        ),
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
         profile_action_html=(
@@ -647,11 +642,17 @@ def render_profile_page(
     )
     return render_page(
         title=summary.display_name,
-        hero_kicker="Profile View",
-        hero_title=summary.display_name,
-        hero_text="This profile view is derived from visible repository records. It resolves linked identities to one canonical profile while preserving the visible bootstrap anchor behind that profile.",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
         content_html=content,
         page_script_html=profile_script_html,
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
     )
 
 
@@ -1293,6 +1294,7 @@ def render_profile_update_page(identity_id: str) -> str:
 
 def render_merge_management_page(identity_id: str) -> str:
     posts, _, _, _, _, identity_context = load_repository_state()
+    posts_index = index_posts(posts)
     summary = find_profile_summary(
         repo_root=get_repo_root(),
         posts=posts,
@@ -1334,7 +1336,7 @@ def render_merge_management_page(identity_id: str) -> str:
             last_activity_text = format_post_timestamp(candidate_summary.post_ids[-1])
 
         post_links_html = "".join(
-            f'<a class="thread-chip" href="/posts/{html.escape(post_id)}">{html.escape(post_id)}</a>'
+            render_post_link_chip(post_id, posts_index)
             for post_id in candidate_summary.post_ids
         ) or "<span>None</span>"
 
@@ -1692,6 +1694,20 @@ def render_breadcrumb(items: list[tuple[str, str]]) -> str:
 
 def first_line(body: str) -> str:
     return body.splitlines()[0] if body.splitlines() else ""
+
+
+def render_post_link_chip(post_id: str, posts_index: dict[str, Post]) -> str:
+    post = posts_index.get(post_id)
+    label = post_id
+    chip_class = "thread-chip"
+    if post is not None:
+        if post.is_root:
+            chip_class += " thread-chip--thread"
+            label = post.subject or post_id
+        else:
+            chip_class += " thread-chip--reply"
+            label = post.subject or first_line(post.body) or post_id
+    return f'<a class="{chip_class}" href="/posts/{html.escape(post_id)}">{html.escape(label)}</a>'
 
 
 def render_task_dependency_targets(
