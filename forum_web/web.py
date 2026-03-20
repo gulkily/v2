@@ -1132,7 +1132,6 @@ def render_instance_info_page() -> str:
     repo_root = get_repo_root()
     info = load_instance_info(repo_root)
     content = load_template("instance_info.html").substitute(
-        breadcrumb_html=render_breadcrumb([("/", "board index"), ("/instance/", "project information")]),
         instance_heading=html.escape(render_public_value(info.instance_name)),
         instance_summary=html.escape(
             info.summary
@@ -1150,10 +1149,16 @@ def render_instance_info_page() -> str:
     )
     return render_page(
         title="Project Information",
-        hero_kicker="Project Info",
-        hero_title="Project information",
-        hero_text="One public page for the project assumptions, public instance facts, and the reasons behind the plain-text constraints used here.",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
         content_html=content,
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
     )
 
 

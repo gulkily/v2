@@ -10,7 +10,7 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
-from forum_core.operation_events import operation_events_path, start_operation, complete_operation
+from forum_core.operation_events import OperationEvent, OperationStep, operation_events_path, start_operation, complete_operation
 from forum_web.web import application
 
 
@@ -85,8 +85,9 @@ class InstanceInfoPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
-        self.assertIn("Project information", body)
         self.assertIn("Project overview", body)
+        self.assertTrue(body.index("Project FAQ") < body.index("Facts"))
+        self.assertTrue(body.index("Facts") < body.index("Project overview"))
         self.assertIn("Demo instance", body)
         self.assertIn("Demo operator", body)
         self.assertIn("operator@example.invalid", body)
@@ -97,6 +98,9 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("Project FAQ", body)
         self.assertIn("Why are posts ASCII-only?", body)
         self.assertIn("generic social feed", body)
+        self.assertNotIn('class="breadcrumb"', body)
+        self.assertNotIn('class="site-header-page-intro"', body)
+        self.assertNotIn("One public page for the project assumptions", body)
 
     def test_instance_info_page_marks_missing_values(self) -> None:
         (self.repo_root / "records" / "instance" / "public.txt").unlink()
@@ -106,7 +110,7 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("Not published.", body)
         self.assertIn("records/instance/public.txt", body)
-        self.assertIn("Project information", body)
+        self.assertNotIn('class="site-header-page-intro"', body)
 
     def test_instance_info_page_renders_recent_operations_panel(self) -> None:
         slow_handle = start_operation(
@@ -120,7 +124,7 @@ class InstanceInfoPageTests(unittest.TestCase):
         try:
             connection.execute(
                 "UPDATE operation_events SET total_duration_ms = ?, started_at = ?, updated_at = ?, ended_at = ? WHERE operation_id = ?",
-                (2500.0, "2026-03-20T02:00:00Z", "2026-03-20T02:00:01Z", "2026-03-20T02:00:02Z", slow_handle.operation_id),
+                (6500.0, "2026-03-20T02:00:00Z", "2026-03-20T02:00:01Z", "2026-03-20T02:00:02Z", slow_handle.operation_id),
             )
             connection.commit()
         finally:
@@ -132,7 +136,23 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertNotIn("Recent slow operations", body)
         self.assertNotIn("GET /activity/", body)
 
-        status, _, body = self.get("/operations/slow/")
+        expected_operations = (
+            OperationEvent(
+                operation_id=slow_handle.operation_id,
+                operation_kind="request",
+                operation_name="GET /activity/",
+                state="completed",
+                started_at="2026-03-20T02:00:00Z",
+                updated_at="2026-03-20T02:00:01Z",
+                ended_at="2026-03-20T02:00:02Z",
+                total_duration_ms=6500.0,
+                error_text=None,
+                metadata={"method": "GET", "path": "/activity/", "view": "code"},
+                steps=(OperationStep(name="render_activity", duration_ms=6400.0),),
+            ),
+        )
+        with mock.patch("forum_web.web.load_recent_slow_operations", return_value=expected_operations):
+            status, _, body = self.get("/operations/slow/")
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Recent slow operations", body)

@@ -1,17 +1,4 @@
 <section class="panel page-section">
-  ${breadcrumb_html}
-  <div class="section-head page-lede">
-    <h2>Project overview</h2>
-    <p>${instance_summary}</p>
-  </div>
-  <div class="stat-grid">
-    <article class="stat-card"><span class="stat-number">${commit_id}</span><span class="stat-label">current commit</span></article>
-    <article class="stat-card"><span class="stat-number">${install_date}</span><span class="stat-label">install date</span></article>
-    <article class="stat-card"><span class="stat-number">${commit_date}</span><span class="stat-label">commit date</span></article>
-  </div>
-</section>
-
-<section class="panel page-section">
   <div class="section-head page-lede">
     <h2>Project FAQ</h2>
     <p>These notes explain the constraints and assumptions behind the public writing and reading experience.</p>
@@ -35,5 +22,17 @@
     <div><strong>Retention policy:</strong> <span>${retention_policy}</span></div>
     <div><strong>Moderation settings:</strong> <span>${moderation_settings}</span></div>
     <div><strong>Metadata source:</strong> <code>${source_path}</code></div>
+  </div>
+</section>
+
+<section class="panel page-section">
+  <div class="section-head page-lede">
+    <h2>Project overview</h2>
+    <p>${instance_summary}</p>
+  </div>
+  <div class="stat-grid">
+    <article class="stat-card"><span class="stat-number">${commit_id}</span><span class="stat-label">current commit</span></article>
+    <article class="stat-card"><span class="stat-number">${install_date}</span><span class="stat-label">install date</span></article>
+    <article class="stat-card"><span class="stat-number">${commit_date}</span><span class="stat-label">commit date</span></article>
   </div>
 </section>
