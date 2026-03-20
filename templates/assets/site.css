@@ -397,6 +397,18 @@ body {
   border-bottom: 1px dotted var(--accent-soft);
 }
 
+.requirements-list {
+  margin: 0;
+}
+
+.requirements-section {
+  gap: 0;
+}
+
+.requirements-section .section-head {
+  margin-bottom: 0;
+}
+
 .link-cluster {
   display: flex;
   flex-wrap: wrap;

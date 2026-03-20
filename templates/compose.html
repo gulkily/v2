@@ -23,12 +23,12 @@ ${reply_target_html}
   <p id="submit-status" class="status-note">Waiting for submission.</p>
 </section>
 
-<section class="panel page-section">
+<section class="panel page-section requirements-section">
   <div class="section-head page-lede">
     <h2>Requirements and limitations</h2>
     <p>Posts are submitted as ASCII-only canonical text records. Keep the body plain enough for humans to read and edit directly in ordinary text tools.</p>
   </div>
-  <ul>
+  <ul class="requirements-list">
     <li>ASCII is required so canonical records stay easier for humans to work with across shells, editors, patches, and git history.</li>
     <li>The limitation also reduces Unicode obfuscation risks such as lookalike characters that are hard to spot during review.</li>
     <li>The browser can normalize common punctuation to ASCII and can remove unsupported characters before you sign the payload.</li>
