@@ -167,7 +167,7 @@ class ActivityEvent:
 
 def activity_filter_mode_from_request(raw_mode: str | None) -> str:
     mode = (raw_mode or "").strip().lower()
-    if mode in {"content", "moderation", "code"}:
+    if mode in {"all", "content", "moderation", "code"}:
         return mode
     return "content"
 
@@ -892,7 +892,7 @@ def render_commit_card(
 
 def render_activity_filter_nav(*, current_mode: str) -> str:
     links = [
-        ("all", "/activity/", "all activity"),
+        ("all", "/activity/?view=all", "all activity"),
         ("content", "/activity/?view=content", "content activity"),
         ("moderation", "/activity/?view=moderation", "moderation activity"),
         ("code", "/activity/?view=code", "code activity"),
@@ -986,9 +986,15 @@ def render_site_activity_page(*, view_mode: str) -> str:
     )
     return render_page(
         title="Repository History",
-        hero_kicker="Activity feed",
-        hero_title="Repository history",
-        hero_text="One filtered timeline for repository content, moderation, and code activity on this instance.",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
         content_html=content,
     )
 

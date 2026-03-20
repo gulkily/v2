@@ -118,9 +118,9 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertNotIn('class="front-layout"', body)
-        self.assertIn("Repository history", body)
-        self.assertIn("Repository activity stream", body)
-        self.assertIn("Browse only git-backed content activity for this instance.", body)
+        self.assertNotIn("Activity feed", body)
+        self.assertNotIn("Repository history", body)
+        self.assertNotIn("Browse only git-backed content activity for this instance.", body)
         self.assertIn("all activity", body)
         self.assertIn("content activity", body)
         self.assertIn("moderation activity", body)
@@ -142,13 +142,18 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertTrue("git status unavailable" in body or "?? state/" in body)
         self.assertNotIn("pin thread", body)
         self.assertNotIn("Add ui helper", body)
+        self.assertNotIn("One filtered timeline for repository content, moderation, and code activity on this instance.", body)
 
     def test_activity_page_filters_content_moderation_and_code(self) -> None:
+        _, _, all_body = self.get("/activity/", "view=all")
         _, _, default_body = self.get("/activity/")
         _, _, content_body = self.get("/activity/", "view=content")
         _, _, moderation_body = self.get("/activity/", "view=moderation")
         _, _, code_body = self.get("/activity/", "view=code")
 
+        self.assertIn("Add reply", all_body)
+        self.assertIn("pin thread", all_body)
+        self.assertIn("Add ui helper", all_body)
         self.assertIn("Add reply", default_body)
         self.assertNotIn("pin thread", default_body)
         self.assertNotIn("Add ui helper", default_body)
@@ -164,6 +169,7 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("view on GitHub", code_body)
         self.assertNotIn("pin thread", code_body)
         self.assertNotIn("Add reply", code_body)
+        self.assertIn('href="/activity/?view=all"', default_body)
 
     def test_moderation_route_redirects_to_filtered_activity_view(self) -> None:
         status, headers, body = self.get("/moderation/")
