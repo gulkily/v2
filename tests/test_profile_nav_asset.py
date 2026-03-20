@@ -310,7 +310,7 @@ process.stdout.write(JSON.stringify({{
 """
         payload = json.loads(self.run_node(script))
 
-        self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}")
+        self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}?self=1")
         self.assertEqual(payload["textContent"], "My profile")
         self.assertEqual(payload["fetchCount"], 0)
 

@@ -18,3 +18,13 @@
   - Ran the same style of smoke test with merge notifications enabled and confirmed the href still resolves to `/merge` rather than the new empty-state route.
 - Notes:
   - The self marker is applied only to the direct `My profile` destination, which keeps merge-management links and other canonical profile URLs unchanged.
+
+## Stage 3 - Add regression coverage for self empty state and nav target behavior
+- Changes:
+  - Added [test_my_profile_empty_state.py](/home/wsl/v2/tests/test_my_profile_empty_state.py) to cover the unpublished self-profile case, the unchanged generic missing-profile case, and the published-profile case when `self=1` is present.
+  - Updated [test_profile_nav_asset.py](/home/wsl/v2/tests/test_profile_nav_asset.py) so the no-notification `My profile` link expectation now includes the `?self=1` marker.
+- Verification:
+  - Ran `python -m unittest tests.test_my_profile_empty_state tests.test_profile_nav_asset`.
+  - Confirmed all 8 focused tests passed.
+- Notes:
+  - The test coverage stays narrow around the route and nav contracts rather than broader page rendering details.
