@@ -16,6 +16,12 @@ def env_flag_enabled(name: str, *, default: bool = False) -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def merge_feature_enabled(env: dict[str, str] | None = None) -> bool:
+    source_env = os.environ if env is None else env
+    raw_value = source_env.get("FORUM_ENABLE_ACCOUNT_MERGE", "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
 def load_template(name: str) -> Template:
     template_path = TEMPLATE_DIR / name
     return Template(template_path.read_text(encoding="utf-8"))
@@ -34,6 +40,7 @@ def render_primary_nav(*, aria_label: str = "Primary") -> str:
     )
     items += (
         '<a href="" data-profile-nav-link data-profile-nav-state="unresolved" '
+        f'data-merge-feature-enabled="{"1" if merge_feature_enabled() else "0"}" '
         'aria-disabled="true" tabindex="-1">My profile</a>'
     )
     return f'<nav class="site-header-nav" aria-label="{html.escape(aria_label)}">{items}</nav>'

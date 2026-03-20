@@ -117,6 +117,7 @@ class RuntimeEnvTests(unittest.TestCase):
         self.assertTrue(status["example_found"])
         self.assertIn("DEDALUS_API_KEY", status["missing_keys"])
         self.assertIn("FORUM_ENABLE_THREAD_AUTO_REPLY", status["missing_keys"])
+        self.assertIn("FORUM_ENABLE_ACCOUNT_MERGE", status["missing_keys"])
 
 
 if __name__ == "__main__":
