@@ -15,6 +15,11 @@ VENV_DIR = REPO_ROOT / ".venv"
 VENV_PYTHON = VENV_DIR / "bin" / "python3"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from forum_git_recover import run_git_recover
 
 from forum_core.runtime_env import (
     dotenv_available,
@@ -39,6 +44,7 @@ class TaskRequest:
     command: str
     install_target: str | None = None
     test_pattern: str | None = None
+    git_recover_apply: bool = False
     public_web_root: str | None = None
     app_root: str | None = None
     repo_root: str | None = None
@@ -65,6 +71,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Install target: user profile (default), repo-local .venv, or the current Python environment.",
     )
     subparsers.add_parser("env-sync", help="Append missing .env settings from .env.example.")
+    git_recover_parser = subparsers.add_parser(
+        "git-recover",
+        help="Diagnose and repair common deploy-checkout git state problems.",
+    )
+    git_recover_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply a repair when the current repo state is safely recoverable.",
+    )
     php_host_parser = subparsers.add_parser(
         "php-host-setup",
         help="Generate PHP-host config and publish public files into a web root.",
@@ -104,6 +119,8 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         return parser, TaskRequest(command="install", install_target=args.target)
     if args.command == "env-sync":
         return parser, TaskRequest(command="env-sync")
+    if args.command == "git-recover":
+        return parser, TaskRequest(command="git-recover", git_recover_apply=bool(args.apply))
     if args.command == "php-host-setup":
         return parser, TaskRequest(
             command="php-host-setup",
@@ -125,6 +142,8 @@ def run_task(request: TaskRequest) -> int:
         return run_install_for_target(request.install_target or "user")
     if request.command == "env-sync":
         return run_env_sync()
+    if request.command == "git-recover":
+        return run_git_recover(REPO_ROOT, apply=request.git_recover_apply)
     if request.command == "php-host-setup":
         return run_php_host_setup(request)
     if request.command == "start":

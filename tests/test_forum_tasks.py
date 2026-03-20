@@ -63,6 +63,20 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(request.command, "install")
         self.assertEqual(request.install_target, "venv")
 
+    def test_parse_task_args_accepts_git_recover(self) -> None:
+        _, request = self.module.parse_task_args(["git-recover"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "git-recover")
+        self.assertFalse(request.git_recover_apply)
+
+    def test_parse_task_args_accepts_git_recover_apply(self) -> None:
+        _, request = self.module.parse_task_args(["git-recover", "--apply"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "git-recover")
+        self.assertTrue(request.git_recover_apply)
+
     def test_run_env_sync_creates_env_from_example(self) -> None:
         self.write_example("# FORUM_HOST=127.0.0.1\nFORUM_PORT=8000\n")
 
@@ -155,6 +169,15 @@ class ForumTasksTests(unittest.TestCase):
         )
         self.assertIn("Creating repo-local virtual environment", stdout.getvalue())
         self.assertIn("repo-local virtual environment", stdout.getvalue())
+
+    def test_run_task_dispatches_git_recover(self) -> None:
+        request = self.module.TaskRequest(command="git-recover", git_recover_apply=True)
+
+        with mock.patch.object(self.module, "run_git_recover", return_value=0) as mocked:
+            exit_code = self.module.run_task(request)
+
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(self.repo_root, apply=True)
 
     def test_parse_task_args_accepts_php_host_setup(self) -> None:
         _, request = self.module.parse_task_args(["php-host-setup", "/tmp/public"])

@@ -1,0 +1,11 @@
+## Stage 1 - Wire `./forum git-recover`
+- Changes:
+  - Added the `git-recover` subcommand to [`scripts/forum_tasks.py`](/home/wsl/v2/scripts/forum_tasks.py) with `--apply` parsing and thin dispatch into a dedicated helper.
+  - Added [`scripts/forum_git_recover.py`](/home/wsl/v2/scripts/forum_git_recover.py) with an initial diagnosis contract and a minimal healthy-state/no-op flow.
+  - Extended [`tests/test_forum_tasks.py`](/home/wsl/v2/tests/test_forum_tasks.py) to cover CLI parsing and dispatch for the new subcommand.
+- Verification:
+  - Ran `./forum help`.
+  - Ran `python3 -m unittest tests.test_forum_tasks`.
+  - Ran `python3 -m unittest tests.test_forum_tasks -k git_recover`.
+- Notes:
+  - This stage intentionally stops at command wiring plus healthy-state handling; specific broken-state diagnosis and repairs land in later stages.
