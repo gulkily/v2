@@ -1263,22 +1263,11 @@ def render_profile_update_page(identity_id: str) -> str:
 
     profile_slug = identity_slug(summary.identity_id)
     content = load_template("profile_update.html").substitute(
-        breadcrumb_html=render_breadcrumb(
-            [
-                ("/", "board index"),
-                (f"/profiles/{profile_slug}", summary.display_name),
-                (f"/profiles/{profile_slug}/update", "update username"),
-            ]
-        ),
         update_heading="Update username",
         update_subhead=summary.identity_id,
         current_display_name=html.escape(summary.display_name),
         identity_id=html.escape(summary.identity_id),
         display_name_source=html.escape(summary.display_name_source),
-        context_text=html.escape(
-            "This dedicated page prepares a signed display-name update for the current resolved identity. "
-            "The same canonical profile page remains the readback surface after submission."
-        ),
         dry_run_value="false",
         source_identity_id=html.escape(summary.identity_id),
         profile_slug=html.escape(profile_slug),
@@ -1287,11 +1276,18 @@ def render_profile_update_page(identity_id: str) -> str:
     )
     return render_page(
         title=f"Update username · {summary.display_name}",
-        hero_kicker="Profile Update",
-        hero_title="Update your username",
-        hero_text="Use the existing browser signing flow to prepare one signed username/display-name update for the resolved profile you are viewing.",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
         content_html=content,
         page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
+        page_banner_html="",
     )
 
 

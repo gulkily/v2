@@ -232,8 +232,6 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn("Update username", body)
         self.assertIn(DISPLAY_NAME, body)
         self.assertIn(IDENTITY_ID, body)
-        self.assertIn("claim one username for this signer identity", body)
-        self.assertIn("later username changes from the same key will be rejected", body)
         self.assertIn("Choose a username:", body)
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
@@ -247,6 +245,13 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertNotIn("Sign and submit", body)
         self.assertIn(">Technical details<", body)
         self.assertNotIn(">Advanced<", body)
+        self.assertNotIn("Account setup", body)
+        self.assertNotIn('data-username-claim-cta', body)
+        self.assertNotIn("Profile Update", body)
+        self.assertNotIn("Update your username", body)
+        self.assertNotIn("Use the existing browser signing flow", body)
+        self.assertNotIn('class="breadcrumb"', body)
+        self.assertNotIn("Enter a new display name", body)
 
 
 if __name__ == "__main__":

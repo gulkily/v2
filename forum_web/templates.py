@@ -114,7 +114,7 @@ def render_page(
     page_script_html: str = "",
     page_shell_class: str = "",
     page_header_html: str | None = None,
-    page_banner_html: str = "",
+    page_banner_html: str | None = None,
     page_footer_html: str = "",
 ) -> str:
     base = load_template("base.html")
@@ -127,7 +127,7 @@ def render_page(
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()
-    if not page_banner_html:
+    if page_banner_html is None:
         page_banner_html = render_username_claim_cta_html()
     page_script_html = (
         render_profile_nav_script_tag()
