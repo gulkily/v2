@@ -8,3 +8,15 @@
   - `python -m pytest tests/test_runtime_env.py`
 - Notes:
   - this stage only introduces the shared flag contract; merge surfaces still behave normally until the next stages gate them
+
+## Stage 2 - Hide merge UI and routes when the flag is off
+- Changes:
+  - hid the profile-level merge action link and self-merge suggestion UI unless the merge flag is enabled
+  - made `/profiles/<slug>/merge` and `/profiles/<slug>/merge/action` return missing-resource behavior while the flag is off
+  - updated `profile_nav.js` so the shared `My profile` nav link no longer fetches merge notifications or redirects into merge management when the flag is off
+- Verification:
+  - `python -m pytest tests/test_username_profile_route.py`
+  - `python -m pytest tests/test_merge_management_page.py`
+  - `python -m pytest tests/test_profile_nav_asset.py`
+- Notes:
+  - this stage gates only web surfaces and nav behavior; merge APIs remain for Stage 3 so the final release posture is not complete yet

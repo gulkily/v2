@@ -250,13 +250,10 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         status, _, body = self.get("/profiles/openpgp-beta")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn("Likely Self-Merge", body)
-        self.assertIn("not me", body)
-        self.assertIn("/assets/profile_merge_suggestion.js", body)
-        self.assertIn(
-            "/profiles/openpgp-beta/merge/action?action=request_merge&other_identity_id=openpgp:alpha",
-            body,
-        )
+        self.assertNotIn("Likely Self-Merge", body)
+        self.assertNotIn("not me", body)
+        self.assertNotIn("/assets/profile_merge_suggestion.js", body)
+        self.assertNotIn("/profiles/openpgp-beta/merge/action?action=request_merge", body)
 
     def test_revoked_merge_restores_other_users_section_on_canonical_root(self) -> None:
         self.write_record(

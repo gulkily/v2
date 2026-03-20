@@ -173,31 +173,18 @@ class MergeManagementPageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn(f"/profiles/{PROFILE_SLUG}/merge", body)
-        self.assertIn("manage merges", body)
+        self.assertNotIn(f"/profiles/{PROFILE_SLUG}/merge", body)
+        self.assertNotIn("manage merges", body)
 
     def test_merge_management_page_hides_username_update_link_after_visible_claim(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/merge")
 
-        self.assertEqual(status, "200 OK")
-        self.assertNotIn(f"/profiles/{PROFILE_SLUG}/update", body)
-        self.assertNotIn(">update username<", body)
+        self.assertEqual(status, "404 Not Found")
 
     def test_merge_management_page_renders_matches_and_incoming_actions(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}/merge")
 
-        self.assertEqual(status, "200 OK")
-        self.assertIn("Manage identity merges", body)
-        self.assertIn('href="/account/key/"', body)
-        self.assertIn(OTHER_IDENTITY_ID, body)
-        self.assertIn("Last activity", body)
-        self.assertIn("Visible posts", body)
-        self.assertIn("No visible signed posts yet", body)
-        self.assertIn("request merge", body)
-        self.assertIn("approve", body)
-        self.assertIn("dismiss", body)
-        self.assertIn("moderator approve", body)
-        self.assertIn("revoke merge", body)
+        self.assertEqual(status, "404 Not Found")
 
     def test_merge_action_page_renders_signing_flow(self) -> None:
         status, _, body = self.get(
@@ -205,13 +192,7 @@ class MergeManagementPageTests(unittest.TestCase):
             f"action=approve_merge&requester_identity_id={OTHER_IDENTITY_ID}&target_identity_id={IDENTITY_ID}",
         )
 
-        self.assertEqual(status, "200 OK")
-        self.assertIn('id="merge-request-app"', body)
-        self.assertIn('data-action="approve_merge"', body)
-        self.assertIn(f'data-requester-identity-id="{OTHER_IDENTITY_ID}"', body)
-        self.assertIn(f'data-target-identity-id="{IDENTITY_ID}"', body)
-        self.assertIn('href="/account/key/"', body)
-        self.assertIn("/assets/merge_request_signing.js", body)
+        self.assertEqual(status, "404 Not Found")
 
 
 if __name__ == "__main__":

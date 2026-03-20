@@ -74,7 +74,11 @@ export async function enhanceProfileNav(
     if (!href) {
       return;
     }
-    const notificationCount = await mergeNotificationCountForIdentity(identityId, fetchImpl);
+    const mergeEnabled = navLink.attributes?.["data-merge-feature-enabled"] === "1"
+      || navLink["data-merge-feature-enabled"] === "1";
+    const notificationCount = mergeEnabled
+      ? await mergeNotificationCountForIdentity(identityId, fetchImpl)
+      : 0;
     navLink.setAttribute("href", notificationCount > 0 ? `${href}/merge` : href);
     navLink.textContent = notificationCount > 0 ? `My profile (${notificationCount})` : "My profile";
     navLink.removeAttribute("aria-disabled");

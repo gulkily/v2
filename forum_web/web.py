@@ -92,6 +92,7 @@ from forum_web.task_threads import index_task_threads, load_task_threads
 from forum_web.templates import (
     load_asset_text,
     load_template,
+    merge_feature_enabled,
     render_page,
     render_profile_nav_script_tag,
     render_site_header,
@@ -503,6 +504,7 @@ def render_profile_page(
     route_path: str,
 ) -> str:
     posts_index = index_posts(posts)
+    merge_enabled = merge_feature_enabled()
     post_links_html = "".join(
         render_post_link_chip(post_id, posts_index)
         for post_id in summary.post_ids
@@ -558,7 +560,7 @@ def render_profile_page(
     root_resolution = resolve_username_root(repo_root=get_repo_root(), username=summary.display_name)
     merge_suggestion_html = ""
     profile_script_html = ""
-    if root_resolution is not None and root_resolution.canonical_identity_id != summary.identity_id:
+    if merge_enabled and root_resolution is not None and root_resolution.canonical_identity_id != summary.identity_id:
         merge_target_summary = find_profile_summary(
             repo_root=get_repo_root(),
             posts=posts,
@@ -610,9 +612,13 @@ def render_profile_page(
             if profile_can_update_username(summary=summary, identity_context=identity_context)
             else ""
         )
-        + f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
-        "manage merges"
-        "</a>",
+        + (
+            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
+            "manage merges"
+            "</a>"
+            if merge_enabled
+            else ""
+        ),
         stat_html=(
             '<div class="stat-grid">'
             f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
@@ -2953,6 +2959,11 @@ def _dispatch_application(environ, start_response):
                 return [body]
 
         if path.startswith("/profiles/") and path.endswith("/merge/action"):
+            if not merge_feature_enabled():
+                body = render_missing_resource("profile").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
             slug = unquote(path.removeprefix("/profiles/").removesuffix("/merge/action"))
             slug = slug.rstrip("/")
             action = query_params.get("action", [""])[0].strip()
@@ -2980,6 +2991,11 @@ def _dispatch_application(environ, start_response):
                 return [body]
 
         if path.startswith("/profiles/") and path.endswith("/merge"):
+            if not merge_feature_enabled():
+                body = render_missing_resource("profile").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
             slug = unquote(path.removeprefix("/profiles/").removesuffix("/merge"))
             slug = slug.rstrip("/")
             try:

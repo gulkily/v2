@@ -122,6 +122,7 @@ const publicKey = await openpgp.readKey({{ armoredKey: generated.publicKey }});
 const fingerprint = publicKey.getFingerprint().toLowerCase();
 const navLink = {{
   attributes: {{}},
+  "data-merge-feature-enabled": "1",
   textContent: "My profile",
   setAttribute(name, value) {{
     this.attributes[name] = value;
@@ -200,6 +201,7 @@ const navLink = {{
   attributes: {{
     "aria-disabled": "true",
     "data-profile-nav-state": "unresolved",
+    "data-merge-feature-enabled": "0",
     tabindex: "-1",
   }},
   textContent: "My profile",
@@ -240,6 +242,77 @@ process.stdout.write(JSON.stringify({{
         self.assertEqual(payload["state"], "unresolved")
         self.assertEqual(payload["href"], "")
         self.assertEqual(payload["textContent"], "My profile")
+
+    def test_profile_nav_asset_skips_merge_notification_fetch_when_feature_disabled(self) -> None:
+        asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
+        vendor_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+        ).as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+import * as openpgp from {json.dumps(vendor_url)};
+const loaderSource = await fs.readFile(new URL({json.dumps((Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js").as_uri())}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const rewrittenAssetSource = assetSource.replace(
+  "./openpgp_loader.js",
+  loaderModuleUrl,
+);
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
+const {{ enhanceProfileNav }} = await import(assetModuleUrl);
+
+const generated = await openpgp.generateKey({{
+  type: "ecc",
+  curve: "ed25519",
+  userIDs: [{{ name: "Profile Nav Test" }}],
+  format: "armored",
+}});
+const publicKey = await openpgp.readKey({{ armoredKey: generated.publicKey }});
+const fingerprint = publicKey.getFingerprint().toLowerCase();
+let fetchCount = 0;
+const navLink = {{
+  attributes: {{"data-merge-feature-enabled": "0"}},
+  textContent: "My profile",
+  setAttribute(name, value) {{
+    this.attributes[name] = value;
+    this[name] = value;
+  }},
+  removeAttribute(name) {{
+    delete this.attributes[name];
+    delete this[name];
+  }},
+}};
+const doc = {{
+  querySelector(selector) {{
+    return selector === "[data-profile-nav-link]" ? navLink : null;
+  }},
+}};
+const storage = {{
+  getItem(key) {{
+    return key === "forum_public_key_armored" ? generated.publicKey : "";
+  }},
+}};
+
+await enhanceProfileNav(doc, storage, async () => {{
+  fetchCount += 1;
+  return {{ ok: true, text: async () => "" }};
+}});
+process.stdout.write(JSON.stringify({{
+  href: navLink.href,
+  textContent: navLink.textContent,
+  fetchCount,
+  fingerprint,
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}")
+        self.assertEqual(payload["textContent"], "My profile")
+        self.assertEqual(payload["fetchCount"], 0)
 
 
 if __name__ == "__main__":
