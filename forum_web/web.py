@@ -1263,6 +1263,29 @@ def render_recent_operation_card(operation) -> str:
 
 
 def render_profile(identity_id: str) -> str:
+    return render_profile_for_request(identity_id, self_request=False)
+
+
+def render_unpublished_profile_page(identity_id: str) -> str:
+    content = load_template("profile_empty_state.html").substitute(
+        identity_id=html.escape(identity_id),
+    )
+    return render_page(
+        title="My profile",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
+        content_html=content,
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
+    )
+
+
+def render_profile_for_request(identity_id: str, *, self_request: bool) -> str:
     posts, _, _, _, _, identity_context = load_repository_state()
     summary = find_profile_summary(
         repo_root=get_repo_root(),
@@ -1271,6 +1294,8 @@ def render_profile(identity_id: str) -> str:
         identity_context=identity_context,
     )
     if summary is None:
+        if self_request:
+            return render_unpublished_profile_page(identity_id)
         raise LookupError(f"unknown identity: {identity_id}")
     return render_profile_page(
         summary=summary,
@@ -3031,7 +3056,8 @@ def _dispatch_application(environ, start_response):
             slug = unquote(path.removeprefix("/profiles/"))
             try:
                 identity_id = identity_id_from_slug(slug)
-                body = render_profile(identity_id).encode("utf-8")
+                self_request = query_params.get("self", [""])[0].strip().lower() in {"1", "true", "yes", "on"}
+                body = render_profile_for_request(identity_id, self_request=self_request).encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
                 start_response("200 OK", headers)
                 return [body]
