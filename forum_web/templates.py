@@ -96,7 +96,7 @@ def render_username_claim_cta_html() -> str:
         '<section class="site-username-claim panel" data-username-claim-cta hidden>'
         '<div class="site-username-claim-copy">'
         '<p class="site-username-claim-kicker">Account setup</p>'
-        '<p class="site-username-claim-text">Your saved signing key can still claim a username for this account.</p>'
+        '<p class="site-username-claim-text">You only get to set a username once, do it wisely.</p>'
         "</div>"
         '<a class="thread-chip site-username-claim-link" data-username-claim-link href="">Choose your username</a>'
         "</section>"

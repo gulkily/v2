@@ -185,6 +185,8 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('data-username-claim-cta', body)
         self.assertIn('/assets/username_claim_cta.js', body)
         self.assertIn('Choose your username', body)
+        self.assertIn('You only get to set a username once, do it wisely.', body)
+        self.assertTrue(body.index('data-username-claim-cta') < body.index('class="site-header-nav"'))
         self.assertIn('>Project info</a>', body)
         self.assertIn('>Activity</a>', body)
         self.assertNotIn('view repository history', body)
