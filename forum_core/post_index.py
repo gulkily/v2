@@ -44,6 +44,22 @@ class IndexBuildResult:
 
 
 @dataclass(frozen=True)
+class PostIndexReadiness:
+    expected_post_count: int
+    indexed_post_count: int
+    indexed_head: str | None
+    current_head: str | None
+    indexed_schema_version: str | None
+    count_mismatch: bool
+    head_mismatch: bool
+    schema_mismatch: bool
+
+    @property
+    def requires_rebuild(self) -> bool:
+        return self.count_mismatch or self.head_mismatch or self.schema_mismatch
+
+
+@dataclass(frozen=True)
 class IndexedPostRow:
     post_id: str
     created_at: str | None
@@ -818,6 +834,39 @@ def rebuild_post_index(
         return IndexBuildResult(post_count=len(posts), indexed_head=indexed_head)
 
 
+def post_index_readiness(repo_root: Path) -> PostIndexReadiness:
+    index = open_post_index(repo_root)
+    try:
+        return _post_index_readiness_for_index(repo_root, index=index)
+    finally:
+        index.connection.close()
+
+
+def _post_index_readiness_for_index(repo_root: Path, *, index: PostIndex) -> PostIndexReadiness:
+    expected_count = len(list(records_posts_dir(repo_root).glob("*.txt")))
+    indexed_head = get_index_metadata(index.connection, "indexed_head") or None
+    indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
+    indexed_schema_version = get_index_metadata(index.connection, "indexed_schema_version")
+    try:
+        indexed_count = int(indexed_count_text)
+    except ValueError:
+        indexed_count = -1
+    current_head = current_repo_head(repo_root)
+    count_mismatch = indexed_count != expected_count
+    head_mismatch = indexed_head != current_head
+    schema_mismatch = not index_schema_is_current(index.connection)
+    return PostIndexReadiness(
+        expected_post_count=expected_count,
+        indexed_post_count=indexed_count,
+        indexed_head=indexed_head,
+        current_head=current_head,
+        indexed_schema_version=indexed_schema_version,
+        count_mismatch=count_mismatch,
+        head_mismatch=head_mismatch,
+        schema_mismatch=schema_mismatch,
+    )
+
+
 def ensure_post_index_current(repo_root: Path) -> PostIndex:
     with tracked_operation(
         repo_root,
@@ -826,32 +875,21 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
         metadata={"entry_point": "ensure_post_index_current"},
     ):
         index = open_post_index(repo_root)
-        expected_count = len(list(records_posts_dir(repo_root).glob("*.txt")))
-        indexed_head = get_index_metadata(index.connection, "indexed_head") or None
-        indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
-        indexed_schema_version = get_index_metadata(index.connection, "indexed_schema_version")
-        try:
-            indexed_count = int(indexed_count_text)
-        except ValueError:
-            indexed_count = -1
-        current_head = current_repo_head(repo_root)
-        count_mismatch = indexed_count != expected_count
-        head_mismatch = indexed_head != current_head
-        schema_mismatch = not index_schema_is_current(index.connection)
-        if count_mismatch or head_mismatch or schema_mismatch:
+        readiness = _post_index_readiness_for_index(repo_root, index=index)
+        if readiness.requires_rebuild:
             logger.warning(
                 "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
                 "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
                 "expected_schema_version=%r",
                 repo_root,
-                count_mismatch,
-                indexed_count,
-                expected_count,
-                head_mismatch,
-                indexed_head,
-                current_head,
-                schema_mismatch,
-                indexed_schema_version,
+                readiness.count_mismatch,
+                readiness.indexed_post_count,
+                readiness.expected_post_count,
+                readiness.head_mismatch,
+                readiness.indexed_head,
+                readiness.current_head,
+                readiness.schema_mismatch,
+                readiness.indexed_schema_version,
                 str(POST_INDEX_SCHEMA_VERSION),
             )
             rebuild_post_index(repo_root, index=index)

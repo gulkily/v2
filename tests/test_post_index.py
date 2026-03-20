@@ -14,6 +14,7 @@ from forum_core.post_index import (
     IndexedAuthorRow,
     POST_INDEX_SCHEMA_VERSION,
     PostCommitTimestamps,
+    PostIndexReadiness,
     author_id_for_post,
     author_row_for_post,
     current_post_index_schema_version,
@@ -25,6 +26,7 @@ from forum_core.post_index import (
     load_indexed_root_posts,
     load_indexed_username_roots,
     open_post_index,
+    post_index_readiness,
     post_index_path,
     rebuild_post_index,
 )
@@ -175,6 +177,56 @@ class PostIndexSchemaTests(unittest.TestCase):
             self.assertTrue(index_schema_is_current(rebuilt.connection))
         finally:
             rebuilt.connection.close()
+
+    def test_post_index_readiness_reports_current_index_without_rebuild(self) -> None:
+        (self.repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
+        (self.repo_root / "records" / "posts" / "root-001.txt").write_text(
+            "Post-ID: root-001\nBoard-Tags: general\nSubject: Hello\n\nBody.\n",
+            encoding="ascii",
+        )
+        subprocess.run(["git", "-C", str(self.repo_root), "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.email", "test@example.com"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "add", "records/posts"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "commit", "-m", "initial"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        rebuild_post_index(self.repo_root)
+
+        readiness = post_index_readiness(self.repo_root)
+
+        self.assertIsInstance(readiness, PostIndexReadiness)
+        self.assertFalse(readiness.requires_rebuild)
+        self.assertFalse(readiness.count_mismatch)
+        self.assertFalse(readiness.head_mismatch)
+        self.assertFalse(readiness.schema_mismatch)
+
+    def test_post_index_readiness_reports_stale_index_when_head_drifts(self) -> None:
+        (self.repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
+        (self.repo_root / "records" / "posts" / "root-001.txt").write_text(
+            "Post-ID: root-001\nBoard-Tags: general\nSubject: Hello\n\nBody.\n",
+            encoding="ascii",
+        )
+        subprocess.run(["git", "-C", str(self.repo_root), "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.email", "test@example.com"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "add", "records/posts"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "commit", "-m", "initial"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        rebuild_post_index(self.repo_root)
+        subprocess.run(
+            ["git", "-C", str(self.repo_root), "commit", "--allow-empty", "-m", "head drift"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        readiness = post_index_readiness(self.repo_root)
+
+        self.assertTrue(readiness.requires_rebuild)
+        self.assertFalse(readiness.count_mismatch)
+        self.assertTrue(readiness.head_mismatch)
+        self.assertFalse(readiness.schema_mismatch)
 
 
 class PostIndexAuthorHelpersTests(unittest.TestCase):
