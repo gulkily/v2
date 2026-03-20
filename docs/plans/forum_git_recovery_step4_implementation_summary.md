@@ -19,3 +19,14 @@
   - Ran `python3 -m unittest tests.test_forum_tasks`.
 - Notes:
   - This stage is diagnosis-only: the command can now classify the targeted states, but `--apply` still refuses to perform repairs until the later repair stages land.
+
+## Stage 3 - Repair low-risk checkout states
+- Changes:
+  - Extended [`scripts/forum_git_recover.py`](/home/wsl/v2/scripts/forum_git_recover.py) with a repair path for low-risk states that can safely restore a clean deployment checkout.
+  - The repair flow now fetches `origin` when available, normalizes local `pull.ff=only`, restores `main` against `origin/main`, and re-establishes upstream tracking for clean detached-head, behind-upstream, missing-upstream, incorrect-upstream, and clean wrong-branch cases.
+  - Extended [`tests/test_forum_git_recover.py`](/home/wsl/v2/tests/test_forum_git_recover.py) to cover detached-head recovery, missing-upstream repair, behind-upstream fast-forward recovery, and clean branch return to `main`.
+- Verification:
+  - Ran `python3 -m unittest tests.test_forum_git_recover tests.test_forum_tasks`.
+- Notes:
+  - Rebase and merge states still stop for manual resolution in this stage.
+  - Local commits or local file changes still block automatic cleanup until the destructive-state guardrail stage.

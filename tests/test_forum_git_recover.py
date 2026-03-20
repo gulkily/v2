@@ -37,6 +37,15 @@ class ForumGitRecoverTests(unittest.TestCase):
             capture_output=True,
         )
 
+    def git_allow_failure(self, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+
     def init_repo(self, repo: Path) -> None:
         repo.mkdir(parents=True, exist_ok=True)
         self.git(repo, "init", "-b", "main")
@@ -185,3 +194,64 @@ class ForumGitRecoverTests(unittest.TestCase):
         self.assertIn("staged_changes", self.issue_codes(diagnosis))
         self.assertIn("tracked_changes", self.issue_codes(diagnosis))
         self.assertIn("untracked_obstruction", self.issue_codes(diagnosis))
+
+    def test_repair_checkout_recovers_detached_head_to_healthy_main(self) -> None:
+        _, _, clone = self.setup_origin_clone()
+        head_commit = self.git(clone, "rev-parse", "HEAD").stdout.strip()
+        self.git(clone, "checkout", "--detach", head_commit)
+
+        diagnosis = self.module.diagnose_repo(clone)
+        repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
+
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertEqual(self.git(clone, "branch", "--show-current").stdout.strip(), "main")
+        self.assertEqual(self.git(clone, "config", "--get", "pull.ff").stdout.strip(), "only")
+
+    def test_repair_checkout_restores_missing_upstream(self) -> None:
+        origin, _, clone = self.setup_origin_clone()
+        self.git(clone, "branch", "--unset-upstream")
+        self.assertNotEqual(
+            self.git_allow_failure(clone, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").returncode,
+            0,
+        )
+        diagnosis = self.module.diagnose_repo(clone)
+
+        repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
+
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertEqual(
+            self.git(clone, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").stdout.strip(),
+            "origin/main",
+        )
+        self.assertTrue(origin.exists())
+
+    def test_repair_checkout_fast_forwards_behind_branch(self) -> None:
+        origin, _, clone = self.setup_origin_clone()
+        updater = self.clone_origin(origin, "updater")
+        self.commit_file(updater, "remote.txt", "remote\n", "remote update")
+        self.git(updater, "push", "origin", "main")
+        self.git(clone, "fetch", "origin")
+        diagnosis = self.module.diagnose_repo(clone)
+
+        repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
+
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertEqual(self.git(clone, "rev-parse", "HEAD").stdout.strip(), self.git(clone, "rev-parse", "origin/main").stdout.strip())
+
+    def test_repair_checkout_returns_to_main_from_clean_feature_branch(self) -> None:
+        _, _, clone = self.setup_origin_clone()
+        self.git(clone, "checkout", "-b", "feature")
+        diagnosis = self.module.diagnose_repo(clone)
+
+        repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
+
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertEqual(self.git(clone, "branch", "--show-current").stdout.strip(), "main")

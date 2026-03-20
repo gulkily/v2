@@ -58,8 +58,18 @@ def run_git_recover(repo_root: Path, *, apply: bool = False) -> int:
         print("Re-run with `./forum git-recover --apply` to attempt an automatic repair.")
         return 1
 
-    print("Automatic repair is not implemented yet for this git state.")
-    return 1
+    repair = repair_checkout(repo_root, diagnosis)
+    print(repair.summary)
+    for line in repair.details:
+        print(f"- {line}")
+    return 0 if repair.succeeded else 1
+
+
+@dataclass(frozen=True)
+class RepairResult:
+    succeeded: bool
+    summary: str
+    details: tuple[str, ...] = ()
 
 
 def diagnose_repo(repo_root: Path) -> RepoDiagnosis:
@@ -146,6 +156,109 @@ def diagnose_repo(repo_root: Path) -> RepoDiagnosis:
         summary=f"Git checkout needs recovery review: {issues[0].summary.lower()}.",
         issues=tuple(issues),
         details=details,
+    )
+
+
+def repair_checkout(repo_root: Path, diagnosis: RepoDiagnosis) -> RepairResult:
+    guarded_issue_codes = {
+        "branch_ahead",
+        "branch_diverged",
+        "staged_changes",
+        "tracked_changes",
+        "untracked_obstruction",
+    }
+    blocked_issue_codes = {
+        "rebase_in_progress",
+        "merge_in_progress",
+    }
+    issue_codes = {issue.code for issue in diagnosis.issues}
+    if issue_codes & blocked_issue_codes:
+        return RepairResult(
+            succeeded=False,
+            summary="Automatic repair stopped because a git operation is still in progress.",
+            details=(
+                "Resolve or abort the in-progress rebase/merge before running `./forum git-recover --apply` again.",
+            ),
+        )
+    if issue_codes & guarded_issue_codes:
+        return RepairResult(
+            succeeded=False,
+            summary="Automatic repair stopped to avoid discarding local work.",
+            details=(
+                "This checkout has local commits or local file changes that require explicit operator cleanup first.",
+            ),
+        )
+
+    details: list[str] = []
+    fetch_result = git(repo_root, "fetch", "origin")
+    if fetch_result.returncode == 0:
+        details.append("Fetched latest refs from `origin`.")
+    elif "No such remote" in (fetch_result.stderr or ""):
+        details.append("Skipped `git fetch origin` because no `origin` remote is configured.")
+    else:
+        return RepairResult(
+            succeeded=False,
+            summary="Automatic repair could not fetch `origin`.",
+            details=_error_lines(fetch_result),
+        )
+
+    pull_ff = git(repo_root, "config", "pull.ff", TARGET_PULL_FF)
+    if pull_ff.returncode != 0:
+        return RepairResult(
+            succeeded=False,
+            summary="Automatic repair could not normalize pull strategy.",
+            details=_error_lines(pull_ff),
+        )
+    details.append("Set local `pull.ff` to `only`.")
+
+    target_remote_exists = git(repo_root, "show-ref", "--verify", "--quiet", f"refs/remotes/{TARGET_UPSTREAM}")
+    target_remote_available = target_remote_exists.returncode == 0
+
+    if target_remote_available:
+        checkout_result = git(repo_root, "checkout", "-B", TARGET_BRANCH, TARGET_UPSTREAM)
+        if checkout_result.returncode != 0:
+            return RepairResult(
+                succeeded=False,
+                summary=f"Automatic repair could not reset `{TARGET_BRANCH}` to `{TARGET_UPSTREAM}`.",
+                details=_error_lines(checkout_result),
+            )
+        details.append(f"Checked out `{TARGET_BRANCH}` and aligned it to `{TARGET_UPSTREAM}`.")
+
+        upstream_result = git(repo_root, "branch", "--set-upstream-to", TARGET_UPSTREAM, TARGET_BRANCH)
+        if upstream_result.returncode != 0:
+            return RepairResult(
+                succeeded=False,
+                summary="Automatic repair could not restore branch upstream tracking.",
+                details=_error_lines(upstream_result),
+            )
+        details.append(f"Set `{TARGET_BRANCH}` to track `{TARGET_UPSTREAM}`.")
+    else:
+        checkout_result = git(repo_root, "checkout", TARGET_BRANCH)
+        if checkout_result.returncode != 0:
+            return RepairResult(
+                succeeded=False,
+                summary=f"Automatic repair could not check out `{TARGET_BRANCH}`.",
+                details=_error_lines(checkout_result),
+            )
+        details.append(f"Checked out existing local `{TARGET_BRANCH}`.")
+
+    post_repair = diagnose_repo(repo_root)
+    if not post_repair.is_healthy:
+        detail_lines = list(details)
+        detail_lines.append(post_repair.summary)
+        for issue in post_repair.issues:
+            detail_lines.append(f"{issue.summary}: {issue.detail}")
+        return RepairResult(
+            succeeded=False,
+            summary="Automatic repair completed some steps but the checkout is still not healthy.",
+            details=tuple(detail_lines),
+        )
+
+    details.append("Checkout is now healthy.")
+    return RepairResult(
+        succeeded=True,
+        summary="Automatic repair completed successfully.",
+        details=tuple(details),
     )
 
 
