@@ -11,6 +11,7 @@ from unittest import mock
 from forum_web.repository import load_posts
 from forum_web.web import (
     activity_filter_mode_from_request,
+    activity_page_from_request,
     build_posts_index,
     classify_commit_activity,
     classify_commit_area,
@@ -137,19 +138,30 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         self.assertEqual(activity_filter_mode_from_request("code"), "code")
         self.assertEqual(activity_filter_mode_from_request("unknown"), "content")
 
+    def test_activity_page_defaults_to_one(self) -> None:
+        self.assertEqual(activity_page_from_request(None), 1)
+        self.assertEqual(activity_page_from_request(""), 1)
+        self.assertEqual(activity_page_from_request("2"), 2)
+        self.assertEqual(activity_page_from_request("0"), 1)
+        self.assertEqual(activity_page_from_request("-9"), 1)
+        self.assertEqual(activity_page_from_request("abc"), 1)
+
     def test_classify_commit_activity_distinguishes_content_moderation_and_code(self) -> None:
         content_commit = mock.Mock(files=("records/posts/root-001.txt",))
+        identity_commit = mock.Mock(files=("records/identity/identity-openpgp-alpha.txt",))
         moderation_commit = mock.Mock(files=("records/moderation/pin-root-001.txt",))
         code_commit = mock.Mock(files=("forum_web/web.py",))
         mixed_commit = mock.Mock(files=("records/posts/root-001.txt", "forum_web/web.py"))
 
         self.assertEqual(classify_commit_activity(content_commit), "content")
+        self.assertEqual(classify_commit_activity(identity_commit), "content")
         self.assertEqual(classify_commit_activity(moderation_commit), "moderation")
         self.assertEqual(classify_commit_activity(code_commit), "code")
         self.assertEqual(classify_commit_activity(mixed_commit), "code")
 
     def test_classify_commit_area_distinguishes_content_moderation_docs_and_code(self) -> None:
         self.assertEqual(classify_commit_area("records/posts/root-001.txt"), "content")
+        self.assertEqual(classify_commit_area("records/identity/identity-openpgp-alpha.txt"), "content")
         self.assertEqual(classify_commit_area("records/moderation/pin-root-001.txt"), "moderation")
         self.assertEqual(classify_commit_area("docs/plans/feature.md"), "docs")
         self.assertEqual(classify_commit_area("forum_web/web.py"), "code")
@@ -213,11 +225,11 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
             mock_fetch.return_value = [
                 fetch_recent_repository_commits(self.repo_root, limit=2)[1],
             ]
-            events = load_activity_events(self.repo_root, mode="all", limit=5)
+            events = load_activity_events(self.repo_root, mode="all", page_size=5)
 
-        self.assertEqual([event.kind for event in events], ["content", "moderation"])
-        self.assertEqual(events[0].commit.subject, "Add root-001")
-        self.assertEqual(events[1].moderation_record.record_id, "pin-root-001")
+        self.assertEqual([event.kind for event in events.events], ["content", "moderation"])
+        self.assertEqual(events.events[0].commit.subject, "Add root-001")
+        self.assertEqual(events.events[1].moderation_record.record_id, "pin-root-001")
 
     def test_load_activity_events_filters_by_kind(self) -> None:
         self.write_record(
@@ -244,13 +256,71 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
         )
         self.commit_paths(["records/moderation/pin-root-001.txt"], "Pin root-001")
 
-        content_events = load_activity_events(self.repo_root, mode="content", limit=5)
-        moderation_events = load_activity_events(self.repo_root, mode="moderation", limit=5)
-        code_events = load_activity_events(self.repo_root, mode="code", limit=5)
+        content_events = load_activity_events(self.repo_root, mode="content", page_size=5)
+        moderation_events = load_activity_events(self.repo_root, mode="moderation", page_size=5)
+        code_events = load_activity_events(self.repo_root, mode="code", page_size=5)
 
-        self.assertTrue(all(event.kind == "content" for event in content_events))
-        self.assertTrue(all(event.kind == "moderation" for event in moderation_events))
-        self.assertEqual(code_events, [])
+        self.assertTrue(all(event.kind == "content" for event in content_events.events))
+        self.assertTrue(all(event.kind == "moderation" for event in moderation_events.events))
+        self.assertEqual(code_events.events, ())
+
+    def test_load_activity_events_pages_content_results(self) -> None:
+        for index in range(7):
+            self.write_record(
+                f"records/posts/root-{index:03}.txt",
+                f"""
+                Post-ID: root-{index:03}
+                Board-Tags: general
+
+                Body {index}.
+                """,
+            )
+            self.commit(f"Add root-{index:03}")
+
+        page_one = load_activity_events(self.repo_root, mode="content", page=1, page_size=3)
+        page_two = load_activity_events(self.repo_root, mode="content", page=2, page_size=3)
+        page_three = load_activity_events(self.repo_root, mode="content", page=3, page_size=3)
+
+        self.assertEqual([event.commit.subject for event in page_one.events], ["Add root-006", "Add root-005", "Add root-004"])
+        self.assertEqual([event.commit.subject for event in page_two.events], ["Add root-003", "Add root-002", "Add root-001"])
+        self.assertEqual([event.commit.subject for event in page_three.events], ["Add root-000"])
+        self.assertTrue(page_one.has_next_page)
+        self.assertTrue(page_two.has_next_page)
+        self.assertFalse(page_three.has_next_page)
+
+    def test_load_activity_events_pages_all_view_after_merge(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+
+            Body one.
+            """,
+        )
+        self.commit("Add root-001")
+        self.write_record(
+            "records/moderation/pin-root-001.txt",
+            """
+            Record-ID: pin-root-001
+            Action: pin
+            Target-Type: thread
+            Target-ID: root-001
+            Timestamp: 2026-03-17T23:00:00Z
+
+            Pin it.
+            """,
+        )
+        self.commit_paths(["records/moderation/pin-root-001.txt"], "Pin root-001")
+        self.write_record("forum_web_stub.py", "print('hello')\n")
+        self.commit_paths(["forum_web_stub.py"], "Add code helper")
+
+        page_one = load_activity_events(self.repo_root, mode="all", page=1, page_size=2)
+        page_two = load_activity_events(self.repo_root, mode="all", page=2, page_size=2)
+
+        self.assertEqual([event.kind for event in page_one.events], ["code", "moderation"])
+        self.assertEqual([event.kind for event in page_two.events], ["content", "moderation"])
+        self.assertTrue(page_one.has_next_page)
 
     def test_fetch_recent_repository_commits_includes_code_changes(self) -> None:
         self.write_record(

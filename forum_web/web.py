@@ -166,11 +166,35 @@ class ActivityEvent:
     moderation_record: object | None = None
 
 
+@dataclass(frozen=True)
+class PagedActivityResult:
+    events: tuple[ActivityEvent, ...]
+    page: int
+    page_size: int
+    has_next_page: bool
+
+
+ACTIVITY_PAGE_SIZE = 12
+
+
 def activity_filter_mode_from_request(raw_mode: str | None) -> str:
     mode = (raw_mode or "").strip().lower()
     if mode in {"all", "content", "moderation", "code"}:
         return mode
     return "content"
+
+
+def activity_page_from_request(raw_page: str | None) -> int:
+    value = (raw_page or "").strip()
+    if not value:
+        return 1
+    try:
+        page = int(value)
+    except ValueError:
+        return 1
+    if page < 1:
+        return 1
+    return page
 
 
 def parse_activity_sort_timestamp(raw_value: str) -> datetime:
@@ -182,10 +206,10 @@ def parse_activity_sort_timestamp(raw_value: str) -> datetime:
 
 def classify_commit_area(path_text: str) -> str:
     normalized = Path(path_text).as_posix()
-    if normalized.startswith("records/posts/"):
-        return "content"
     if normalized.startswith("records/moderation/"):
         return "moderation"
+    if normalized.startswith("records/"):
+        return "content"
     if normalized.lower().endswith(".md"):
         return "docs"
     return "code"
@@ -326,7 +350,7 @@ def fetch_recent_commits(repo_root: Path, *, limit: int = 12) -> list[GitCommitE
 def classify_commit_activity(commit: GitCommitEntry) -> str:
     normalized_files = tuple(Path(file_path).as_posix() for file_path in commit.files)
     if any(
-        not path.startswith("records/posts/") and not path.startswith("records/moderation/")
+        not path.startswith("records/") and not path.startswith("records/moderation/")
         for path in normalized_files
     ):
         return "code"
@@ -355,35 +379,90 @@ def resolve_commit_posts(commit: GitCommitEntry, posts_index: dict[str, Post]) -
     return touched
 
 
-def load_activity_events(repo_root: Path, *, mode: str, limit: int = 12) -> list[ActivityEvent]:
+def fetch_matching_repository_commits(
+    repo_root: Path,
+    *,
+    mode: str,
+    start: int,
+    page_size: int,
+) -> tuple[list[GitCommitEntry], bool]:
+    target_count = start + page_size + 1
+    fetch_limit = max(target_count, page_size)
+    filtered: list[GitCommitEntry] = []
+    exhausted = False
+    while True:
+        commits = fetch_recent_repository_commits(repo_root, limit=fetch_limit)
+        filtered = [commit for commit in commits if classify_commit_activity(commit) == mode]
+        exhausted = len(commits) < fetch_limit
+        if exhausted or len(filtered) >= target_count:
+            break
+        fetch_limit *= 2
+    page_commits = filtered[start : start + page_size]
+    has_next_page = len(filtered) > start + page_size
+    return page_commits, has_next_page
+
+
+def load_activity_events(
+    repo_root: Path,
+    *,
+    mode: str,
+    page: int = 1,
+    page_size: int = ACTIVITY_PAGE_SIZE,
+) -> PagedActivityResult:
+    start = max(page - 1, 0) * page_size
     events: list[ActivityEvent] = []
-    if mode in {"all", "content", "code"}:
+    has_next_page = False
+    if mode in {"content", "code"}:
+        commits, has_next_page = fetch_matching_repository_commits(
+            repo_root,
+            mode=mode,
+            start=start,
+            page_size=page_size,
+        )
         events.extend(
             ActivityEvent(
                 kind=classify_commit_activity(commit),
                 sort_timestamp=parse_activity_sort_timestamp(commit.commit_date),
                 commit=commit,
             )
-            for commit in fetch_recent_repository_commits(repo_root, limit=limit)
-            if mode == "all" or classify_commit_activity(commit) == mode
+            for commit in commits
         )
-    if mode in {"all", "moderation"}:
-        moderation_records = load_moderation_records(moderation_records_dir(repo_root))
-        records = moderation_log_slice(moderation_records, limit=limit)
-        events.extend(
-            ActivityEvent(
-                kind="moderation",
-                sort_timestamp=parse_activity_sort_timestamp(record.timestamp),
-                moderation_record=record,
+    else:
+        source_limit = start + page_size + 1
+        if mode in {"all"}:
+            events.extend(
+                ActivityEvent(
+                    kind=classify_commit_activity(commit),
+                    sort_timestamp=parse_activity_sort_timestamp(commit.commit_date),
+                    commit=commit,
+                )
+                for commit in fetch_recent_repository_commits(repo_root, limit=source_limit)
             )
-            for record in records
-        )
-    return sort_activity_events(events, limit=limit)
+        if mode in {"all", "moderation"}:
+            moderation_records = load_moderation_records(moderation_records_dir(repo_root))
+            records = moderation_log_slice(moderation_records, limit=source_limit)
+            events.extend(
+                ActivityEvent(
+                    kind="moderation",
+                    sort_timestamp=parse_activity_sort_timestamp(record.timestamp),
+                    moderation_record=record,
+                )
+                for record in records
+            )
+        ordered = sort_activity_events(events)
+        page_events = ordered[start : start + page_size]
+        has_next_page = len(ordered) > start + page_size
+        events = page_events
+    return PagedActivityResult(
+        events=tuple(events),
+        page=page,
+        page_size=page_size,
+        has_next_page=has_next_page,
+    )
 
 
-def sort_activity_events(events: list[ActivityEvent], *, limit: int = 12) -> list[ActivityEvent]:
-    ordered = sorted(events, key=lambda event: event.sort_timestamp, reverse=True)
-    return ordered[:limit]
+def sort_activity_events(events: list[ActivityEvent]) -> list[ActivityEvent]:
+    return sorted(events, key=lambda event: event.sort_timestamp, reverse=True)
 
 
 def indexed_timestamp_value(timestamp_text: str | None) -> float:
@@ -936,7 +1015,7 @@ def render_site_activity_page(*, view_mode: str) -> str:
         record_current_operation_step("activity_build_posts_index", (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
-    events = load_activity_events(repo_root, mode=view_mode)
+    activity_result = load_activity_events(repo_root, mode=view_mode)
     record_current_operation_step("activity_load_events", (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
@@ -947,16 +1026,12 @@ def render_site_activity_page(*, view_mode: str) -> str:
             identity_context=identity_context,
             all_posts=posts,
         )
-        for event in events
+        for event in activity_result.events
     )
     record_current_operation_step("activity_render_event_cards", (time.perf_counter() - started_at) * 1000.0)
     if not event_cards:
         event_cards = '<article class="post-card"><p class="post-link">No activity matches this filter yet.</p></article>'
 
-    started_at = time.perf_counter()
-    git_summary = git_status_summary(repo_root)
-    record_current_operation_step("activity_git_status_summary", (time.perf_counter() - started_at) * 1000.0)
-    git_worktree_value = git_summary.get("git_worktree") or git_summary.get("worktree") or "git status unavailable"
     intro_text = (
         "Browse one combined reverse-chronological timeline of content, moderation, and code changes. "
         "Commit cards highlight touched files and outbound GitHub links when available."
@@ -971,10 +1046,6 @@ def render_site_activity_page(*, view_mode: str) -> str:
         filter_nav_html=render_activity_filter_nav(current_mode=view_mode),
         activity_intro_text=html.escape(intro_text),
         event_cards_html=event_cards,
-        git_commit_id=html.escape(git_summary.get("commit_id") or "unknown"),
-        git_commit_date=html.escape(git_summary.get("commit_date") or "unknown"),
-        git_source_path=html.escape(git_summary.get("source_path") or "unknown"),
-        git_worktree=html.escape(git_worktree_value),
     )
     return render_page(
         title="Repository History",
