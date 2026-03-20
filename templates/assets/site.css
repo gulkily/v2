@@ -1,6 +1,8 @@
 :root {
+  color-scheme: light dark;
   --bg-top: #f3f1ea;
   --bg-bottom: #ece7db;
+  --bg-glow: rgba(236, 228, 200, 0.62);
   --paper: rgba(251, 250, 245, 0.92);
   --paper-strong: #fbfaf5;
   --ink: #1f2a28;
@@ -9,6 +11,97 @@
   --accent-soft: #cfd7d1;
   --edge: rgba(82, 101, 96, 0.18);
   --shadow: rgba(31, 42, 40, 0.1);
+  --surface-elevated: var(--paper-strong);
+  --surface-band: #ece4c8;
+  --surface-claim-border: rgba(45, 91, 115, 0.28);
+  --surface-claim-top: rgba(45, 91, 115, 0.1);
+  --surface-claim-bottom: rgba(236, 228, 200, 0.78);
+  --surface-inline-code: rgba(139, 94, 52, 0.08);
+  --surface-stat-border: rgba(139, 94, 52, 0.14);
+  --surface-stat-top: rgba(255, 247, 235, 0.95);
+  --surface-stat-bottom: rgba(246, 237, 223, 0.95);
+  --surface-chip: rgba(255, 249, 240, 0.65);
+  --surface-chip-active-border: rgba(139, 94, 52, 0.34);
+  --surface-chip-active: rgba(240, 220, 191, 0.92);
+  --surface-card-border: rgba(139, 94, 52, 0.16);
+  --surface-card-top: rgba(255, 250, 241, 0.97);
+  --surface-card-bottom: rgba(247, 238, 225, 0.97);
+  --surface-badge: rgba(139, 94, 52, 0.1);
+  --surface-commit-top: rgba(255, 252, 247, 0.95);
+  --surface-commit-bottom: rgba(245, 241, 232, 0.95);
+  --surface-post-top: rgba(255, 252, 246, 0.98);
+  --surface-post-bottom: rgba(244, 241, 232, 0.96);
+  --surface-post-highlight: rgba(255, 255, 255, 0.45);
+  --surface-post-hidden-top: rgba(245, 238, 228, 0.96);
+  --surface-post-hidden-bottom: rgba(238, 228, 213, 0.94);
+  --surface-quote-border: rgba(139, 94, 52, 0.35);
+  --surface-technical: rgba(255, 249, 240, 0.84);
+  --surface-input: rgba(255, 251, 244, 0.96);
+  --surface-button-top: rgba(255, 247, 235, 0.98);
+  --surface-button-bottom: rgba(236, 228, 200, 0.98);
+  --surface-compose-card: rgba(255, 249, 240, 0.72);
+  --surface-table-border: rgba(139, 94, 52, 0.16);
+  --surface-table-alt: rgba(255, 249, 240, 0.68);
+  --surface-table-target-outline: rgba(139, 94, 52, 0.4);
+  --surface-table-target: rgba(255, 245, 230, 0.92);
+  --surface-task-id: rgba(45, 91, 115, 0.1);
+  --surface-task-context: rgba(255, 249, 240, 0.72);
+  --surface-board-hover: #e4ece6;
+  --surface-board-divider: #cfd7d1;
+
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-top: #111820;
+    --bg-bottom: #0a1016;
+    --bg-glow: rgba(54, 93, 115, 0.26);
+    --paper: rgba(18, 25, 33, 0.92);
+    --paper-strong: #18212b;
+    --ink: #e4ece9;
+    --muted: #b4c0bc;
+    --accent: #8fc4df;
+    --accent-soft: #41515a;
+    --edge: rgba(162, 184, 180, 0.22);
+    --shadow: rgba(0, 0, 0, 0.42);
+    --surface-elevated: #18212b;
+    --surface-band: #23313d;
+    --surface-claim-border: rgba(143, 196, 223, 0.34);
+    --surface-claim-top: rgba(143, 196, 223, 0.18);
+    --surface-claim-bottom: rgba(53, 68, 81, 0.86);
+    --surface-inline-code: rgba(143, 196, 223, 0.14);
+    --surface-stat-border: rgba(143, 196, 223, 0.18);
+    --surface-stat-top: rgba(35, 46, 57, 0.98);
+    --surface-stat-bottom: rgba(25, 34, 43, 0.98);
+    --surface-chip: rgba(32, 42, 52, 0.92);
+    --surface-chip-active-border: rgba(143, 196, 223, 0.38);
+    --surface-chip-active: rgba(40, 57, 71, 0.98);
+    --surface-card-border: rgba(143, 196, 223, 0.18);
+    --surface-card-top: rgba(30, 40, 50, 0.98);
+    --surface-card-bottom: rgba(21, 29, 37, 0.98);
+    --surface-badge: rgba(143, 196, 223, 0.16);
+    --surface-commit-top: rgba(30, 40, 49, 0.98);
+    --surface-commit-bottom: rgba(21, 29, 37, 0.98);
+    --surface-post-top: rgba(31, 41, 50, 0.98);
+    --surface-post-bottom: rgba(22, 29, 37, 0.98);
+    --surface-post-highlight: rgba(255, 255, 255, 0.05);
+    --surface-post-hidden-top: rgba(48, 40, 33, 0.96);
+    --surface-post-hidden-bottom: rgba(34, 28, 23, 0.96);
+    --surface-quote-border: rgba(143, 196, 223, 0.35);
+    --surface-technical: rgba(28, 37, 46, 0.96);
+    --surface-input: rgba(28, 37, 46, 0.98);
+    --surface-button-top: rgba(41, 56, 68, 0.98);
+    --surface-button-bottom: rgba(28, 39, 48, 0.98);
+    --surface-compose-card: rgba(30, 40, 50, 0.92);
+    --surface-table-border: rgba(143, 196, 223, 0.18);
+    --surface-table-alt: rgba(29, 39, 49, 0.86);
+    --surface-table-target-outline: rgba(143, 196, 223, 0.45);
+    --surface-table-target: rgba(38, 53, 66, 0.95);
+    --surface-task-id: rgba(143, 196, 223, 0.15);
+    --surface-task-context: rgba(30, 40, 50, 0.92);
+    --surface-board-hover: #263742;
+    --surface-board-divider: #41515a;
+  }
 }
 
 * {
@@ -24,7 +117,7 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at top, rgba(236, 228, 200, 0.62), transparent 34%),
+    radial-gradient(circle at top, var(--bg-glow), transparent 34%),
     linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
   font-family: Verdana, Tahoma, Geneva, sans-serif;
 }
@@ -48,7 +141,7 @@ body {
 .site-header,
 .site-footer {
   border: 1px solid var(--accent-soft);
-  background: var(--paper-strong);
+  background: var(--surface-elevated);
   box-shadow: 0 14px 34px var(--shadow);
 }
 
@@ -62,8 +155,8 @@ body {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
-  border-color: rgba(45, 91, 115, 0.28);
-  background: linear-gradient(135deg, rgba(45, 91, 115, 0.1), rgba(236, 228, 200, 0.78));
+  border-color: var(--surface-claim-border);
+  background: linear-gradient(135deg, var(--surface-claim-top), var(--surface-claim-bottom));
 }
 
 .site-username-claim-copy {
@@ -99,7 +192,7 @@ body {
 
 .site-header-band {
   border-bottom: 1px solid var(--accent-soft);
-  background: #ece4c8;
+  background: var(--surface-band);
 }
 
 .site-header-band p,
@@ -231,7 +324,7 @@ body {
 .panel code {
   padding: 0.15rem 0.35rem;
   border-radius: 999px;
-  background: rgba(139, 94, 52, 0.08);
+  background: var(--surface-inline-code);
 }
 
 .section-head {

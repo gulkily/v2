@@ -97,6 +97,15 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertEqual(headers.get("Content-Type"), "text/javascript; charset=utf-8")
         self.assertIn("async function loadOpenPgp()", body)
 
+    def test_site_css_declares_dark_mode_theme_tokens(self) -> None:
+        status, headers, body = self.get("/assets/site.css")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers.get("Content-Type"), "text/css; charset=utf-8")
+        self.assertIn("color-scheme: light dark;", body)
+        self.assertIn("@media (prefers-color-scheme: dark)", body)
+        self.assertIn("--surface-elevated:", body)
+
     def test_compose_thread_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get_with_env(
             "/compose/thread",
