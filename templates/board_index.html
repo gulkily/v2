@@ -1,17 +1,9 @@
 <section class="panel page-section">
-  <div class="section-head page-lede">
-    <h2>Threads worth opening</h2>
-    <p>Open a thread and scan the current board without an extra home-page nav row.</p>
-  </div>
-  ${stats_html}
-</section>
-
-<section class="panel page-section" aria-labelledby="front-page-heading">
-  <div class="section-head page-lede">
-    <h2 id="front-page-heading">Visible threads</h2>
-    <p>Canonical thread roots stay readable here without introducing a second page shell.</p>
-  </div>
   <section class="board-index-thread-list" aria-label="Visible threads">
     ${thread_rows_html}
   </section>
+</section>
+
+<section class="panel page-section">
+  ${stats_html}
 </section>

@@ -662,10 +662,16 @@ def render_board_index() -> str:
     content = load_template("board_index.html").substitute(context)
     return render_page(
         title="Forum Reader",
-        hero_kicker="Board Index",
-        hero_title="Threads gathered straight from canonical text records",
-        hero_text="This board view reads the git-tracked post files directly, groups thread roots by board tags, and keeps the dataset browsable without adding a database or durable index layer.",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
         content_html=content,
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
     )
 
 
