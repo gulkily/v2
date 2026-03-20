@@ -1271,7 +1271,7 @@ def render_profile_update_page(identity_id: str) -> str:
         dry_run_value="false",
         source_identity_id=html.escape(summary.identity_id),
         profile_slug=html.escape(profile_slug),
-        display_name_value=html.escape(summary.display_name),
+        display_name_value="",
         submit_label="Submit update",
     )
     return render_page(

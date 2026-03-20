@@ -233,6 +233,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn(DISPLAY_NAME, body)
         self.assertIn(IDENTITY_ID, body)
         self.assertIn("Choose a username:", body)
+        self.assertIn('id="display-name-input" name="display_name" type="text" maxlength="80" value="" required', body)
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
         self.assertIn('data-dry-run="false"', body)
@@ -252,6 +253,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertNotIn("Use the existing browser signing flow", body)
         self.assertNotIn('class="breadcrumb"', body)
         self.assertNotIn("Enter a new display name", body)
+        self.assertNotIn(f'value="{DISPLAY_NAME}"', body)
 
 
 if __name__ == "__main__":
