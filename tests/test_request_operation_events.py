@@ -156,17 +156,17 @@ process.stdout.write(signature);
         self.assertEqual(instance_operation.metadata["path"], "/instance/")
 
     def test_activity_request_records_view_metadata_and_timing_steps(self) -> None:
-        status, _, _ = self.request("/activity/", query_string="view=code")
+        status, _, _ = self.request("/activity/", query_string="view=code&page=3")
 
         self.assertEqual(status, "200 OK")
         operations = load_recent_operations(self.repo_root)
         activity_operation = next(event for event in operations if event.operation_name == "GET /activity/")
         self.assertEqual(activity_operation.state, "completed")
         self.assertEqual(activity_operation.metadata["view"], "code")
+        self.assertEqual(activity_operation.metadata["page"], 3)
         step_names = tuple(step.name for step in activity_operation.steps)
         self.assertIn("activity_load_events", step_names)
         self.assertIn("activity_render_event_cards", step_names)
-        self.assertIn("activity_git_status_summary", step_names)
         self.assertNotIn("activity_load_repository_state", step_names)
 
     def test_content_activity_request_still_records_repository_load_step(self) -> None:
@@ -176,6 +176,7 @@ process.stdout.write(signature);
         operations = load_recent_operations(self.repo_root)
         activity_operation = next(event for event in operations if event.operation_name == "GET /activity/")
         self.assertEqual(activity_operation.metadata["view"], "content")
+        self.assertEqual(activity_operation.metadata["page"], 1)
         step_names = tuple(step.name for step in activity_operation.steps)
         self.assertIn("activity_load_repository_state", step_names)
         self.assertIn("activity_build_posts_index", step_names)

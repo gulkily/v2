@@ -18,3 +18,13 @@
   - `python -m pytest tests/test_site_activity_page.py`
 - Notes:
   - request-operation metadata and broader regression coverage for paginated activity requests are deferred to Stage 3
+
+## Stage 3 - Lock paginated activity behavior into focused regression coverage
+- Changes:
+  - extended request-operation tests so `/activity/` records both `view` and `page` metadata for paginated requests
+  - ran the combined helper, page, and request-level activity regression set against the new pagination behavior
+  - kept the implementation scoped to the current read model and route contract; no new event store or route family was introduced
+- Verification:
+  - `python -m pytest tests/test_site_activity_git_log_helpers.py tests/test_site_activity_page.py tests/test_request_operation_events.py`
+- Notes:
+  - the current implementation uses numbered GET pagination and preserves the existing `view` filter model across all activity sections
