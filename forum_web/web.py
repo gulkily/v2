@@ -236,12 +236,7 @@ def maybe_render_reindex_feedback_page(
     mark_startup_ready: bool,
 ) -> str | None:
     readiness = post_index_readiness(repo_root)
-    has_existing_index_state = (
-        readiness.indexed_head is not None
-        or readiness.indexed_schema_version is not None
-        or readiness.indexed_post_count > 0
-    )
-    if not readiness.requires_rebuild or readiness.current_head is None or not has_existing_index_state:
+    if not readiness.requires_rebuild or readiness.current_head is None:
         return None
     target_path = path
     if query_string:

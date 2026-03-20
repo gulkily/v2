@@ -158,6 +158,31 @@ class PostIndexStartupTests(unittest.TestCase):
         mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
         mock_startup.assert_not_called()
 
+    def test_board_request_shows_refresh_page_when_index_database_is_missing(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=0,
+            indexed_head=None,
+            current_head="test-head",
+            indexed_schema_version=None,
+            count_mismatch=True,
+            head_mismatch=True,
+            schema_mismatch=True,
+        )
+        with self.assertLogs("forum_web.web", level="WARNING") as captured_logs:
+            with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+                with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True) as mock_start:
+                    with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                        status, _, body = self.request("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Refreshing forum data", body)
+        self.assertTrue(any("post index rebuild triggered for" in message for message in captured_logs.output))
+        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
+        mock_startup.assert_not_called()
+
     def test_profile_request_shows_refresh_page_when_index_drifts_after_startup(self) -> None:
         web._INDEX_STARTUP_READY_ROOTS.clear()
         web._INDEX_STARTUP_READY_ROOTS.add(self.repo_root.resolve())

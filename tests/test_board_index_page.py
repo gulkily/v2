@@ -9,6 +9,7 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
+from forum_core.post_index import ensure_post_index_current
 from forum_web.web import application
 
 
@@ -250,6 +251,7 @@ class BoardIndexPageTests(unittest.TestCase):
             """,
         )
         self.commit_posts("Update root-001", "2026-03-17T12:00:00+00:00")
+        ensure_post_index_current(self.repo_root)
 
         status, _, body = self.get("/")
 
