@@ -1,0 +1,24 @@
+Post-ID: identity-openpgp-fbea5c6fccdaf365faca29c2c4ba69f97c9ce6ec
+Board-Tags: identity
+Subject: identity bootstrap
+Identity-ID: openpgp:fbea5c6fccdaf365faca29c2c4ba69f97c9ce6ec
+Signer-Fingerprint: FBEA5C6FCCDAF365FACA29C2C4BA69F97C9CE6EC
+Bootstrap-By-Post: thread-20260320190851-21-050b308f
+Bootstrap-By-Thread: thread-20260320190851-21-050b308f
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+xjMEab2bPRYJKwYBBAHaRw8BAQdAxgHOvqzvlJOZNhQJ0SWsOkzFphqwcvVl
+s0JvcUmVg3jNCmZvcnVtLXVzZXLCwBMEExYKAIUFgmm9mz0DCwkHCRDEumn5
+fJzm7EUUAAAAAAAcACBzYWx0QG5vdGF0aW9ucy5vcGVucGdwanMub3JnAtoe
+AXUkEtyq/vk+QDwC5IN8RcFmGiFxfo+Qydo7iNEFFQoIDgwEFgACAQIZAQKb
+AwIeARYhBPvqXG/M2vNl+sopwsS6afl8nObsAAAXhwD/b3vK+x2fg1O4Mikq
+dUAV9OvXL/Fx5xmeI1zMSmjU+ZkA/AwM5Yn9UxVE1hBDkPywM8Cu5Emuw5pq
+ksPDFrj7l+8EzjgEab2bPRIKKwYBBAGXVQEFAQEHQEAAbFyXKBciMvXLgHGl
+6kNfsO+YSzQbce2jMXrylWAKAwEIB8K+BBgWCgBwBYJpvZs9CRDEumn5fJzm
+7EUUAAAAAAAcACBzYWx0QG5vdGF0aW9ucy5vcGVucGdwanMub3JnPY3kAMyj
+2XjvaR4RA7E0GxnqI+Iu76oT5/czR3nnKU4CmwwWIQT76lxvzNrzZfrKKcLE
+umn5fJzm7AAAWIwBANaou4FYhKbY8Jt+75aVI2OiUNMRoKnIJoNmQWcPLgvJ
+AQDfTNe/olgg5TpFu6RNuxcD1TX9J9XuuNTI2ix7d4yHBA==
+=1E5R
+-----END PGP PUBLIC KEY BLOCK-----
