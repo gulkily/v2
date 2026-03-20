@@ -19,3 +19,13 @@
   - `python -m pytest tests/test_instance_info_page.py`
 - Notes:
   - The change stays CSS-centric, so template churn remains low while most major pages inherit the new dark-mode treatment automatically.
+
+## Stage 3 - Dark mode regression coverage and final verification
+- Changes:
+  - Added `tests/test_site_css_asset.py` to assert that the shared stylesheet exposes the dark-mode media query and routes key shared surfaces through theme variables.
+  - Completed a final multi-page regression sweep across compose, home, thread, profile, and instance routes after the theme cleanup.
+- Verification:
+  - `python -m pytest tests/test_site_css_asset.py`
+  - `python -m pytest tests/test_compose_thread_page.py tests/test_board_index_page.py tests/test_task_thread_pages.py tests/test_username_profile_route.py tests/test_instance_info_page.py`
+- Notes:
+  - Automated coverage checks for theme hooks and route stability; visual contrast still benefits from real-browser review during product QA.
