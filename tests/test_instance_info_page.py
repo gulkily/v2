@@ -129,11 +129,23 @@ class InstanceInfoPageTests(unittest.TestCase):
         status, _, body = self.get("/instance/")
 
         self.assertEqual(status, "200 OK")
+        self.assertNotIn("Recent slow operations", body)
+        self.assertNotIn("GET /activity/", body)
+
+        status, _, body = self.get("/operations/slow/")
+
+        self.assertEqual(status, "200 OK")
         self.assertIn("Recent slow operations", body)
         self.assertIn("GET /activity/", body)
         self.assertIn("method: GET", body)
         self.assertIn("path: /activity/", body)
         self.assertIn("view: code", body)
+
+    def test_primary_nav_does_not_link_to_slow_operations_page(self) -> None:
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn('/operations/slow/', body)
 
 
 if __name__ == "__main__":

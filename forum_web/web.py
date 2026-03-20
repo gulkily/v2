@@ -1144,7 +1144,6 @@ def render_instance_info_page() -> str:
         commit_id=html.escape(render_public_value(info.commit_id)),
         commit_date=html.escape(render_public_value(info.commit_date)),
         source_path=html.escape(str(info.source_path.relative_to(repo_root))),
-        recent_operations_html=render_recent_operations_panel(repo_root),
     )
     return render_page(
         title="Project Information",
@@ -2621,6 +2620,12 @@ def _dispatch_application(environ, start_response):
 
         if path == "/instance/":
             body = render_instance_info_page().encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/operations/slow/":
+            body = render_recent_operations_page().encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
