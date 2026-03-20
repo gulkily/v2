@@ -255,3 +255,44 @@ class ForumGitRecoverTests(unittest.TestCase):
         self.assertTrue(repair.succeeded)
         self.assertTrue(recovered.is_healthy)
         self.assertEqual(self.git(clone, "branch", "--show-current").stdout.strip(), "main")
+
+    def test_repair_checkout_blocks_branch_ahead_state(self) -> None:
+        _, _, clone = self.setup_origin_clone()
+        self.commit_file(clone, "local.txt", "local\n", "local update")
+        diagnosis = self.module.diagnose_repo(clone)
+
+        repair = self.module.repair_checkout(clone, diagnosis)
+
+        self.assertFalse(repair.succeeded)
+        self.assertIn("discarding local work", repair.summary)
+        self.assertTrue(any("Branch ahead of upstream" in line for line in repair.details))
+
+    def test_repair_checkout_blocks_branch_diverged_state(self) -> None:
+        origin, _, clone = self.setup_origin_clone()
+        updater = self.clone_origin(origin, "updater")
+        self.commit_file(clone, "local.txt", "local\n", "local update")
+        self.commit_file(updater, "remote.txt", "remote\n", "remote update")
+        self.git(updater, "push", "origin", "main")
+        self.git(clone, "fetch", "origin")
+        diagnosis = self.module.diagnose_repo(clone)
+
+        repair = self.module.repair_checkout(clone, diagnosis)
+
+        self.assertFalse(repair.succeeded)
+        self.assertTrue(any("Branch diverged from upstream" in line for line in repair.details))
+
+    def test_repair_checkout_blocks_local_file_changes(self) -> None:
+        _, _, clone = self.setup_origin_clone()
+        tracked_path = clone / "base.txt"
+        tracked_path.write_text("modified\n", encoding="utf-8")
+        self.git(clone, "add", "base.txt")
+        tracked_path.write_text("modified again\n", encoding="utf-8")
+        (clone / "scratch.txt").write_text("scratch\n", encoding="utf-8")
+        diagnosis = self.module.diagnose_repo(clone)
+
+        repair = self.module.repair_checkout(clone, diagnosis)
+
+        self.assertFalse(repair.succeeded)
+        self.assertTrue(any("Staged but uncommitted changes" in line for line in repair.details))
+        self.assertTrue(any("Tracked working-tree changes" in line for line in repair.details))
+        self.assertTrue(any("Untracked-file obstruction risk" in line for line in repair.details))

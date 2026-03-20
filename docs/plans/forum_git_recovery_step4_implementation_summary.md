@@ -30,3 +30,12 @@
 - Notes:
   - Rebase and merge states still stop for manual resolution in this stage.
   - Local commits or local file changes still block automatic cleanup until the destructive-state guardrail stage.
+
+## Stage 4 - Guard destructive recovery states
+- Changes:
+  - Tightened [`scripts/forum_git_recover.py`](/home/wsl/v2/scripts/forum_git_recover.py) so risky states now return deterministic guarded-refusal details instead of a generic failure.
+  - Extended [`tests/test_forum_git_recover.py`](/home/wsl/v2/tests/test_forum_git_recover.py) to cover guarded refusal for ahead-of-upstream, diverged, and local staged/tracked/untracked-change states.
+- Verification:
+  - Ran `python3 -m unittest tests.test_forum_git_recover tests.test_forum_tasks`.
+- Notes:
+  - The command still does not offer a destructive opt-in flag in this slice; operators must clean up or intentionally discard risky local state themselves before rerunning `--apply`.

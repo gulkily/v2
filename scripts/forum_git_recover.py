@@ -180,12 +180,15 @@ def repair_checkout(repo_root: Path, diagnosis: RepoDiagnosis) -> RepairResult:
                 "Resolve or abort the in-progress rebase/merge before running `./forum git-recover --apply` again.",
             ),
         )
-    if issue_codes & guarded_issue_codes:
+    guarded = tuple(issue for issue in diagnosis.issues if issue.code in guarded_issue_codes)
+    if guarded:
+        guarded_lines = tuple(f"{issue.summary}: {issue.detail}" for issue in guarded)
         return RepairResult(
             succeeded=False,
             summary="Automatic repair stopped to avoid discarding local work.",
-            details=(
-                "This checkout has local commits or local file changes that require explicit operator cleanup first.",
+            details=guarded_lines
+            + (
+                "Clean up or intentionally discard local commits/changes before running `./forum git-recover --apply` again.",
             ),
         )
 
