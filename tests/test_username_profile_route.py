@@ -236,6 +236,8 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("Other Users With This Name", body)
         self.assertIn("/profiles/openpgp-beta", body)
+        self.assertNotIn("linked identities", body)
+        self.assertNotIn(">openpgp:beta</a>", body)
         self.assertIn("<details", body)
         self.assertIn(">Technical details<", body)
         self.assertNotIn("Key material", body)
@@ -265,6 +267,7 @@ class UsernameProfileRouteCollisionTests(unittest.TestCase):
         )
 
         self.assertEqual(status, "200 OK")
+        self.assertIn("linked identities", body)
         self.assertIn("Likely Self-Merge", body)
         self.assertIn("not me", body)
         self.assertIn("/assets/profile_merge_suggestion.js", body)

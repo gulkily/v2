@@ -621,9 +621,13 @@ def render_profile_page(
         ),
         stat_html=(
             '<div class="stat-grid">'
-            f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
-            f'<article class="stat-card"><span class="stat-number">{len(summary.post_ids)}</span><span class="stat-label">visible posts</span></article>'
-            f'<article class="stat-card"><span class="stat-number">{len(summary.thread_ids)}</span><span class="stat-label">threads touched</span></article>'
+            + (
+                f'<article class="stat-card"><span class="stat-number">{len(summary.member_identity_ids)}</span><span class="stat-label">linked identities</span></article>'
+                if merge_enabled
+                else ""
+            )
+            + f'<article class="stat-card"><span class="stat-number">{len(summary.post_ids)}</span><span class="stat-label">visible posts</span></article>'
+            + f'<article class="stat-card"><span class="stat-number">{len(summary.thread_ids)}</span><span class="stat-label">threads touched</span></article>'
             "</div>"
         ),
         bootstrap_identity_id=html.escape(summary.identity_id),
@@ -639,9 +643,13 @@ def render_profile_page(
         other_username_html=other_username_html,
         username_route_html=username_route_html,
         public_key_text=html.escape(summary.public_key_text),
-        member_identity_html="".join(
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(member_identity_id))}">{html.escape(member_identity_id)}</a>'
-            for member_identity_id in summary.member_identity_ids
+        member_identity_html=(
+            "".join(
+                f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(member_identity_id))}">{html.escape(member_identity_id)}</a>'
+                for member_identity_id in summary.member_identity_ids
+            )
+            if merge_enabled
+            else ""
         ),
         post_links_html=post_links_html,
         merge_suggestion_html=merge_suggestion_html,
