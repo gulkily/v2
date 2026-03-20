@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from forum_web import web
-from forum_core.post_index import POST_INDEX_SCHEMA_VERSION, open_post_index
+from forum_core.post_index import POST_INDEX_SCHEMA_VERSION, PostIndexReadiness, open_post_index
 
 
 class PostIndexStartupTests(unittest.TestCase):
@@ -128,6 +128,55 @@ class PostIndexStartupTests(unittest.TestCase):
             self.assertEqual(author_row["display_name"], "Author Name")
         finally:
             rebuilt.connection.close()
+
+    def test_board_request_shows_refresh_page_when_startup_index_is_stale(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=0,
+            indexed_head=None,
+            current_head="test-head",
+            indexed_schema_version=str(POST_INDEX_SCHEMA_VERSION),
+            count_mismatch=True,
+            head_mismatch=True,
+            schema_mismatch=False,
+        )
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True) as mock_start:
+                with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                    status, _, body = self.request("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Refreshing forum data", body)
+        self.assertIn("recent slow operations", body)
+        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
+        mock_startup.assert_not_called()
+
+    def test_profile_request_shows_refresh_page_when_index_drifts_after_startup(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+        web._INDEX_STARTUP_READY_ROOTS.add(self.repo_root.resolve())
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=1,
+            indexed_head="old-head",
+            current_head="new-head",
+            indexed_schema_version=str(POST_INDEX_SCHEMA_VERSION),
+            count_mismatch=False,
+            head_mismatch=True,
+            schema_mismatch=False,
+        )
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=False) as mock_start:
+                with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                    status, _, body = self.request("/profiles/openpgp-alpha")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Refreshing forum data", body)
+        self.assertIn("/profiles/openpgp-alpha", body)
+        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=False)
+        mock_startup.assert_called_once_with(self.repo_root)
 
 
 if __name__ == "__main__":

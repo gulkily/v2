@@ -5,10 +5,11 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
@@ -24,7 +25,7 @@ from forum_core.operation_events import (
     record_current_operation_step,
     start_operation,
 )
-from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts
+from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts, post_index_readiness
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
 from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
@@ -102,6 +103,8 @@ from forum_web.templates import (
 load_repo_env()
 notify_missing_env_defaults()
 _INDEX_STARTUP_READY_ROOTS: set[Path] = set()
+_INDEX_REBUILD_IN_PROGRESS_ROOTS: set[Path] = set()
+_INDEX_REBUILD_LOCK = threading.Lock()
 
 
 def get_repo_root() -> Path:
@@ -123,6 +126,101 @@ def ensure_runtime_post_index_startup(repo_root: Path) -> None:
         return
     ensure_post_index_current(resolved_root)
     _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
+
+
+def _request_supports_reindex_feedback(path: str, *, method: str) -> bool:
+    if method != "GET":
+        return False
+    if path == "/" or path.startswith("/threads/") or path.startswith("/user/"):
+        return True
+    if not path.startswith("/profiles/"):
+        return False
+    return not (
+        path.endswith("/update")
+        or path.endswith("/merge")
+        or path.endswith("/merge/action")
+    )
+
+
+def start_background_post_index_refresh(repo_root: Path, *, mark_startup_ready: bool) -> bool:
+    resolved_root = repo_root.resolve()
+    with _INDEX_REBUILD_LOCK:
+        if resolved_root in _INDEX_REBUILD_IN_PROGRESS_ROOTS:
+            return False
+        _INDEX_REBUILD_IN_PROGRESS_ROOTS.add(resolved_root)
+
+    def run_refresh() -> None:
+        try:
+            ensure_post_index_current(resolved_root)
+            if mark_startup_ready:
+                _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
+        finally:
+            with _INDEX_REBUILD_LOCK:
+                _INDEX_REBUILD_IN_PROGRESS_ROOTS.discard(resolved_root)
+
+    thread = threading.Thread(
+        target=run_refresh,
+        name=f"post-index-refresh-{resolved_root.name}",
+        daemon=True,
+    )
+    thread.start()
+    return True
+
+
+def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -> str:
+    status_text = (
+        "Forum data is being refreshed for this page. The page will retry automatically in a moment."
+        if rebuild_started
+        else "Forum data is already being refreshed for this page. The page will retry automatically in a moment."
+    )
+    content = (
+        '<section class="panel page-section">'
+        '<div class="section-head page-lede">'
+        '<h2>Refreshing forum data</h2>'
+        f'<p>{html.escape(status_text)}</p>'
+        "</div>"
+        '<p class="thread-meta">If this takes longer than expected, you can check the recent slow operations view for the same rebuild.</p>'
+        '<div class="action-row link-cluster">'
+        f'<a class="thread-chip" href="{html.escape(target_path)}">retry now</a>'
+        '<a class="thread-chip" href="/operations/slow/">recent slow operations</a>'
+        "</div>"
+        "</section>"
+    )
+    return render_page(
+        title="Refreshing forum data",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
+        content_html=content,
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
+        page_script_html=(
+            "<script>"
+            f'window.setTimeout(function () {{ window.location.replace({json.dumps(target_path)}); }}, 1200);'
+            "</script>"
+        ),
+    )
+
+
+def maybe_render_reindex_feedback_page(
+    *,
+    repo_root: Path,
+    path: str,
+    query_string: str,
+    mark_startup_ready: bool,
+) -> str | None:
+    readiness = post_index_readiness(repo_root)
+    if not readiness.requires_rebuild:
+        return None
+    target_path = path
+    if query_string:
+        target_path = f"{target_path}?{query_string}"
+    rebuild_started = start_background_post_index_refresh(repo_root, mark_startup_ready=mark_startup_ready)
+    return render_post_index_refresh_page(target_path=target_path, rebuild_started=rebuild_started)
 
 
 def load_repository_state():
@@ -2617,7 +2715,34 @@ def _dispatch_application(environ, start_response):
     path = environ.get("PATH_INFO", "/")
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
     method = environ.get("REQUEST_METHOD", "GET").upper()
-    ensure_runtime_post_index_startup(get_repo_root())
+    repo_root = get_repo_root()
+    if _request_supports_reindex_feedback(path, method=method):
+        resolved_root = repo_root.resolve()
+        if resolved_root not in _INDEX_STARTUP_READY_ROOTS:
+            refresh_page = maybe_render_reindex_feedback_page(
+                repo_root=repo_root,
+                path=path,
+                query_string=environ.get("QUERY_STRING", ""),
+                mark_startup_ready=True,
+            )
+            if refresh_page is not None:
+                body = refresh_page.encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+    ensure_runtime_post_index_startup(repo_root)
+    if _request_supports_reindex_feedback(path, method=method):
+        refresh_page = maybe_render_reindex_feedback_page(
+            repo_root=repo_root,
+            path=path,
+            query_string=environ.get("QUERY_STRING", ""),
+            mark_startup_ready=False,
+        )
+        if refresh_page is not None:
+            body = refresh_page.encode("utf-8")
+            headers = [("Content-Type", "text/html; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
 
     try:
         if path == "/api/create_thread":
