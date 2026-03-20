@@ -164,10 +164,10 @@ process.stdout.write(signature);
         self.assertEqual(activity_operation.state, "completed")
         self.assertEqual(activity_operation.metadata["view"], "code")
         step_names = tuple(step.name for step in activity_operation.steps)
-        self.assertIn("activity_load_repository_state", step_names)
         self.assertIn("activity_load_events", step_names)
         self.assertIn("activity_render_event_cards", step_names)
         self.assertIn("activity_git_status_summary", step_names)
+        self.assertNotIn("activity_load_repository_state", step_names)
 
     def test_create_thread_request_persists_phase_timings_in_request_record(self) -> None:
         payload_text = dedent(

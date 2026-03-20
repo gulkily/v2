@@ -781,12 +781,14 @@ def render_commit_card(
     identity_context,
     *,
     activity_kind: str = "content",
+    all_posts: list[Post] | None = None,
 ) -> str:
     post_cards = "".join(
         render_post_card(
             post,
             root_thread_id=post.root_thread_id,
             identity_context=identity_context,
+            all_posts=all_posts,
             compact_thread_view=True,
         )
         for post in posts
@@ -850,26 +852,44 @@ def render_activity_filter_nav(*, current_mode: str) -> str:
     return "".join(parts)
 
 
-def render_activity_event_card(event: ActivityEvent, *, posts_index: dict[str, Post], identity_context) -> str:
+def render_activity_event_card(
+    event: ActivityEvent,
+    *,
+    posts_index: dict[str, Post],
+    identity_context,
+    all_posts: list[Post] | None = None,
+) -> str:
     if event.kind == "moderation" and event.moderation_record is not None:
-        return render_moderation_card(event.moderation_record, identity_context=identity_context)
+        return render_moderation_card(
+            event.moderation_record,
+            identity_context=identity_context,
+            posts=all_posts,
+        )
     assert event.commit is not None
     return render_commit_card(
         event.commit,
         resolve_commit_posts(event.commit, posts_index),
         identity_context,
         activity_kind=event.kind,
+        all_posts=all_posts,
     )
 
 
 def render_site_activity_page(*, view_mode: str) -> str:
     repo_root = get_repo_root()
-    started_at = time.perf_counter()
-    posts, _, _, _, _, identity_context = load_repository_state()
-    record_current_operation_step("activity_load_repository_state", (time.perf_counter() - started_at) * 1000.0)
+    posts: list[Post] = []
+    identity_context = None
+    posts_index: dict[str, Post] = {}
+    if view_mode != "code":
+        started_at = time.perf_counter()
+        posts, _, _, _, _, identity_context = load_repository_state()
+        record_current_operation_step("activity_load_repository_state", (time.perf_counter() - started_at) * 1000.0)
+
+        started_at = time.perf_counter()
+        posts_index = build_posts_index(posts, repo_root)
+        record_current_operation_step("activity_build_posts_index", (time.perf_counter() - started_at) * 1000.0)
 
     started_at = time.perf_counter()
-    posts_index = build_posts_index(posts, repo_root)
     events = load_activity_events(repo_root, mode=view_mode)
     record_current_operation_step("activity_load_events", (time.perf_counter() - started_at) * 1000.0)
 
@@ -879,6 +899,7 @@ def render_site_activity_page(*, view_mode: str) -> str:
             event,
             posts_index=posts_index,
             identity_context=identity_context,
+            all_posts=posts,
         )
         for event in events
     )
@@ -1471,9 +1492,18 @@ def render_merge_request_action_page(
     )
 
 
-def render_post_card(post, *, root_thread_id: str, identity_context, hidden: bool = False, compact_thread_view: bool = False, show_subject: bool = True) -> str:
+def render_post_card(
+    post,
+    *,
+    root_thread_id: str,
+    identity_context,
+    all_posts: list[Post] | None = None,
+    hidden: bool = False,
+    compact_thread_view: bool = False,
+    show_subject: bool = True,
+) -> str:
     repo_root = get_repo_root()
-    posts = load_posts(repo_root / "records" / "posts")
+    posts = all_posts if all_posts is not None else load_posts(repo_root / "records" / "posts")
     subject_html = ""
     if show_subject and post.subject:
         subject_html = f'<h3 class="post-subject">{html.escape(post.subject)}</h3>'
@@ -1563,9 +1593,9 @@ def render_compose_reference(post, *, root_thread_id: str, identity_context) -> 
     )
 
 
-def render_moderation_card(record, *, identity_context) -> str:
+def render_moderation_card(record, *, identity_context, posts: list[Post] | None = None) -> str:
     repo_root = get_repo_root()
-    posts = load_posts(repo_root / "records" / "posts")
+    loaded_posts = posts if posts is not None else load_posts(repo_root / "records" / "posts")
     target_href = f"/threads/{html.escape(record.target_id)}" if record.target_type == "thread" else f"/posts/{html.escape(record.target_id)}"
     moderator_html = ""
     if record.identity_id and record.signer_fingerprint:
@@ -1576,7 +1606,7 @@ def render_moderation_card(record, *, identity_context) -> str:
             fallback_display_name=short_identity_label(record.signer_fingerprint),
         )
         moderator_html = (
-            f'<p class="post-identity">moderated by <a href="{html.escape(preferred_profile_href(repo_root=repo_root, posts=posts, identity_context=identity_context, identity_id=canonical_identity_id or record.identity_id))}">'
+            f'<p class="post-identity">moderated by <a href="{html.escape(preferred_profile_href(repo_root=repo_root, posts=loaded_posts, identity_context=identity_context, identity_id=canonical_identity_id or record.identity_id))}">'
             f'{html.escape(display_name)}</a></p>'
         )
     reason_html = (
