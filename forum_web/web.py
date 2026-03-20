@@ -153,9 +153,11 @@ def start_background_post_index_refresh(repo_root: Path, *, mark_startup_ready: 
 
     def run_refresh() -> None:
         try:
+            logger.info("background post-index refresh started for %s", resolved_root)
             rebuild_post_index(resolved_root)
             if mark_startup_ready:
                 _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
+            logger.info("background post-index refresh completed for %s", resolved_root)
         except Exception:
             logger.exception("background post-index refresh failed for %s", resolved_root)
         finally:
@@ -185,6 +187,7 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         "<title>Refreshing forum data</title>"
         "<style>"
+        ":root{color-scheme:light dark;}"
         "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
         ".wrap{min-height:100vh;display:grid;place-items:center;padding:1.5rem;}"
         ".card{width:min(38rem,100%);background:#fbfaf5;border:1px solid rgba(82,101,96,.18);"
@@ -197,6 +200,13 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
         ".actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem;}"
         ".actions a{display:inline-block;padding:.5rem .75rem;border:1px solid rgba(82,101,96,.22);"
         "color:#1f2a28;text-decoration:none;background:#fffaf1;}"
+        "@media (prefers-color-scheme: dark){"
+        "body{background:#111820;color:#e4ece9;}"
+        ".card{background:#18212b;border-color:rgba(162,184,180,.22);box-shadow:0 14px 34px rgba(0,0,0,.42);}"
+        ".kicker{color:#8fc4df;}"
+        ".meta{color:#b4c0bc;}"
+        ".actions a{border-color:rgba(162,184,180,.22);color:#e4ece9;background:#24313c;}"
+        "}"
         "</style>"
         '<meta http-equiv="refresh" content="1;url=' + html.escape(target_path, quote=True) + '">'
         "</head>"
@@ -205,10 +215,9 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
         '<p class="kicker">Preparing Page</p>'
         "<h1>Refreshing forum data</h1>"
         f"<p>{html.escape(status_text)}</p>"
-        '<p class="meta">If this takes longer than expected, you can check the recent slow operations view for the same rebuild.</p>'
+        '<p class="meta">This page retries automatically while the rebuild finishes.</p>'
         '<div class="actions">'
         f'<a href="{html.escape(target_path)}">retry now</a>'
-        '<a href="/operations/slow/">recent slow operations</a>'
         "</div>"
         "</section></main>"
         "<script>"

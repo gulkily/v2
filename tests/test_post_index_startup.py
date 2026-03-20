@@ -149,7 +149,8 @@ class PostIndexStartupTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Refreshing forum data", body)
-        self.assertIn("recent slow operations", body)
+        self.assertIn("prefers-color-scheme: dark", body)
+        self.assertNotIn("recent slow operations", body)
         self.assertNotIn('/assets/site.css', body)
         self.assertNotIn('/assets/username_claim_cta.js', body)
         mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
