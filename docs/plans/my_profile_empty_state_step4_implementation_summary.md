@@ -8,3 +8,13 @@
   - Ran `python -c '...PATH_INFO=\"/profiles/openpgp-alpha\"; QUERY_STRING=\"\"...'` against a temporary empty repo and confirmed `404 Not Found` still returns the generic missing-resource page without the new empty-state markup.
 - Notes:
   - This stage intentionally relies on an explicit self-request marker because the server cannot infer browser-held identity for unpublished profiles on its own.
+
+## Stage 2 - Wire the shared My profile nav to the unpublished-profile route
+- Changes:
+  - Updated [profile_nav.js](/home/wsl/v2/templates/assets/profile_nav.js) so the normal `My profile` destination now resolves to `/profiles/<identity-slug>?self=1` when there are no merge notifications.
+  - Kept the merge-attention behavior unchanged so notification-bearing states still point to `/profiles/<identity-slug>/merge`.
+- Verification:
+  - Ran a Node import smoke test for `enhanceProfileNav(...)` with a generated browser key and merge notifications disabled, and confirmed the resolved href ends with `?self=1`.
+  - Ran the same style of smoke test with merge notifications enabled and confirmed the href still resolves to `/merge` rather than the new empty-state route.
+- Notes:
+  - The self marker is applied only to the direct `My profile` destination, which keeps merge-management links and other canonical profile URLs unchanged.
