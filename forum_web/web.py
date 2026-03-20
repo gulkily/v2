@@ -991,21 +991,45 @@ def render_thread(thread_id: str) -> str:
         else '<p class="status-note">This thread is locked by moderation. New replies are disabled.</p>'
     )
     thread_labels = thread_status_labels(thread_id, moderation_state)
-    thread_meta = f"{visible_reply_count(thread, moderation_state)} visible repl{'y' if visible_reply_count(thread, moderation_state) == 1 else 'ies'} in this thread."
+    visible_replies = visible_reply_count(thread, moderation_state)
+    thread_meta = ""
+    if visible_replies > 0:
+        thread_meta = f"{visible_replies} visible repl{'y' if visible_replies == 1 else 'ies'} in this thread."
     if root_thread_type(thread.root):
-        thread_meta = f"{root_thread_type(thread.root)} thread. {thread_meta}"
+        thread_meta = (
+            f"{root_thread_type(thread.root)} thread. {thread_meta}"
+            if thread_meta
+            else f"{root_thread_type(thread.root)} thread."
+        )
     if thread_labels:
-        thread_meta += " " + " ".join(thread_labels) + "."
+        thread_meta = (
+            thread_meta + " " if thread_meta else ""
+        ) + " ".join(thread_labels) + "."
+    thread_meta_html = ""
+    if thread_meta:
+        thread_meta_html = f'<p class="thread-meta">{thread_meta}</p>'
+    replies_section_html = ""
+    if visible_replies > 0:
+        replies_section_html = (
+            '<section class="panel page-section">'
+            '<div class="section-head page-lede"><h2>Replies</h2></div>'
+            '<div class="post-stack">'
+            + "".join(
+                render_post_card(
+                    reply,
+                    root_thread_id=thread.root.post_id,
+                    identity_context=identity_context,
+                    hidden=post_is_hidden(moderation_state, reply.post_id, thread.root.post_id),
+                    compact_thread_view=True,
+                )
+                for reply in thread.replies
+            )
+            + "</div></section>"
+        )
 
     content = load_template("thread.html").substitute(
-        breadcrumb_html=render_breadcrumb(
-            [
-                ('/', 'board index'),
-                ('/threads/' + thread.root.post_id, 'thread'),
-            ]
-        ),
         thread_heading=html.escape(thread.root.subject or thread.root.post_id),
-        thread_meta=thread_meta,
+        thread_meta_html=thread_meta_html,
         reply_link_html=reply_link_html,
         root_context_html=render_thread_root_context(thread),
         root_post_html=render_post_card(
@@ -1015,25 +1039,18 @@ def render_thread(thread_id: str) -> str:
             compact_thread_view=True,
             show_subject=False,
         ),
-        replies_html="".join(
-            render_post_card(
-                reply,
-                root_thread_id=thread.root.post_id,
-                identity_context=identity_context,
-                hidden=post_is_hidden(moderation_state, reply.post_id, thread.root.post_id),
-                compact_thread_view=True,
-            )
-            for reply in thread.replies
-        ),
+        replies_section_html=replies_section_html,
     )
     return render_page(
         title=thread.root.subject or thread.root.post_id,
-        hero_kicker="Thread View",
-        hero_title=thread.root.subject or thread.root.post_id,
-        hero_text=(
-            "Task threads are typed root posts: the root carries structured task metadata, and replies stay ordinary task comments."
-            if is_task_root(thread.root)
-            else "The thread page is rendered directly from canonical post files without a database, using deterministic reply ordering from the repository state."
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
         ),
         content_html=content,
     )

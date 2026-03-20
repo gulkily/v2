@@ -130,6 +130,28 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn("/compose/reply?thread_id=T01&parent_id=T01", body)
         self.assertNotIn("<h2>Example task thread</h2>", body)
         self.assertEqual(body.count("Example task thread"), 2)
+        self.assertNotIn("Thread View", body)
+        self.assertNotIn("Task threads are typed root posts", body)
+        self.assertNotIn('class="breadcrumb"', body)
+
+    def test_thread_page_hides_empty_reply_metadata_and_section(self) -> None:
+        self.write_record(
+            "records/posts/thread-empty.txt",
+            """
+            Post-ID: thread-empty
+            Board-Tags: general
+            Subject: Empty thread
+
+            Root body.
+            """,
+        )
+
+        status, _, body = self.get("/threads/thread-empty")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn("0 visible replies in this thread", body)
+        self.assertNotIn("<h2>Replies</h2>", body)
+        self.assertNotIn('class="breadcrumb"', body)
 
     def test_task_thread_page_hides_low_value_slug_metadata_and_formats_permalink(self) -> None:
         status, _, body = self.get("/threads/T01")

@@ -1,6 +1,6 @@
 <section class="panel page-section">
-  ${breadcrumb_html}
-  <p class="thread-meta">${thread_meta}</p>
+  <h1>${thread_heading}</h1>
+  ${thread_meta_html}
   <div class="link-cluster">
     ${reply_link_html}
   </div>
@@ -8,11 +8,4 @@
   ${root_post_html}
 </section>
 
-<section class="panel page-section">
-  <div class="section-head page-lede">
-    <h2>Replies</h2>
-  </div>
-  <div class="post-stack">
-    ${replies_html}
-  </div>
-</section>
+${replies_section_html}
