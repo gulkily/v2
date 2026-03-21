@@ -287,6 +287,31 @@ class PostIndexStartupTests(unittest.TestCase):
         )
         mock_startup.assert_not_called()
 
+    def test_cgi_style_rebuild_request_bypasses_buffered_status_contract(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=0,
+            indexed_head=None,
+            current_head="test-head",
+            indexed_schema_version=None,
+            count_mismatch=True,
+            head_mismatch=True,
+            schema_mismatch=True,
+        )
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                status, _, body = self.request(
+                    "/",
+                    query_string="__forum_rebuild=1",
+                    extra_environ={"wsgi.run_once": True},
+                )
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn("Refreshing forum data", body)
+        mock_startup.assert_called_once_with(self.repo_root)
+
 
 if __name__ == "__main__":
     unittest.main()
