@@ -77,6 +77,35 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(request.command, "git-recover")
         self.assertTrue(request.git_recover_apply)
 
+    def test_parse_task_args_accepts_content_purge_preview(self) -> None:
+        _, request = self.module.parse_task_args(["content-purge", "records/posts", "records/identity"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "content-purge")
+        self.assertEqual(request.content_purge_paths, ("records/posts", "records/identity"))
+        self.assertFalse(request.content_purge_apply)
+        self.assertFalse(request.content_purge_force)
+        self.assertIsNone(request.content_purge_archive_output)
+
+    def test_parse_task_args_accepts_content_purge_apply_options(self) -> None:
+        _, request = self.module.parse_task_args(
+            [
+                "content-purge",
+                "records/posts",
+                "--archive-output",
+                "/tmp/archive.zip",
+                "--apply",
+                "--force",
+            ]
+        )
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "content-purge")
+        self.assertEqual(request.content_purge_paths, ("records/posts",))
+        self.assertEqual(request.content_purge_archive_output, "/tmp/archive.zip")
+        self.assertTrue(request.content_purge_apply)
+        self.assertTrue(request.content_purge_force)
+
     def test_parse_task_args_accepts_rebuild_index(self) -> None:
         _, request = self.module.parse_task_args(["rebuild-index"])
 
@@ -192,6 +221,27 @@ class ForumTasksTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         mocked.assert_called_once_with(self.repo_root, apply=True)
+
+    def test_run_task_dispatches_content_purge_preview(self) -> None:
+        request = self.module.TaskRequest(
+            command="content-purge",
+            content_purge_paths=("records/posts", "records/identity"),
+            content_purge_archive_output="/tmp/archive.zip",
+            content_purge_apply=False,
+            content_purge_force=True,
+        )
+
+        with mock.patch.object(self.module, "run_content_purge", return_value=0) as mocked:
+            exit_code = self.module.run_task(request)
+
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            self.repo_root,
+            paths=["records/posts", "records/identity"],
+            archive_output=Path("/tmp/archive.zip"),
+            dry_run=True,
+            force=True,
+        )
 
     def test_run_task_dispatches_rebuild_index(self) -> None:
         request = self.module.TaskRequest(command="rebuild-index", rebuild_index_repo_root="/tmp/forum-data")

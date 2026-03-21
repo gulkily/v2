@@ -20,6 +20,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from forum_git_recover import run_git_recover
+from forum_content_purge import run_content_purge
 
 from forum_core.post_index import rebuild_post_index
 from forum_core.runtime_env import (
@@ -46,6 +47,10 @@ class TaskRequest:
     install_target: str | None = None
     test_pattern: str | None = None
     git_recover_apply: bool = False
+    content_purge_paths: tuple[str, ...] = ()
+    content_purge_archive_output: str | None = None
+    content_purge_apply: bool = False
+    content_purge_force: bool = False
     rebuild_index_repo_root: str | None = None
     public_web_root: str | None = None
     app_root: str | None = None
@@ -81,6 +86,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="Apply a repair by resetting the checkout to the expected deployment state.",
+    )
+    content_purge_parser = subparsers.add_parser(
+        "content-purge",
+        help="Preview or apply archival-plus-history purge for selected records paths.",
+    )
+    content_purge_parser.add_argument(
+        "paths",
+        nargs="+",
+        help="Canonical repository-backed content paths to archive and purge.",
+    )
+    content_purge_parser.add_argument(
+        "--archive-output",
+        help="Optional output path for the generated archive.",
+    )
+    content_purge_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply the purge workflow instead of previewing it.",
+    )
+    content_purge_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow the workflow to continue past future safety prompts when supported.",
     )
     rebuild_index_parser = subparsers.add_parser(
         "rebuild-index",
@@ -131,6 +159,14 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         return parser, TaskRequest(command="env-sync")
     if args.command == "git-recover":
         return parser, TaskRequest(command="git-recover", git_recover_apply=bool(args.apply))
+    if args.command == "content-purge":
+        return parser, TaskRequest(
+            command="content-purge",
+            content_purge_paths=tuple(args.paths),
+            content_purge_archive_output=args.archive_output,
+            content_purge_apply=bool(args.apply),
+            content_purge_force=bool(args.force),
+        )
     if args.command == "rebuild-index":
         return parser, TaskRequest(command="rebuild-index", rebuild_index_repo_root=args.repo_root)
     if args.command == "php-host-setup":
@@ -156,6 +192,18 @@ def run_task(request: TaskRequest) -> int:
         return run_env_sync()
     if request.command == "git-recover":
         return run_git_recover(REPO_ROOT, apply=request.git_recover_apply)
+    if request.command == "content-purge":
+        return run_content_purge(
+            REPO_ROOT,
+            paths=list(request.content_purge_paths),
+            archive_output=(
+                Path(request.content_purge_archive_output)
+                if request.content_purge_archive_output
+                else None
+            ),
+            dry_run=not request.content_purge_apply,
+            force=request.content_purge_force,
+        )
     if request.command == "rebuild-index":
         return run_rebuild_index(repo_root_text=request.rebuild_index_repo_root)
     if request.command == "php-host-setup":
