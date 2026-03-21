@@ -692,6 +692,83 @@ class PostIndexBuildTests(unittest.TestCase):
         finally:
             index.connection.close()
 
+    def test_ensure_post_index_current_fast_forwards_head_drift_without_full_rebuild(self) -> None:
+        self.write_post(
+            "records/posts/root-200.txt",
+            """
+            Post-ID: root-200
+            Board-Tags: general
+            Subject: Stored post
+
+            Stored body.
+            """,
+        )
+        self.commit_all("Add root", "2026-03-18T10:00:00+00:00")
+        rebuild_post_index(self.repo_root)
+        self.run_git(
+            "commit",
+            "--allow-empty",
+            "-m",
+            "noop drift",
+            env={
+                "GIT_AUTHOR_DATE": "2026-03-18T11:00:00+00:00",
+                "GIT_COMMITTER_DATE": "2026-03-18T11:00:00+00:00",
+                "PATH": os.environ["PATH"],
+            },
+        )
+
+        with mock.patch(
+            "forum_core.post_index.rebuild_post_index",
+            side_effect=AssertionError("full rebuild should not run for compatible head drift"),
+        ):
+            index = ensure_post_index_current(self.repo_root)
+        try:
+            indexed_head = get_index_metadata(index.connection, "indexed_head")
+            current_head = self.run_git("rev-parse", "HEAD")
+            self.assertEqual(indexed_head, current_head)
+        finally:
+            index.connection.close()
+
+    def test_ensure_post_index_current_falls_back_to_full_rebuild_for_deleted_post_commit(self) -> None:
+        self.write_post(
+            "records/posts/root-200.txt",
+            """
+            Post-ID: root-200
+            Board-Tags: general
+            Subject: First root
+
+            First body.
+            """,
+        )
+        self.write_post(
+            "records/posts/root-201.txt",
+            """
+            Post-ID: root-201
+            Board-Tags: general
+            Subject: Second root
+
+            Second body.
+            """,
+        )
+        self.commit_all("Add roots", "2026-03-18T10:00:00+00:00")
+        rebuild_post_index(self.repo_root)
+
+        (self.repo_root / "records" / "posts" / "root-201.txt").unlink()
+        self.commit_all("Delete root", "2026-03-18T11:00:00+00:00")
+
+        index = ensure_post_index_current(self.repo_root)
+        try:
+            rows = index.connection.execute(
+                "SELECT post_id FROM posts ORDER BY post_id"
+            ).fetchall()
+            self.assertEqual([row["post_id"] for row in rows], ["root-200"])
+            self.assertEqual(
+                get_index_metadata(index.connection, "indexed_head"),
+                self.run_git("rev-parse", "HEAD"),
+            )
+        finally:
+            index.connection.close()
+
     def test_incremental_refresh_uses_touched_path_timestamps_only(self) -> None:
         first_payload_text = dedent(
             """

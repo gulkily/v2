@@ -7,3 +7,14 @@
   - `python -m unittest tests.test_post_index.PostIndexSchemaTests.test_post_index_readiness_reports_current_index_without_rebuild tests.test_post_index.PostIndexSchemaTests.test_post_index_readiness_reports_stale_index_when_head_drifts tests.test_post_index.PostIndexSchemaTests.test_post_index_readiness_requires_full_rebuild_when_schema_compatibility_metadata_is_missing`
 - Notes:
   - Stage 1 does not change recovery execution yet; `ensure_post_index_current(...)` still runs the existing rebuild path after classifying the stale state.
+
+## Stage 2 - Fast-forward compatible head drift through incremental catch-up
+- Changes:
+  - Added commit-range and per-commit touched-path helpers in `forum_core/post_index.py` so compatible head drift can be replayed through the existing `refresh_post_index_after_commit(...)` path.
+  - Updated `ensure_post_index_current(...)` to attempt incremental catch-up when readiness resolves to `incremental_catch_up`, then fall back to the existing full rebuild path when the commit range is unsafe or unsupported.
+  - Kept incremental catch-up intentionally narrow: commits touching `records/identity-links/`, unsupported change statuses, or unsafe history shapes fall back to full rebuild instead of forcing broader refresh semantics.
+- Verification:
+  - `python -m unittest tests.test_post_index.PostIndexBuildTests.test_ensure_post_index_current_fast_forwards_head_drift_without_full_rebuild tests.test_post_index.PostIndexBuildTests.test_ensure_post_index_current_falls_back_to_full_rebuild_for_deleted_post_commit`
+  - Manual smoke check with a disposable repo and an empty follow-up commit confirmed `ensure_post_index_current(...)` advanced `indexed_head` to the new `HEAD` without a full rebuild path.
+- Notes:
+  - This stage reduces rebuild frequency only for safe, replayable head drift. Unsupported history patterns still intentionally use the canonical full rebuild contract.

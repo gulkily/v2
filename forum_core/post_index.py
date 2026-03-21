@@ -358,6 +358,101 @@ def current_repo_head(repo_root: Path) -> str | None:
     return result.stdout.strip() or None
 
 
+def _commit_is_ancestor(repo_root: Path, *, ancestor_commit: str, descendant_commit: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", ancestor_commit, descendant_commit],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def commit_range(repo_root: Path, *, start_head: str, end_head: str) -> tuple[str, ...]:
+    if not _commit_is_ancestor(repo_root, ancestor_commit=start_head, descendant_commit=end_head):
+        return ()
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-list", "--reverse", f"{start_head}..{end_head}"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ()
+    return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
+
+
+def _path_can_use_incremental_catch_up(relative_path: str) -> bool:
+    if relative_path.startswith("records/posts/"):
+        return relative_path.endswith(".txt")
+    return (
+        relative_path.startswith("records/profile-updates/")
+        or relative_path.startswith("records/identity/")
+    )
+
+
+def commit_touched_paths(repo_root: Path, *, commit_id: str) -> tuple[str, ...] | None:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "diff-tree", "--root", "--no-commit-id", "--name-status", "-r", commit_id],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    touched_paths: list[str] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t")
+        status = parts[0]
+        changed_paths = tuple(candidate for candidate in parts[1:] if candidate)
+        if not changed_paths:
+            return None
+        if any(path.startswith("records/identity-links/") for path in changed_paths):
+            return None
+        relevant_paths = tuple(path for path in changed_paths if _path_can_use_incremental_catch_up(path))
+        if not relevant_paths:
+            continue
+        if status not in {"A", "M"}:
+            return None
+        touched_paths.extend(relevant_paths)
+    return tuple(dict.fromkeys(touched_paths))
+
+
+def catch_up_post_index_between_heads(
+    repo_root: Path,
+    *,
+    start_head: str,
+    end_head: str,
+    timing_callback: PhaseTimingCallback | None = None,
+) -> bool:
+    commit_ids = commit_range(repo_root, start_head=start_head, end_head=end_head)
+    if not commit_ids:
+        return False
+    with tracked_operation(
+        repo_root,
+        operation_kind="maintenance",
+        operation_name="post_index_incremental_catch_up",
+        metadata={"entry_point": "catch_up_post_index_between_heads"},
+    ):
+        for commit_id in commit_ids:
+            touched_paths = commit_touched_paths(repo_root, commit_id=commit_id)
+            if touched_paths is None:
+                return False
+            refresh_post_index_after_commit(
+                repo_root,
+                commit_id=commit_id,
+                touched_paths=touched_paths,
+                timing_callback=timing_callback,
+            )
+    return True
+
+
 def _record_phase_timing(
     timing_callback: PhaseTimingCallback | None,
     *,
@@ -1006,7 +1101,7 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
         readiness = _post_index_readiness_for_index(repo_root, index=index)
         if readiness.requires_rebuild:
             logger.warning(
-                "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
+                "post index recovery triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
                 "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
                 "indexed_schema_compatibility_version=%r expected_schema_version=%r expected_schema_compatibility_version=%r "
                 "recovery_kind=%s recovery_reason=%s",
@@ -1025,6 +1120,16 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
                 readiness.resolved_recovery_kind,
                 readiness.resolved_recovery_reason,
             )
+            if readiness.resolved_recovery_kind == "incremental_catch_up":
+                index.connection.close()
+                catch_up_succeeded = catch_up_post_index_between_heads(
+                    repo_root,
+                    start_head=readiness.indexed_head,
+                    end_head=readiness.current_head,
+                )
+                if catch_up_succeeded:
+                    return open_post_index(repo_root)
+                index = open_post_index(repo_root)
             rebuild_post_index(repo_root, index=index)
         return index
 
