@@ -181,16 +181,6 @@ def repair_checkout(repo_root: Path, diagnosis: RepoDiagnosis) -> RepairResult:
             ),
         )
     guarded = tuple(issue for issue in diagnosis.issues if issue.code in guarded_issue_codes)
-    if guarded:
-        guarded_lines = tuple(f"{issue.summary}: {issue.detail}" for issue in guarded)
-        return RepairResult(
-            succeeded=False,
-            summary="Automatic repair stopped to avoid discarding local work.",
-            details=guarded_lines
-            + (
-                "Clean up or intentionally discard local commits/changes before running `./forum git-recover --apply` again.",
-            ),
-        )
 
     details: list[str] = []
     fetch_result = git(repo_root, "fetch", "origin")
@@ -204,6 +194,25 @@ def repair_checkout(repo_root: Path, diagnosis: RepoDiagnosis) -> RepairResult:
             summary="Automatic repair could not fetch `origin`.",
             details=_error_lines(fetch_result),
         )
+
+    if guarded:
+        reset_worktree = git(repo_root, "reset", "--hard", "HEAD")
+        if reset_worktree.returncode != 0:
+            return RepairResult(
+                succeeded=False,
+                summary="Automatic repair could not discard tracked working-tree changes.",
+                details=_error_lines(reset_worktree),
+            )
+        details.append("Discarded staged and tracked working-tree changes.")
+
+        clean_result = git(repo_root, "clean", "-fd")
+        if clean_result.returncode != 0:
+            return RepairResult(
+                succeeded=False,
+                summary="Automatic repair could not remove untracked files.",
+                details=_error_lines(clean_result),
+            )
+        details.append("Removed untracked files that could block checkout recovery.")
 
     pull_ff = git(repo_root, "config", "pull.ff", TARGET_PULL_FF)
     if pull_ff.returncode != 0:

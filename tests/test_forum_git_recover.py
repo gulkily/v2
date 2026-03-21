@@ -256,18 +256,19 @@ class ForumGitRecoverTests(unittest.TestCase):
         self.assertTrue(recovered.is_healthy)
         self.assertEqual(self.git(clone, "branch", "--show-current").stdout.strip(), "main")
 
-    def test_repair_checkout_blocks_branch_ahead_state(self) -> None:
+    def test_repair_checkout_discards_branch_ahead_state(self) -> None:
         _, _, clone = self.setup_origin_clone()
         self.commit_file(clone, "local.txt", "local\n", "local update")
         diagnosis = self.module.diagnose_repo(clone)
 
         repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
 
-        self.assertFalse(repair.succeeded)
-        self.assertIn("discarding local work", repair.summary)
-        self.assertTrue(any("Branch ahead of upstream" in line for line in repair.details))
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertFalse((clone / "local.txt").exists())
 
-    def test_repair_checkout_blocks_branch_diverged_state(self) -> None:
+    def test_repair_checkout_recovers_diverged_branch(self) -> None:
         origin, _, clone = self.setup_origin_clone()
         updater = self.clone_origin(origin, "updater")
         self.commit_file(clone, "local.txt", "local\n", "local update")
@@ -277,11 +278,14 @@ class ForumGitRecoverTests(unittest.TestCase):
         diagnosis = self.module.diagnose_repo(clone)
 
         repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
 
-        self.assertFalse(repair.succeeded)
-        self.assertTrue(any("Branch diverged from upstream" in line for line in repair.details))
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertEqual(self.git(clone, "rev-parse", "HEAD").stdout.strip(), self.git(clone, "rev-parse", "origin/main").stdout.strip())
+        self.assertFalse((clone / "local.txt").exists())
 
-    def test_repair_checkout_blocks_local_file_changes(self) -> None:
+    def test_repair_checkout_discards_local_file_changes(self) -> None:
         _, _, clone = self.setup_origin_clone()
         tracked_path = clone / "base.txt"
         tracked_path.write_text("modified\n", encoding="utf-8")
@@ -291,8 +295,9 @@ class ForumGitRecoverTests(unittest.TestCase):
         diagnosis = self.module.diagnose_repo(clone)
 
         repair = self.module.repair_checkout(clone, diagnosis)
+        recovered = self.module.diagnose_repo(clone)
 
-        self.assertFalse(repair.succeeded)
-        self.assertTrue(any("Staged but uncommitted changes" in line for line in repair.details))
-        self.assertTrue(any("Tracked working-tree changes" in line for line in repair.details))
-        self.assertTrue(any("Untracked-file obstruction risk" in line for line in repair.details))
+        self.assertTrue(repair.succeeded)
+        self.assertTrue(recovered.is_healthy)
+        self.assertEqual((clone / "base.txt").read_text(encoding="utf-8"), "base\n")
+        self.assertFalse((clone / "scratch.txt").exists())

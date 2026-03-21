@@ -9,7 +9,7 @@ Use `./forum` as the short repo-root command for common local tasks.
 - `./forum install --target current`: install into the current Python environment.
 - `./forum env-sync`: append missing `.env` settings from `.env.example` without overwriting existing values.
 - `./forum git-recover`: diagnose the current checkout for common deploy-sync git failures.
-- `./forum git-recover --apply`: repair supported clean checkout states back to local `main` tracking `origin/main`.
+- `./forum git-recover --apply`: reset the checkout back to local `main` tracking `origin/main`, discarding local commits and working-tree changes when needed.
 - `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
 - `./forum start`: run the local read-only forum server.
 - `./forum test`: run the full unittest suite.
@@ -19,8 +19,7 @@ The command contract is intentionally small: future backends such as Perl should
 
 ## Git recovery
 - `./forum git-recover` is the canonical operator diagnosis path when a checkout is failing normal `git pull`.
-- In this slice, `--apply` auto-recovers only clean high-likelihood states such as detached `HEAD`, wrong branch, missing or incorrect upstream, behind-upstream drift, and pull-strategy normalization.
-- `--apply` refuses risky states that could discard local work, including local commits ahead/diverged from upstream and staged, tracked, or untracked working-tree changes.
+- `--apply` resets the checkout to the expected deployment state and may discard local commits, staged changes, tracked edits, and untracked files to get back to `origin/main`.
 - Mid-operation states such as rebase-in-progress and merge-in-progress are diagnosed, but still require explicit operator resolution before rerunning `--apply`.
 
 ## Direct entrypoints still supported

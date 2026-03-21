@@ -78,7 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
     git_recover_parser.add_argument(
         "--apply",
         action="store_true",
-        help="Apply a repair when the current repo state is safely recoverable.",
+        help="Apply a repair by resetting the checkout to the expected deployment state.",
     )
     php_host_parser = subparsers.add_parser(
         "php-host-setup",
