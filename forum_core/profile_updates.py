@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from forum_core.public_keys import resolve_public_key_from_signature
 
 ALLOWED_PROFILE_UPDATE_ACTIONS = ("set_display_name",)
 MAX_DISPLAY_NAME_LENGTH = 80
+PREVENT_DUPLICATE_USERNAMES_ENV = "FORUM_PREVENT_DUPLICATE_USERNAMES"
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,12 @@ def profile_update_sort_key(record: ProfileUpdateRecord) -> tuple[str, str]:
 
 def profile_update_records_dir(repo_root: Path) -> Path:
     return repo_root / "records" / "profile-updates"
+
+
+def prevent_duplicate_usernames_enabled(env: dict[str, str] | None = None) -> bool:
+    source_env = os.environ if env is None else env
+    raw_value = source_env.get(PREVENT_DUPLICATE_USERNAMES_ENV, "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
 
 
 def ensure_timestamp_text(timestamp_text: str) -> str:

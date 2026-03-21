@@ -7,11 +7,14 @@ from pathlib import Path
 
 from forum_core.identity import build_identity_id
 from forum_core.operation_events import emit_operation_timing
+from forum_core.post_index import load_indexed_username_claims
 from forum_core.profile_updates import (
+    PREVENT_DUPLICATE_USERNAMES_ENV,
     ProfileUpdateRecord,
     has_visible_profile_update_for_source_identity,
     load_profile_update_records,
     parse_profile_update_text,
+    prevent_duplicate_usernames_enabled,
     profile_update_records_dir,
 )
 from forum_core.public_keys import resolve_canonical_public_key_path, store_or_reuse_public_key
@@ -25,6 +28,7 @@ from forum_cgi.posting import (
 )
 from forum_cgi.signing import verify_detached_signature
 from forum_web.profiles import load_identity_context
+from forum_web.profiles import username_route_token
 from forum_web.repository import load_posts
 
 logger = logging.getLogger(__name__)
@@ -89,6 +93,13 @@ def validate_profile_update_record(
             f"unknown source identity: {record.source_identity_id}",
             status="404 Not Found",
         )
+    canonical_identity_id = identity_context.canonical_identity_id(record.source_identity_id)
+    if canonical_identity_id is None:
+        raise PostingError(
+            "not_found",
+            f"unknown source identity: {record.source_identity_id}",
+            status="404 Not Found",
+        )
     if has_visible_profile_update_for_source_identity(
         source_identity_id=record.source_identity_id,
         profile_updates=profile_updates,
@@ -99,6 +110,15 @@ def validate_profile_update_record(
             "username/display name can only be claimed once per signer identity",
             status="403 Forbidden",
         )
+    if prevent_duplicate_usernames_enabled():
+        username_token = username_route_token(record.display_name)
+        duplicate_claims = load_indexed_username_claims(repo_root, username_token=username_token)
+        if any(claim.canonical_identity_id != canonical_identity_id for claim in duplicate_claims):
+            raise PostingError(
+                "conflict",
+                f"username/display name is already claimed by another account; disable {PREVENT_DUPLICATE_USERNAMES_ENV} to allow duplicates",
+                status="409 Conflict",
+            )
 
 
 def build_profile_update_preview(record: ProfileUpdateRecord, repo_root: Path) -> ProfileUpdateSubmissionResult:

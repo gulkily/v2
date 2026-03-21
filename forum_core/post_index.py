@@ -1066,6 +1066,9 @@ def _post_index_readiness_for_index(repo_root: Path, *, index: PostIndex) -> Pos
     elif not index_schema_compatibility_is_current(index.connection):
         recovery_kind = "full_rebuild"
         recovery_reason = "schema_compatibility_mismatch"
+    elif current_head is None and indexed_head is None and not count_mismatch:
+        recovery_kind = "current"
+        recovery_reason = "current"
     elif current_head is None or indexed_head is None:
         recovery_kind = "full_rebuild"
         recovery_reason = "missing_head_metadata"

@@ -99,10 +99,13 @@ process.stdout.write(JSON.stringify({{
         return json.loads(self.run_node_module(script))
 
     def sign_payload(self, payload_text: str) -> str:
+        return self.sign_payload_with_private_key(payload_text, self.private_key_text)
+
+    def sign_payload_with_private_key(self, payload_text: str, private_key_text: str) -> str:
         script = f"""
 import * as openpgp from {json.dumps(self.openpgp_module_url)};
 const privateKey = await openpgp.readPrivateKey({{
-  armoredKey: {json.dumps(self.private_key_text)},
+  armoredKey: {json.dumps(private_key_text)},
 }});
 const message = await openpgp.createMessage({{
   text: {json.dumps(payload_text)},
@@ -341,6 +344,144 @@ process.stdout.write(signature);
         self.assertNotIn("SecondName", profile_body)
 
         self.assertFalse((self.repo_root / "records/profile-updates/profile-update-test-006.txt").exists())
+
+    def test_api_update_profile_allows_duplicate_username_when_flag_is_off(self) -> None:
+        shared_name = "SharedName"
+        first_generated = self.generate_signing_keypair()
+        first_identity_id = build_identity_id(fingerprint_from_public_key_text(first_generated["publicKey"]))
+        second_generated = self.generate_signing_keypair()
+        second_identity_id = build_identity_id(fingerprint_from_public_key_text(second_generated["publicKey"]))
+
+        for index, (identity_id, public_key_text) in enumerate(
+            (
+                (first_identity_id, first_generated["publicKey"]),
+                (second_identity_id, second_generated["publicKey"]),
+            ),
+            start=1,
+        ):
+            bootstrap_record_id, bootstrap_payload = build_bootstrap_payload(
+                identity_id=identity_id,
+                signer_fingerprint=fingerprint_from_public_key_text(public_key_text),
+                bootstrap_post_id=f"root-identity-{index}",
+                bootstrap_thread_id=f"root-identity-{index}",
+                public_key_text=public_key_text,
+            )
+            self.write_record(f"records/identity/{bootstrap_record_id}.txt", bootstrap_payload)
+
+        first_payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-007
+            Action: set_display_name
+            Source-Identity-ID: {first_identity_id}
+            Timestamp: 2026-03-14T12:06:00Z
+
+            {shared_name}
+            """
+        ).lstrip()
+        first_request_body = json.dumps(
+            {
+                "payload": first_payload_text,
+                "signature": self.sign_payload_with_private_key(first_payload_text, first_generated["privateKey"]),
+                "public_key": first_generated["publicKey"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
+
+        second_payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-008
+            Action: set_display_name
+            Source-Identity-ID: {second_identity_id}
+            Timestamp: 2026-03-14T12:07:00Z
+
+            {shared_name}
+            """
+        ).lstrip()
+        second_request_body = json.dumps(
+            {
+                "payload": second_payload_text,
+                "signature": self.sign_payload_with_private_key(second_payload_text, second_generated["privateKey"]),
+                "public_key": second_generated["publicKey"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+        second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
+
+        self.assertEqual(first_status, "200 OK")
+        self.assertEqual(second_status, "200 OK")
+        self.assertIn("Record-ID: profile-update-test-008", second_body)
+
+    def test_api_update_profile_rejects_duplicate_username_when_flag_is_on(self) -> None:
+        shared_name = "SharedName"
+        first_generated = self.generate_signing_keypair()
+        first_identity_id = build_identity_id(fingerprint_from_public_key_text(first_generated["publicKey"]))
+        second_generated = self.generate_signing_keypair()
+        second_identity_id = build_identity_id(fingerprint_from_public_key_text(second_generated["publicKey"]))
+
+        for index, (identity_id, public_key_text) in enumerate(
+            (
+                (first_identity_id, first_generated["publicKey"]),
+                (second_identity_id, second_generated["publicKey"]),
+            ),
+            start=1,
+        ):
+            bootstrap_record_id, bootstrap_payload = build_bootstrap_payload(
+                identity_id=identity_id,
+                signer_fingerprint=fingerprint_from_public_key_text(public_key_text),
+                bootstrap_post_id=f"root-identity-flag-{index}",
+                bootstrap_thread_id=f"root-identity-flag-{index}",
+                public_key_text=public_key_text,
+            )
+            self.write_record(f"records/identity/{bootstrap_record_id}.txt", bootstrap_payload)
+
+        first_payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-009
+            Action: set_display_name
+            Source-Identity-ID: {first_identity_id}
+            Timestamp: 2026-03-14T12:08:00Z
+
+            {shared_name}
+            """
+        ).lstrip()
+        first_request_body = json.dumps(
+            {
+                "payload": first_payload_text,
+                "signature": self.sign_payload_with_private_key(first_payload_text, first_generated["privateKey"]),
+                "public_key": first_generated["publicKey"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        second_payload_text = dedent(
+            f"""
+            Record-ID: profile-update-test-010
+            Action: set_display_name
+            Source-Identity-ID: {second_identity_id}
+            Timestamp: 2026-03-14T12:09:00Z
+
+            {shared_name}
+            """
+        ).lstrip()
+        second_request_body = json.dumps(
+            {
+                "payload": second_payload_text,
+                "signature": self.sign_payload_with_private_key(second_payload_text, second_generated["privateKey"]),
+                "public_key": second_generated["publicKey"],
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        with mock.patch.dict(os.environ, {"FORUM_PREVENT_DUPLICATE_USERNAMES": "yes"}, clear=False):
+            first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
+            second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
+
+        self.assertEqual(first_status, "200 OK")
+        self.assertEqual(second_status, "409 Conflict")
+        self.assertIn("Error-Code: conflict", second_body)
+        self.assertIn("username/display name is already claimed by another account", second_body)
+        self.assertFalse((self.repo_root / "records/profile-updates/profile-update-test-010.txt").exists())
 
 
 if __name__ == "__main__":
