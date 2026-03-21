@@ -10,6 +10,7 @@ Use `./forum` as the short repo-root command for common local tasks.
 - `./forum env-sync`: append missing `.env` settings from `.env.example` without overwriting existing values.
 - `./forum git-recover`: diagnose the current checkout for common deploy-sync git failures.
 - `./forum git-recover --apply`: reset the checkout back to local `main` tracking `origin/main`, discarding local commits and working-tree changes when needed.
+- `./forum rebuild-index`: force a full rebuild of the derived post index for the current checkout.
 - `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
 - `./forum start`: run the local read-only forum server.
 - `./forum test`: run the full unittest suite.

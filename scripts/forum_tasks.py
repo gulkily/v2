@@ -21,6 +21,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from forum_git_recover import run_git_recover
 
+from forum_core.post_index import rebuild_post_index
 from forum_core.runtime_env import (
     dotenv_available,
     get_missing_env_defaults,
@@ -45,6 +46,7 @@ class TaskRequest:
     install_target: str | None = None
     test_pattern: str | None = None
     git_recover_apply: bool = False
+    rebuild_index_repo_root: str | None = None
     public_web_root: str | None = None
     app_root: str | None = None
     repo_root: str | None = None
@@ -79,6 +81,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="Apply a repair by resetting the checkout to the expected deployment state.",
+    )
+    rebuild_index_parser = subparsers.add_parser(
+        "rebuild-index",
+        help="Manually rebuild the derived post index.",
+    )
+    rebuild_index_parser.add_argument(
+        "--repo-root",
+        help="Override the forum data repository path. Defaults to the current checkout root.",
     )
     php_host_parser = subparsers.add_parser(
         "php-host-setup",
@@ -121,6 +131,8 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         return parser, TaskRequest(command="env-sync")
     if args.command == "git-recover":
         return parser, TaskRequest(command="git-recover", git_recover_apply=bool(args.apply))
+    if args.command == "rebuild-index":
+        return parser, TaskRequest(command="rebuild-index", rebuild_index_repo_root=args.repo_root)
     if args.command == "php-host-setup":
         return parser, TaskRequest(
             command="php-host-setup",
@@ -144,6 +156,8 @@ def run_task(request: TaskRequest) -> int:
         return run_env_sync()
     if request.command == "git-recover":
         return run_git_recover(REPO_ROOT, apply=request.git_recover_apply)
+    if request.command == "rebuild-index":
+        return run_rebuild_index(repo_root_text=request.rebuild_index_repo_root)
     if request.command == "php-host-setup":
         return run_php_host_setup(request)
     if request.command == "start":
@@ -233,6 +247,13 @@ def run_start() -> int:
         return 1
     command = [sys.executable, str(REPO_ROOT / "scripts/run_read_only.py")]
     return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
+
+
+def run_rebuild_index(*, repo_root_text: str | None = None) -> int:
+    repo_root = (Path(repo_root_text).expanduser() if repo_root_text else REPO_ROOT).resolve()
+    rebuild_post_index(repo_root)
+    print(f"Rebuilt post index for {repo_root}")
+    return 0
 
 
 def run_php_host_setup(request: TaskRequest) -> int:

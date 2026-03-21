@@ -77,6 +77,20 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(request.command, "git-recover")
         self.assertTrue(request.git_recover_apply)
 
+    def test_parse_task_args_accepts_rebuild_index(self) -> None:
+        _, request = self.module.parse_task_args(["rebuild-index"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "rebuild-index")
+        self.assertIsNone(request.rebuild_index_repo_root)
+
+    def test_parse_task_args_accepts_rebuild_index_repo_root_override(self) -> None:
+        _, request = self.module.parse_task_args(["rebuild-index", "--repo-root", "/tmp/forum-data"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "rebuild-index")
+        self.assertEqual(request.rebuild_index_repo_root, "/tmp/forum-data")
+
     def test_run_env_sync_creates_env_from_example(self) -> None:
         self.write_example("# FORUM_HOST=127.0.0.1\nFORUM_PORT=8000\n")
 
@@ -178,6 +192,28 @@ class ForumTasksTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         mocked.assert_called_once_with(self.repo_root, apply=True)
+
+    def test_run_task_dispatches_rebuild_index(self) -> None:
+        request = self.module.TaskRequest(command="rebuild-index", rebuild_index_repo_root="/tmp/forum-data")
+
+        with mock.patch.object(self.module, "run_rebuild_index", return_value=0) as mocked:
+            exit_code = self.module.run_task(request)
+
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(repo_root_text="/tmp/forum-data")
+
+    def test_run_rebuild_index_rebuilds_post_index_for_current_repo_root(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with mock.patch.object(self.module, "rebuild_post_index") as mocked:
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = self.module.run_rebuild_index()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        mocked.assert_called_once_with(self.repo_root.resolve())
+        self.assertIn("Rebuilt post index for", stdout.getvalue())
 
     def test_parse_task_args_accepts_php_host_setup(self) -> None:
         _, request = self.module.parse_task_args(["php-host-setup", "/tmp/public"])
