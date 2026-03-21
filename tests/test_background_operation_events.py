@@ -53,6 +53,17 @@ class BackgroundOperationEventsTests(unittest.TestCase):
         self.assertEqual(event.state, "completed")
         self.assertIn("post_index_load_posts", tuple(step.name for step in event.steps))
 
+    def test_rebuild_post_index_records_detailed_timestamp_substeps(self) -> None:
+        rebuild_post_index(self.repo_root)
+
+        operations = load_recent_operations(self.repo_root)
+        event = next(operation for operation in operations if operation.operation_name == "post_index_rebuild")
+        step_names = tuple(step.name for step in event.steps)
+
+        self.assertIn("post_index_commit_timestamp_paths", step_names)
+        self.assertIn("post_index_commit_timestamp_git_logs", step_names)
+        self.assertIn("post_index_commit_timestamps", step_names)
+
 
 if __name__ == "__main__":
     unittest.main()

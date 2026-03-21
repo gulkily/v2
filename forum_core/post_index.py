@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import sqlite3
 import subprocess
@@ -310,25 +311,66 @@ def current_repo_head(repo_root: Path) -> str | None:
     return result.stdout.strip() or None
 
 
-def post_commit_timestamps(repo_root: Path) -> dict[str, PostCommitTimestamps]:
-    timestamps: dict[str, PostCommitTimestamps] = {}
-    for path in sorted(records_posts_dir(repo_root).glob("*.txt")):
-        relative_path = str(path.relative_to(repo_root))
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), "log", "--follow", "--format=%cI", "--", relative_path],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+def _record_phase_timing(
+    timing_callback: PhaseTimingCallback | None,
+    *,
+    phase_name: str,
+    started_at: float,
+) -> None:
+    emit_operation_timing(timing_callback, phase_name, (time.perf_counter() - started_at) * 1000.0)
+
+
+def _post_record_relative_paths(repo_root: Path) -> tuple[str, ...]:
+    return tuple(sorted(str(path.relative_to(repo_root)) for path in records_posts_dir(repo_root).glob("*.txt")))
+
+
+def _post_commit_timestamps_for_relative_path(
+    repo_root: Path,
+    *,
+    relative_path: str,
+) -> tuple[str, PostCommitTimestamps]:
+    path = repo_root / relative_path
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "log", "--follow", "--format=%cI", "--", relative_path],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    commit_times = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if not commit_times:
+        return path.stem, PostCommitTimestamps(created_at=None, updated_at=None)
+    return path.stem, PostCommitTimestamps(
+        created_at=commit_times[-1],
+        updated_at=commit_times[0],
+    )
+
+
+def post_commit_timestamps(
+    repo_root: Path,
+    *,
+    timing_callback: PhaseTimingCallback | None = None,
+) -> dict[str, PostCommitTimestamps]:
+    started_at = time.perf_counter()
+    relative_paths = _post_record_relative_paths(repo_root)
+    _record_phase_timing(
+        timing_callback,
+        phase_name="post_index_commit_timestamp_paths",
+        started_at=started_at,
+    )
+    started_at = time.perf_counter()
+    timestamps = {
+        post_id: timestamps
+        for post_id, timestamps in (
+            _post_commit_timestamps_for_relative_path(repo_root, relative_path=relative_path)
+            for relative_path in relative_paths
         )
-        commit_times = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-        if not commit_times:
-            timestamps[path.stem] = PostCommitTimestamps(created_at=None, updated_at=None)
-            continue
-        timestamps[path.stem] = PostCommitTimestamps(
-            created_at=commit_times[-1],
-            updated_at=commit_times[0],
-        )
+    }
+    _record_phase_timing(
+        timing_callback,
+        phase_name="post_index_commit_timestamp_git_logs",
+        started_at=started_at,
+    )
     return timestamps
 
 
@@ -342,21 +384,11 @@ def post_commit_timestamps_for_paths(
         path = repo_root / relative_path
         if path.parent != records_posts_dir(repo_root) or path.suffix != ".txt":
             continue
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), "log", "--follow", "--format=%cI", "--", relative_path],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        post_id, path_timestamps = _post_commit_timestamps_for_relative_path(
+            repo_root,
+            relative_path=relative_path,
         )
-        commit_times = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-        if not commit_times:
-            timestamps[path.stem] = PostCommitTimestamps(created_at=None, updated_at=None)
-            continue
-        timestamps[path.stem] = PostCommitTimestamps(
-            created_at=commit_times[-1],
-            updated_at=commit_times[0],
-        )
+        timestamps[post_id] = path_timestamps
     return timestamps
 
 
@@ -798,7 +830,7 @@ def rebuild_post_index(
         identity_context = load_identity_context(repo_root=repo_root, posts=posts)
         record_timing("post_index_load_identity_context", started_at)
         started_at = time.perf_counter()
-        timestamps_by_post_id = post_commit_timestamps(repo_root)
+        timestamps_by_post_id = post_commit_timestamps(repo_root, timing_callback=record_timing)
         record_timing("post_index_commit_timestamps", started_at)
         started_at = time.perf_counter()
         commit_order = repo_commit_order(repo_root)
