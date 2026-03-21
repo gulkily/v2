@@ -21,6 +21,39 @@ class ComposeThreadPageTests(unittest.TestCase):
     def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
         return self.get_with_env(path, query_string=query_string)
 
+    def get_bytes(
+        self,
+        path: str,
+        *,
+        query_string: str = "",
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[str, dict[str, str], bytes]:
+        environ = {
+            "PATH_INFO": path,
+            "QUERY_STRING": query_string,
+            "REQUEST_METHOD": "GET",
+            "CONTENT_LENGTH": "0",
+            "wsgi.input": BytesIO(b""),
+        }
+        response: dict[str, object] = {}
+
+        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+            response["status"] = status
+            response["headers"] = headers
+
+        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
+        if extra_env:
+            env.update(extra_env)
+
+        with mock.patch.dict(os.environ, env):
+            body = b"".join(application(environ, start_response))
+
+        return (
+            response["status"],
+            dict(response["headers"]),
+            body,
+        )
+
     def get_with_env(self, path: str, *, query_string: str = "", extra_env: dict[str, str] | None = None) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
@@ -112,6 +145,21 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn("color-scheme: light dark;", body)
         self.assertIn("@media (prefers-color-scheme: dark)", body)
         self.assertIn("--surface-elevated:", body)
+
+    def test_favicon_svg_asset_is_served(self) -> None:
+        status, headers, body = self.get("/assets/favicon.svg")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers.get("Content-Type"), "image/svg+xml; charset=utf-8")
+        self.assertIn("<svg", body)
+
+    def test_favicon_ico_is_served_for_older_browser_requests(self) -> None:
+        status, headers, body = self.get_bytes("/favicon.ico")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers.get("Content-Type"), "image/x-icon")
+        self.assertTrue(body.startswith(b"\x00\x00\x01\x00"))
+        self.assertGreater(len(body), 100)
 
     def test_compose_thread_page_exposes_pow_settings_when_enabled(self) -> None:
         status, _, body = self.get_with_env(

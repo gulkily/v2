@@ -92,6 +92,7 @@ from forum_web.repository import (
 )
 from forum_web.task_threads import index_task_threads, load_task_threads
 from forum_web.templates import (
+    load_asset_bytes,
     load_asset_text,
     load_template,
     merge_feature_enabled,
@@ -3267,6 +3268,18 @@ def _dispatch_application(environ, start_response):
         if path == "/assets/site.css":
             body = load_asset_text("site.css").encode("utf-8")
             headers = [("Content-Type", "text/css; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/assets/favicon.svg":
+            body = load_asset_text("favicon.svg").encode("utf-8")
+            headers = [("Content-Type", "image/svg+xml; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/favicon.ico":
+            body = load_asset_bytes("favicon.ico")
+            headers = [("Content-Type", "image/x-icon")]
             start_response("200 OK", headers)
             return [body]
 
