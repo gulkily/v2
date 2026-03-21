@@ -268,7 +268,8 @@ process.stdout.write(signature);
 
         self.assertEqual(status_page["status"], 200)
         self.assertIn("X-Forum-Php-Cache: MISS", status_page["headers"])
-        self.assertIn("Refreshing forum data", status_page["body"])
+        self.assertIn("Refreshing the forum...", status_page["body"])
+        self.assertIn("A small interval of stillness while the next page arrives.", status_page["body"])
         self.assertIn("__forum_rebuild=1", status_page["body"])
         self.assertEqual(self.cache_files(), [])
 
@@ -276,13 +277,13 @@ process.stdout.write(signature);
 
         self.assertEqual(rebuild_response["status"], 200)
         self.assertIn("Hello", rebuild_response["body"])
-        self.assertNotIn("Refreshing forum data", rebuild_response["body"])
+        self.assertNotIn("Refreshing the forum...", rebuild_response["body"])
         self.assertEqual(self.cache_files(), [])
 
         final_response = self.php_request("/")
         self.assertEqual(final_response["status"], 200)
         self.assertIn("Hello", final_response["body"])
-        self.assertNotIn("Refreshing forum data", final_response["body"])
+        self.assertNotIn("Refreshing the forum...", final_response["body"])
         self.assertEqual(len(self.cache_files()), 1)
 
 

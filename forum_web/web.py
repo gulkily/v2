@@ -149,9 +149,9 @@ def _request_supports_reindex_feedback(path: str, *, method: str) -> bool:
 
 def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -> str:
     status_text = (
-        "Forum data is being refreshed for this page. The page will retry automatically in a moment."
+        "A small interval of stillness while the next page arrives."
         if rebuild_started
-        else "Forum data is already being refreshed for this page. The page will retry automatically in a moment."
+        else "A small interval of stillness while the next page arrives."
     )
     return (
         "<!doctype html>"
@@ -159,7 +159,7 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
         "<head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>Refreshing forum data</title>"
+        "<title>Refreshing the forum</title>"
         "<style>"
         ":root{color-scheme:light dark;}"
         "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
@@ -186,10 +186,10 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
         "</head>"
         "<body>"
         '<main class="wrap"><section class="card">'
-        '<p class="kicker">Preparing Page</p>'
-        "<h1>Refreshing forum data</h1>"
+        '<p class="kicker">zenmemes</p>'
+        "<h1>Refreshing the forum...</h1>"
         f"<p>{html.escape(status_text)}</p>"
-        '<p class="meta">This page retries automatically while the rebuild finishes.</p>'
+        '<p class="meta">This page retries automatically in a moment.</p>'
         '<div class="actions">'
         f'<a href="{html.escape(target_path)}">retry now</a>'
         "</div>"
@@ -210,7 +210,7 @@ def render_streamed_post_index_refresh_response(*, target_path: str, status_text
         "<head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>Refreshing forum data</title>"
+        "<title>Refreshing the forum</title>"
         "<style>"
         ":root{color-scheme:light dark;}"
         "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
@@ -236,10 +236,10 @@ def render_streamed_post_index_refresh_response(*, target_path: str, status_text
         "</head>"
         "<body>"
         '<main class="wrap"><section class="card">'
-        '<p class="kicker">Preparing Page</p>'
-        "<h1>Refreshing forum data</h1>"
+        '<p class="kicker">zenmemes</p>'
+        "<h1>Refreshing the forum...</h1>"
         f"<p>{html.escape(status_text)}</p>"
-        '<p class="meta">This page will continue as soon as the rebuild finishes.</p>'
+        '<p class="meta">This page will continue in a moment.</p>'
         '<div class="actions">'
         f'<a href="{html.escape(target_path)}">retry now</a>'
         "</div>"
@@ -309,7 +309,7 @@ def maybe_render_streamed_reindex_feedback_response(
         "3",
         True,
     )
-    status_text = "Forum data is being refreshed for this page."
+    status_text = "A small interval of stillness while the next page arrives."
     start_response = environ.get("_forum_start_response")
     if callable(start_response):
         start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
@@ -370,7 +370,7 @@ def maybe_render_buffered_reindex_feedback_response(
                 (POST_INDEX_REBUILD_REQUEST_HEADER, rebuild_path),
             ],
         )
-    return [b"Refreshing forum data.\n"]
+    return [b"Refreshing the forum...\n"]
 
 
 def load_repository_state():

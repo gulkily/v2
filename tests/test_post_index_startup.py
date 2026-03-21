@@ -151,7 +151,7 @@ class PostIndexStartupTests(unittest.TestCase):
                         status, _, body = self.request("/")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn("Refreshing forum data", body)
+        self.assertIn("Refreshing the forum...", body)
         self.assertIn("prefers-color-scheme: dark", body)
         self.assertNotIn("recent slow operations", body)
         self.assertNotIn('/assets/site.css', body)
@@ -180,7 +180,8 @@ class PostIndexStartupTests(unittest.TestCase):
                         status, _, body = self.request("/")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn("Refreshing forum data", body)
+        self.assertIn("Refreshing the forum...", body)
+        self.assertIn("A small interval of stillness while the next page arrives.", body)
         self.assertTrue(any("post index rebuild triggered for" in message for message in captured_logs.output))
         mock_rebuild.assert_called_once_with(self.repo_root.resolve())
         mock_startup.assert_not_called()
@@ -205,7 +206,8 @@ class PostIndexStartupTests(unittest.TestCase):
                     status, _, body = self.request("/profiles/openpgp-alpha")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn("Refreshing forum data", body)
+        self.assertIn("Refreshing the forum...", body)
+        self.assertIn("A small interval of stillness while the next page arrives.", body)
         self.assertIn("/profiles/openpgp-alpha", body)
         mock_rebuild.assert_called_once_with(self.repo_root.resolve())
         mock_startup.assert_called_once_with(self.repo_root)
@@ -254,7 +256,7 @@ class PostIndexStartupTests(unittest.TestCase):
         self.assertEqual(headers[web.POST_INDEX_REBUILD_STATUS_HEADER], "required")
         self.assertEqual(headers[web.POST_INDEX_REBUILD_TARGET_HEADER], "/")
         self.assertEqual(headers[web.POST_INDEX_REBUILD_REQUEST_HEADER], "/?__forum_rebuild=1")
-        self.assertIn("Refreshing forum data", body)
+        self.assertIn("Refreshing the forum...", body)
         mock_rebuild.assert_not_called()
         mock_startup.assert_not_called()
 
@@ -309,7 +311,7 @@ class PostIndexStartupTests(unittest.TestCase):
                 )
 
         self.assertEqual(status, "200 OK")
-        self.assertNotIn("Refreshing forum data", body)
+        self.assertNotIn("Refreshing the forum...", body)
         mock_startup.assert_called_once_with(self.repo_root)
 
 

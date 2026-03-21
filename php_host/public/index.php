@@ -350,7 +350,7 @@ function forum_is_post_index_rebuild_status_response(array $parsed): bool
 
 function forum_render_post_index_rebuild_status_page(string $targetPath, string $rebuildPath): string
 {
-    $title = htmlspecialchars('Refreshing forum data', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $title = htmlspecialchars('Refreshing the forum', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $targetPathHtml = htmlspecialchars($targetPath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $rebuildPathHtml = htmlspecialchars($rebuildPath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $targetPathJson = json_encode($targetPath, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
@@ -456,10 +456,10 @@ function forum_render_post_index_rebuild_status_page(string $targetPath, string 
 <body>
   <main class="wrap">
     <section class="card">
-      <p class="kicker">Preparing Page</p>
-      <h1>Refreshing forum data</h1>
-      <p>Forum data is being refreshed for this page.</p>
-      <p class="meta">This page will continue automatically when the rebuild finishes.</p>
+      <p class="kicker">zenmemes</p>
+      <h1>Refreshing the forum...</h1>
+      <p>A small interval of stillness while the next page arrives.</p>
+      <p class="meta">This page will continue in a moment.</p>
       <div class="actions">
         <a href="{$targetPathHtml}">retry now</a>
       </div>
