@@ -196,6 +196,13 @@ process.stdout.write(signature);
             return []
         return sorted(path for path in cache_root.glob("*.cgi"))
 
+    def write_committed_post(self, *, post_id: str, subject: str, body_text: str) -> None:
+        relative_path = Path("records") / "posts" / f"{post_id}.txt"
+        payload = self.build_thread_payload(post_id=post_id, subject=subject, body_text=body_text)
+        (self.data_repo_root / relative_path).write_text(payload, encoding="utf-8")
+        self.run_command(["git", "add", relative_path.as_posix()], cwd=self.data_repo_root)
+        self.run_command(["git", "commit", "-m", f"Add {post_id}"], cwd=self.data_repo_root)
+
     def test_php_host_caches_allowlisted_reads_and_marks_hit_headers(self) -> None:
         first = self.php_request("/")
         second = self.php_request("/")
@@ -239,6 +246,34 @@ process.stdout.write(signature);
         refreshed = self.php_request("/")
         self.assertIn("X-Forum-Php-Cache: MISS", refreshed["headers"])
         self.assertIn("thread-php-cache-001", refreshed["body"])
+
+    def test_php_host_shows_status_page_before_blocking_rebuild_request(self) -> None:
+        self.write_committed_post(
+            post_id="thread-php-reindex-001",
+            subject="Hello",
+            body_text="This committed post should trigger a cold-start rebuild.",
+        )
+
+        status_page = self.php_request("/")
+
+        self.assertEqual(status_page["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", status_page["headers"])
+        self.assertIn("Refreshing forum data", status_page["body"])
+        self.assertIn("__forum_rebuild=1", status_page["body"])
+        self.assertEqual(self.cache_files(), [])
+
+        rebuild_response = self.php_request("/", query_string="__forum_rebuild=1")
+
+        self.assertEqual(rebuild_response["status"], 200)
+        self.assertIn("Hello", rebuild_response["body"])
+        self.assertNotIn("Refreshing forum data", rebuild_response["body"])
+        self.assertEqual(self.cache_files(), [])
+
+        final_response = self.php_request("/")
+        self.assertEqual(final_response["status"], 200)
+        self.assertIn("Hello", final_response["body"])
+        self.assertNotIn("Refreshing forum data", final_response["body"])
+        self.assertEqual(len(self.cache_files()), 1)
 
 
 if __name__ == "__main__":

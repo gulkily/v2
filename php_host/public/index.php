@@ -327,6 +327,182 @@ function forum_apply_response_headers(array $headers): void
     }
 }
 
+function forum_header_value(array $headers, string $name): ?string
+{
+    $prefix = strtolower($name) . ':';
+    foreach ($headers as $line) {
+        if (!is_string($line)) {
+            continue;
+        }
+        $trimmed = trim($line);
+        if (strtolower(substr($trimmed, 0, strlen($prefix))) !== $prefix) {
+            continue;
+        }
+        return trim(substr($trimmed, strlen($prefix)));
+    }
+    return null;
+}
+
+function forum_is_post_index_rebuild_status_response(array $parsed): bool
+{
+    return forum_header_value($parsed['headers'], 'X-Forum-Post-Index-Status') === 'required';
+}
+
+function forum_render_post_index_rebuild_status_page(string $targetPath, string $rebuildPath): string
+{
+    $title = htmlspecialchars('Refreshing forum data', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $targetPathHtml = htmlspecialchars($targetPath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $rebuildPathHtml = htmlspecialchars($rebuildPath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $targetPathJson = json_encode($targetPath, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    $rebuildPathJson = json_encode($rebuildPath, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+    return <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{$title}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f1ea;
+      --panel: #fbfaf5;
+      --text: #1f2a28;
+      --muted: #5f6b67;
+      --accent: #2d5b73;
+      --border: rgba(82, 101, 96, 0.18);
+      --button-bg: #fffaf1;
+      --button-border: rgba(82, 101, 96, 0.22);
+      --shadow: rgba(31, 42, 40, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Verdana, Tahoma, Geneva, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+    }
+    .card {
+      width: min(38rem, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 34px var(--shadow);
+      padding: 1.25rem 1.2rem;
+      border-radius: 0.35rem;
+    }
+    .kicker {
+      margin: 0 0 0.45rem;
+      color: var(--accent);
+      font: 0.78rem "Courier New", Courier, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0.1rem 0 0.65rem;
+      font: 2rem Georgia, "Times New Roman", serif;
+    }
+    p {
+      margin: 0.55rem 0;
+      line-height: 1.5;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1rem;
+    }
+    .actions a {
+      display: inline-block;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--button-border);
+      color: var(--text);
+      text-decoration: none;
+      background: var(--button-bg);
+    }
+    iframe {
+      width: 0;
+      height: 0;
+      border: 0;
+      position: absolute;
+      inset: auto;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111820;
+        --panel: #18212b;
+        --text: #e4ece9;
+        --muted: #b4c0bc;
+        --accent: #8fc4df;
+        --border: rgba(162, 184, 180, 0.22);
+        --button-bg: #24313c;
+        --button-border: rgba(162, 184, 180, 0.22);
+        --shadow: rgba(0, 0, 0, 0.42);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <p class="kicker">Preparing Page</p>
+      <h1>Refreshing forum data</h1>
+      <p>Forum data is being refreshed for this page.</p>
+      <p class="meta">This page will continue automatically when the rebuild finishes.</p>
+      <div class="actions">
+        <a href="{$targetPathHtml}">retry now</a>
+      </div>
+    </section>
+  </main>
+  <iframe id="forum-reindex-worker" title="" aria-hidden="true" tabindex="-1"></iframe>
+  <script>
+    (function () {
+      var targetPath = {$targetPathJson};
+      var rebuildPath = {$rebuildPathJson};
+      var worker = document.getElementById("forum-reindex-worker");
+      var completed = false;
+      function finish() {
+        if (completed) {
+          return;
+        }
+        completed = true;
+        window.location.replace(targetPath);
+      }
+      worker.addEventListener("load", finish, { once: true });
+      worker.src = rebuildPath;
+    }());
+  </script>
+</body>
+</html>
+HTML;
+}
+
+function forum_apply_post_index_rebuild_status_response(array $parsed, array $extraHeaders = []): array
+{
+    $targetPath = forum_header_value($parsed['headers'], 'X-Forum-Post-Index-Target-Path') ?? '/';
+    $rebuildPath = forum_header_value($parsed['headers'], 'X-Forum-Post-Index-Rebuild-Path') ?? $targetPath;
+    http_response_code(200);
+    forum_apply_response_headers([
+        'Content-Type: text/html; charset=utf-8',
+        'Cache-Control: no-store',
+        'Vary: User-Agent',
+    ]);
+    forum_apply_response_headers($extraHeaders);
+    echo forum_render_post_index_rebuild_status_page($targetPath, $rebuildPath);
+    return $parsed;
+}
+
 function forum_apply_cgi_response(string $response, array $extraHeaders = []): array
 {
     $parsed = forum_parse_cgi_response($response);
@@ -400,6 +576,10 @@ if ($exitCode !== 0) {
 
 $response = $stdout === false ? '' : $stdout;
 $parsed = forum_parse_cgi_response($response);
+if (forum_is_post_index_rebuild_status_response($parsed)) {
+    forum_apply_post_index_rebuild_status_response($parsed, ['X-Forum-Php-Cache: MISS']);
+    exit;
+}
 forum_store_cached_response($parsed, $response);
 forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], forum_asset_cache_headers()));
 if (forum_mutating_request() && (int) $parsed['status_code'] >= 200 && (int) $parsed['status_code'] < 400) {

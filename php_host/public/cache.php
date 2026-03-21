@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 const FORUM_PHP_MICROCACHE_TTL_SECONDS = 5;
 const FORUM_PHP_ASSET_CACHE_MAX_AGE_SECONDS = 3600;
+const FORUM_PHP_POST_INDEX_REBUILD_QUERY_PARAM = '__forum_rebuild';
 
 function forum_request_path(): string
 {
@@ -20,6 +21,29 @@ function forum_request_query_string(): string
 {
     $query = $_SERVER['QUERY_STRING'] ?? '';
     return is_string($query) ? $query : '';
+}
+
+function forum_request_query_param(string $name): ?string
+{
+    $query = forum_request_query_string();
+    if ($query === '') {
+        return null;
+    }
+    parse_str($query, $params);
+    $value = $params[$name] ?? null;
+    if (is_string($value)) {
+        return $value;
+    }
+    return null;
+}
+
+function forum_post_index_rebuild_request(): bool
+{
+    $value = forum_request_query_param(FORUM_PHP_POST_INDEX_REBUILD_QUERY_PARAM);
+    if ($value === null) {
+        return false;
+    }
+    return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
 }
 
 function forum_asset_request_path(?string $path = null): ?string
@@ -46,6 +70,9 @@ function forum_asset_request_path(?string $path = null): ?string
 function forum_cacheable_read_request(): bool
 {
     if (forum_request_method() !== 'GET') {
+        return false;
+    }
+    if (forum_post_index_rebuild_request()) {
         return false;
     }
     if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
