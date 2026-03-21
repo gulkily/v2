@@ -11,6 +11,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_core.post_index import (
+    POST_INDEX_COMPATIBILITY_VERSION,
     IndexedAuthorRow,
     POST_INDEX_SCHEMA_VERSION,
     PostCommitTimestamps,
@@ -197,9 +198,16 @@ class PostIndexSchemaTests(unittest.TestCase):
 
         self.assertIsInstance(readiness, PostIndexReadiness)
         self.assertFalse(readiness.requires_rebuild)
+        self.assertFalse(readiness.requires_full_rebuild)
         self.assertFalse(readiness.count_mismatch)
         self.assertFalse(readiness.head_mismatch)
         self.assertFalse(readiness.schema_mismatch)
+        self.assertEqual(readiness.resolved_recovery_kind, "current")
+        self.assertEqual(readiness.resolved_recovery_reason, "current")
+        self.assertEqual(
+            readiness.indexed_schema_compatibility_version,
+            str(POST_INDEX_COMPATIBILITY_VERSION),
+        )
 
     def test_post_index_readiness_reports_stale_index_when_head_drifts(self) -> None:
         (self.repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
@@ -225,9 +233,42 @@ class PostIndexSchemaTests(unittest.TestCase):
         readiness = post_index_readiness(self.repo_root)
 
         self.assertTrue(readiness.requires_rebuild)
+        self.assertFalse(readiness.requires_full_rebuild)
         self.assertFalse(readiness.count_mismatch)
         self.assertTrue(readiness.head_mismatch)
         self.assertFalse(readiness.schema_mismatch)
+        self.assertEqual(readiness.resolved_recovery_kind, "incremental_catch_up")
+        self.assertEqual(readiness.resolved_recovery_reason, "head_mismatch")
+
+    def test_post_index_readiness_requires_full_rebuild_when_schema_compatibility_metadata_is_missing(self) -> None:
+        (self.repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
+        (self.repo_root / "records" / "posts" / "root-001.txt").write_text(
+            "Post-ID: root-001\nBoard-Tags: general\nSubject: Hello\n\nBody.\n",
+            encoding="ascii",
+        )
+        subprocess.run(["git", "-C", str(self.repo_root), "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "config", "user.email", "test@example.com"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "add", "records/posts"], check=True)
+        subprocess.run(["git", "-C", str(self.repo_root), "commit", "-m", "initial"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        rebuild_post_index(self.repo_root)
+        index = open_post_index(self.repo_root)
+        try:
+            index.connection.execute(
+                "DELETE FROM post_index_metadata WHERE key = ?",
+                ("indexed_schema_compatibility_version",),
+            )
+            index.connection.commit()
+        finally:
+            index.connection.close()
+
+        readiness = post_index_readiness(self.repo_root)
+
+        self.assertTrue(readiness.requires_rebuild)
+        self.assertTrue(readiness.requires_full_rebuild)
+        self.assertEqual(readiness.resolved_recovery_kind, "full_rebuild")
+        self.assertEqual(readiness.resolved_recovery_reason, "schema_compatibility_mismatch")
 
 
 class PostIndexAuthorHelpersTests(unittest.TestCase):

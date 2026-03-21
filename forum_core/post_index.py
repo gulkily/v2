@@ -22,6 +22,7 @@ from forum_web.profiles import (
 
 
 POST_INDEX_SCHEMA_VERSION = 3
+POST_INDEX_COMPATIBILITY_VERSION = 1
 PhaseTimingCallback = Callable[[str, float], None]
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,51 @@ class PostIndexReadiness:
     count_mismatch: bool
     head_mismatch: bool
     schema_mismatch: bool
+    indexed_schema_compatibility_version: str | None = None
+    recovery_kind: str | None = None
+    recovery_reason: str | None = None
+
+    @property
+    def resolved_recovery_kind(self) -> str:
+        if self.recovery_kind is not None:
+            return self.recovery_kind
+        if not self.count_mismatch and not self.head_mismatch and not self.schema_mismatch:
+            return "current"
+        if self.schema_mismatch or not self.schema_compatibility_is_current:
+            return "full_rebuild"
+        if self.current_head is None or self.indexed_head is None:
+            return "full_rebuild"
+        if self.head_mismatch:
+            return "incremental_catch_up"
+        return "full_rebuild"
+
+    @property
+    def resolved_recovery_reason(self) -> str:
+        if self.recovery_reason is not None:
+            return self.recovery_reason
+        if not self.count_mismatch and not self.head_mismatch and not self.schema_mismatch:
+            return "current"
+        if self.schema_mismatch:
+            return "schema_mismatch"
+        if not self.schema_compatibility_is_current:
+            return "schema_compatibility_mismatch"
+        if self.current_head is None or self.indexed_head is None:
+            return "missing_head_metadata"
+        if self.head_mismatch:
+            return "head_mismatch"
+        return "unknown"
+
+    @property
+    def schema_compatibility_is_current(self) -> bool:
+        return self.indexed_schema_compatibility_version == str(POST_INDEX_COMPATIBILITY_VERSION)
 
     @property
     def requires_rebuild(self) -> bool:
-        return self.count_mismatch or self.head_mismatch or self.schema_mismatch
+        return self.resolved_recovery_kind != "current"
+
+    @property
+    def requires_full_rebuild(self) -> bool:
+        return self.resolved_recovery_kind == "full_rebuild"
 
 
 @dataclass(frozen=True)
@@ -296,6 +338,11 @@ def set_index_metadata(connection: sqlite3.Connection, key: str, value: str) -> 
 def index_schema_is_current(connection: sqlite3.Connection) -> bool:
     indexed_schema_version = get_index_metadata(connection, "indexed_schema_version")
     return indexed_schema_version == str(POST_INDEX_SCHEMA_VERSION)
+
+
+def index_schema_compatibility_is_current(connection: sqlite3.Connection) -> bool:
+    indexed_schema_compatibility_version = get_index_metadata(connection, "indexed_schema_compatibility_version")
+    return indexed_schema_compatibility_version == str(POST_INDEX_COMPATIBILITY_VERSION)
 
 
 def current_repo_head(repo_root: Path) -> str | None:
@@ -878,6 +925,11 @@ def rebuild_post_index(
         set_index_metadata(active_index.connection, "indexed_head", indexed_head or "")
         set_index_metadata(active_index.connection, "indexed_post_count", str(len(posts)))
         set_index_metadata(active_index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+        set_index_metadata(
+            active_index.connection,
+            "indexed_schema_compatibility_version",
+            str(POST_INDEX_COMPATIBILITY_VERSION),
+        )
         started_at = time.perf_counter()
         active_index.connection.commit()
         record_timing("post_index_commit_sqlite", started_at)
@@ -899,6 +951,10 @@ def _post_index_readiness_for_index(repo_root: Path, *, index: PostIndex) -> Pos
     indexed_head = get_index_metadata(index.connection, "indexed_head") or None
     indexed_count_text = get_index_metadata(index.connection, "indexed_post_count") or "0"
     indexed_schema_version = get_index_metadata(index.connection, "indexed_schema_version")
+    indexed_schema_compatibility_version = get_index_metadata(
+        index.connection,
+        "indexed_schema_compatibility_version",
+    )
     try:
         indexed_count = int(indexed_count_text)
     except ValueError:
@@ -907,15 +963,35 @@ def _post_index_readiness_for_index(repo_root: Path, *, index: PostIndex) -> Pos
     count_mismatch = indexed_count != expected_count
     head_mismatch = indexed_head != current_head
     schema_mismatch = not index_schema_is_current(index.connection)
+    recovery_kind = "current"
+    recovery_reason = "current"
+    if schema_mismatch:
+        recovery_kind = "full_rebuild"
+        recovery_reason = "schema_mismatch"
+    elif not index_schema_compatibility_is_current(index.connection):
+        recovery_kind = "full_rebuild"
+        recovery_reason = "schema_compatibility_mismatch"
+    elif current_head is None or indexed_head is None:
+        recovery_kind = "full_rebuild"
+        recovery_reason = "missing_head_metadata"
+    elif head_mismatch:
+        recovery_kind = "incremental_catch_up"
+        recovery_reason = "head_mismatch"
+    elif count_mismatch:
+        recovery_kind = "full_rebuild"
+        recovery_reason = "count_mismatch"
     return PostIndexReadiness(
         expected_post_count=expected_count,
         indexed_post_count=indexed_count,
         indexed_head=indexed_head,
         current_head=current_head,
         indexed_schema_version=indexed_schema_version,
+        indexed_schema_compatibility_version=indexed_schema_compatibility_version,
         count_mismatch=count_mismatch,
         head_mismatch=head_mismatch,
         schema_mismatch=schema_mismatch,
+        recovery_kind=recovery_kind,
+        recovery_reason=recovery_reason,
     )
 
 
@@ -932,7 +1008,8 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
             logger.warning(
                 "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
                 "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
-                "expected_schema_version=%r",
+                "indexed_schema_compatibility_version=%r expected_schema_version=%r expected_schema_compatibility_version=%r "
+                "recovery_kind=%s recovery_reason=%s",
                 repo_root,
                 readiness.count_mismatch,
                 readiness.indexed_post_count,
@@ -942,7 +1019,11 @@ def ensure_post_index_current(repo_root: Path) -> PostIndex:
                 readiness.current_head,
                 readiness.schema_mismatch,
                 readiness.indexed_schema_version,
+                readiness.indexed_schema_compatibility_version,
                 str(POST_INDEX_SCHEMA_VERSION),
+                str(POST_INDEX_COMPATIBILITY_VERSION),
+                readiness.resolved_recovery_kind,
+                readiness.resolved_recovery_reason,
             )
             rebuild_post_index(repo_root, index=index)
         return index
@@ -974,6 +1055,11 @@ def refresh_post_index_after_commit(
                 str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
             )
             set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+            set_index_metadata(
+                index.connection,
+                "indexed_schema_compatibility_version",
+                str(POST_INDEX_COMPATIBILITY_VERSION),
+            )
             index.connection.commit()
             return
 
@@ -1032,6 +1118,11 @@ def refresh_post_index_after_commit(
             str(len(list(records_posts_dir(repo_root).glob("*.txt")))),
         )
         set_index_metadata(index.connection, "indexed_schema_version", str(POST_INDEX_SCHEMA_VERSION))
+        set_index_metadata(
+            index.connection,
+            "indexed_schema_compatibility_version",
+            str(POST_INDEX_COMPATIBILITY_VERSION),
+        )
         started_at = time.perf_counter()
         index.connection.commit()
         record_timing("post_index_commit_sqlite", started_at)
