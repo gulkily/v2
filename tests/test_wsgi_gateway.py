@@ -58,6 +58,28 @@ class WsgiGatewayTests(unittest.TestCase):
         self.assertIn("X-Test: 1\r\n", response)
         self.assertTrue(response.endswith("\r\nready"))
 
+    def test_render_cgi_response_buffers_iterable_chunks_into_one_body(self) -> None:
+        def application(environ, start_response):
+            start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
+
+            def chunks():
+                yield b"<p>loading</p>"
+                yield b"<script>done()</script>"
+
+            return chunks()
+
+        response = render_cgi_response(
+            application,
+            env={
+                "REQUEST_METHOD": "GET",
+                "PATH_INFO": "/",
+                "QUERY_STRING": "",
+            },
+            body_stream=BytesIO(b""),
+        ).decode("utf-8")
+
+        self.assertIn("<p>loading</p><script>done()</script>", response)
+
 
 if __name__ == "__main__":
     unittest.main()
