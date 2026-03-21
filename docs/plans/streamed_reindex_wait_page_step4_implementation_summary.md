@@ -17,3 +17,12 @@
   - `python -m unittest tests.test_post_index_startup tests.test_request_operation_events tests.test_wsgi_gateway tests.test_board_index_page tests.test_username_profile_route`
 - Notes:
   - This stage documents the current CGI/PHP limitation in behavior rather than attempting to redesign that gateway.
+
+## Stage 3 - Lock streamed request behavior into regression coverage
+- Changes:
+  - Added request-operation coverage proving that a streamed reindex request still lands as a completed tracked request once the iterable response is fully consumed.
+  - Re-ran the startup, request-operation, gateway, and route suites together to confirm the streamed Python path and CGI/PHP fallback remain coherent as one slice.
+- Verification:
+  - `python -m unittest tests.test_post_index_startup tests.test_request_operation_events tests.test_wsgi_gateway tests.test_board_index_page tests.test_username_profile_route`
+- Notes:
+  - The streamed wait flow is now covered at the request-lifecycle level, not only at the page-content level.

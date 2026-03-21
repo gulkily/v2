@@ -12,6 +12,7 @@ from unittest import mock
 
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text
 from forum_core.operation_events import load_recent_operations
+from forum_core.post_index import PostIndexReadiness
 from forum_web.web import application
 
 
@@ -222,6 +223,28 @@ process.stdout.write(signature);
         failed_operation = next(event for event in operations if event.operation_name == "GET /instance/")
         self.assertEqual(failed_operation.state, "failed")
         self.assertEqual(failed_operation.error_text, "broken page")
+
+    def test_streamed_reindex_request_completes_operation_after_iterable_finishes(self) -> None:
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=0,
+            indexed_head=None,
+            current_head=self.run_command(["git", "-C", str(self.repo_root), "rev-parse", "HEAD"], cwd=self.repo_root).stdout.strip(),
+            indexed_schema_version=None,
+            count_mismatch=True,
+            head_mismatch=True,
+            schema_mismatch=True,
+        )
+
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.rebuild_post_index"):
+                status, _, body = self.request("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Refreshing forum data", body)
+        operations = load_recent_operations(self.repo_root)
+        board_operation = next(event for event in operations if event.operation_name == "GET /")
+        self.assertEqual(board_operation.state, "completed")
 
 
 if __name__ == "__main__":
