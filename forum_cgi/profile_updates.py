@@ -61,7 +61,7 @@ def resolve_profile_update_signature_path(repo_root: Path, record_id: str) -> Pa
 
 def parse_profile_update_payload(payload_text: str) -> ProfileUpdateRecord:
     try:
-        return parse_profile_update_text(payload_text)
+        return parse_profile_update_text(payload_text, strict_username=True)
     except ValueError as exc:
         raise PostingError("bad_request", str(exc)) from exc
 

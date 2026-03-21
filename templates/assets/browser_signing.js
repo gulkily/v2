@@ -378,8 +378,17 @@ function normalizeDisplayName(displayName) {
     throw new Error("Display-Name must be a single line");
   }
   ensureAscii(value, "Display-Name");
-  if (value.length > 80) {
-    throw new Error("Display-Name must be at most 80 characters");
+  if (value.length < 3) {
+    throw new Error("Display-Name must be at least 3 characters");
+  }
+  if (value.length > 32) {
+    throw new Error("Display-Name must be at most 32 characters");
+  }
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)) {
+    throw new Error("Display-Name must use lowercase ASCII letters, digits, and single hyphens only");
+  }
+  if (new Set(["activity", "admin", "api", "assets", "compose", "instance", "profiles", "threads", "user"]).has(value)) {
+    throw new Error("Display-Name is reserved");
   }
   return value;
 }

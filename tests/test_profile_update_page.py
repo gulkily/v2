@@ -86,7 +86,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
             Source-Identity-ID: {IDENTITY_ID}
             Timestamp: 2026-03-18T00:00:00Z
 
-            ClaimedName
+            claimed-name
             """,
         )
 
@@ -124,7 +124,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
             Source-Identity-ID: {other_identity_id}
             Timestamp: 2026-03-18T12:00:00Z
 
-            SharedName
+            shared-name
             """,
         )
         self.write_record(
@@ -188,7 +188,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
             Source-Identity-ID: {other_identity_id}
             Timestamp: 2026-03-18T12:00:00Z
 
-            SharedName
+            shared-name
             """,
         )
         self.write_record(
@@ -233,7 +233,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn(DISPLAY_NAME, body)
         self.assertIn(IDENTITY_ID, body)
         self.assertIn("Choose a username:", body)
-        self.assertIn('id="display-name-input" name="display_name" type="text" maxlength="80" value="" required', body)
+        self.assertIn('id="display-name-input" name="display_name" type="text" maxlength="32" value="" required', body)
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
         self.assertIn('data-dry-run="false"', body)

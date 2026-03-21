@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -11,8 +12,23 @@ from forum_core.public_keys import resolve_public_key_from_signature
 
 
 ALLOWED_PROFILE_UPDATE_ACTIONS = ("set_display_name",)
-MAX_DISPLAY_NAME_LENGTH = 80
+MIN_DISPLAY_NAME_LENGTH = 3
+MAX_DISPLAY_NAME_LENGTH = 32
 PREVENT_DUPLICATE_USERNAMES_ENV = "FORUM_PREVENT_DUPLICATE_USERNAMES"
+DISPLAY_NAME_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+RESERVED_DISPLAY_NAMES = frozenset(
+    {
+        "activity",
+        "admin",
+        "api",
+        "assets",
+        "compose",
+        "instance",
+        "profiles",
+        "threads",
+        "user",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -59,7 +75,7 @@ def ensure_timestamp_text(timestamp_text: str) -> str:
     return timestamp_text
 
 
-def normalize_display_name(display_name: str) -> str:
+def normalize_display_name(display_name: str, *, strict_username: bool = False) -> str:
     value = display_name.strip()
     if not value:
         raise ValueError("display name must not be blank")
@@ -69,12 +85,28 @@ def normalize_display_name(display_name: str) -> str:
         value.encode("ascii")
     except UnicodeEncodeError as exc:
         raise ValueError("display name must be ASCII") from exc
-    if len(value) > MAX_DISPLAY_NAME_LENGTH:
-        raise ValueError(f"display name must be at most {MAX_DISPLAY_NAME_LENGTH} characters")
+    if strict_username:
+        if len(value) < MIN_DISPLAY_NAME_LENGTH:
+            raise ValueError(f"display name must be at least {MIN_DISPLAY_NAME_LENGTH} characters")
+        if len(value) > MAX_DISPLAY_NAME_LENGTH:
+            raise ValueError(f"display name must be at most {MAX_DISPLAY_NAME_LENGTH} characters")
+        if DISPLAY_NAME_PATTERN.fullmatch(value) is None:
+            raise ValueError(
+                "display name must use lowercase ASCII letters, digits, and single hyphens only"
+            )
+        if value in RESERVED_DISPLAY_NAMES:
+            raise ValueError("display name is reserved")
+    elif len(value) > 80:
+        raise ValueError("display name must be at most 80 characters")
     return value
 
 
-def parse_profile_update_text(raw_text: str, *, source_path: Path | None = None) -> ProfileUpdateRecord:
+def parse_profile_update_text(
+    raw_text: str,
+    *,
+    source_path: Path | None = None,
+    strict_username: bool = False,
+) -> ProfileUpdateRecord:
     header_text, separator, body_text = raw_text.partition("\n\n")
     if not separator:
         raise ValueError("profile-update text is missing header/body separator")
@@ -104,7 +136,7 @@ def parse_profile_update_text(raw_text: str, *, source_path: Path | None = None)
             field_name="Source-Identity-ID",
         ),
         timestamp=ensure_timestamp_text(timestamp),
-        display_name=normalize_display_name(body_text.rstrip("\n")),
+        display_name=normalize_display_name(body_text.rstrip("\n"), strict_username=strict_username),
         path=source_path or Path("<request>"),
     )
 

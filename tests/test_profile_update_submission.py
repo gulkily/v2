@@ -156,7 +156,7 @@ process.stdout.write(signature);
             Source-Identity-ID: {self.identity_id}
             Timestamp: 2026-03-14T12:00:00Z
 
-            BrightName
+            bright-name
             """
         ).lstrip()
         signature_text = self.sign_payload(payload_text)
@@ -174,7 +174,7 @@ process.stdout.write(signature);
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: profile-update-test-001", body)
-        self.assertIn("Display-Name: BrightName", body)
+        self.assertIn("Display-Name: bright-name", body)
         self.assertIn("Commit-ID:", body)
         self.assertTrue((self.repo_root / "records/profile-updates/profile-update-test-001.txt").exists())
         self.assertEqual(len(captured_logs.output), 1)
@@ -191,7 +191,7 @@ process.stdout.write(signature);
         profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
 
         self.assertEqual(profile_status, "200 OK")
-        self.assertIn("BrightName", profile_body)
+        self.assertIn("bright-name", profile_body)
 
         log_result = self.run_command(["git", "log", "--oneline", "--max-count", "1"], cwd=self.repo_root)
         self.assertIn("update_profile: profile-update-test-001", log_result.stdout)
@@ -204,7 +204,7 @@ process.stdout.write(signature);
             Source-Identity-ID: {self.identity_id}
             Timestamp: 2026-03-14T12:02:00Z
 
-            ReusedName
+            reused-name
             """
         ).lstrip()
         signature_text = self.sign_payload(payload_text)
@@ -227,7 +227,7 @@ process.stdout.write(signature);
         self.assertTrue(canonical_path.exists())
         self.assertFalse((self.repo_root / "records" / "profile-updates" / "profile-update-test-003.txt.pub.asc").exists())
 
-    def test_profile_page_escapes_script_shaped_display_name(self) -> None:
+    def test_api_update_profile_rejects_invalid_username_shape(self) -> None:
         payload_text = dedent(
             f"""
             Record-ID: profile-update-test-002
@@ -250,13 +250,8 @@ process.stdout.write(signature);
 
         status, _, body = self.request("/api/update_profile", method="POST", body=request_body)
 
-        self.assertEqual(status, "200 OK")
-
-        profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
-
-        self.assertEqual(profile_status, "200 OK")
-        self.assertNotIn("<script>alert()</script>", profile_body)
-        self.assertIn("&lt;script&gt;alert()&lt;/script&gt;", profile_body)
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("display name must use lowercase ASCII letters, digits, and single hyphens only", body)
 
     def test_api_update_profile_refreshes_username_index_without_full_rebuild(self) -> None:
         ensure_post_index_current(self.repo_root).connection.close()
@@ -267,7 +262,7 @@ process.stdout.write(signature);
             Source-Identity-ID: {self.identity_id}
             Timestamp: 2026-03-14T12:03:00Z
 
-            BrightName
+            bright-name
             """
         ).lstrip()
         signature_text = self.sign_payload(payload_text)
@@ -289,7 +284,7 @@ process.stdout.write(signature);
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: profile-update-test-004", body)
         roots = load_indexed_username_roots(self.repo_root)
-        self.assertEqual(roots["brightname"].claim_record_id, "profile-update-test-004")
+        self.assertEqual(roots["bright-name"].claim_record_id, "profile-update-test-004")
 
     def test_api_update_profile_rejects_second_claim_from_same_identity(self) -> None:
         first_payload_text = dedent(
@@ -299,7 +294,7 @@ process.stdout.write(signature);
             Source-Identity-ID: {self.identity_id}
             Timestamp: 2026-03-14T12:04:00Z
 
-            FirstName
+            first-name
             """
         ).lstrip()
         first_request_body = json.dumps(
@@ -310,7 +305,8 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
+        with mock.patch.dict(os.environ, {"FORUM_PREVENT_DUPLICATE_USERNAMES": "0"}, clear=False):
+            first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
 
         second_payload_text = dedent(
             f"""
@@ -319,7 +315,7 @@ process.stdout.write(signature);
             Source-Identity-ID: {self.identity_id}
             Timestamp: 2026-03-14T12:05:00Z
 
-            SecondName
+            second-name
             """
         ).lstrip()
         second_request_body = json.dumps(
@@ -330,7 +326,8 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
+        with mock.patch.dict(os.environ, {"FORUM_PREVENT_DUPLICATE_USERNAMES": "0"}, clear=False):
+            second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
 
         self.assertEqual(first_status, "200 OK")
         self.assertEqual(second_status, "403 Forbidden")
@@ -340,13 +337,13 @@ process.stdout.write(signature);
         profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
 
         self.assertEqual(profile_status, "200 OK")
-        self.assertIn("FirstName", profile_body)
-        self.assertNotIn("SecondName", profile_body)
+        self.assertIn("first-name", profile_body)
+        self.assertNotIn("second-name", profile_body)
 
         self.assertFalse((self.repo_root / "records/profile-updates/profile-update-test-006.txt").exists())
 
     def test_api_update_profile_allows_duplicate_username_when_flag_is_off(self) -> None:
-        shared_name = "SharedName"
+        shared_name = "shared-name"
         first_generated = self.generate_signing_keypair()
         first_identity_id = build_identity_id(fingerprint_from_public_key_text(first_generated["publicKey"]))
         second_generated = self.generate_signing_keypair()
@@ -386,7 +383,8 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
+        with mock.patch.dict(os.environ, {"FORUM_PREVENT_DUPLICATE_USERNAMES": "0"}, clear=False):
+            first_status, _, _ = self.request("/api/update_profile", method="POST", body=first_request_body)
 
         second_payload_text = dedent(
             f"""
@@ -406,14 +404,15 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
-        second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
+        with mock.patch.dict(os.environ, {"FORUM_PREVENT_DUPLICATE_USERNAMES": "0"}, clear=False):
+            second_status, _, second_body = self.request("/api/update_profile", method="POST", body=second_request_body)
 
         self.assertEqual(first_status, "200 OK")
         self.assertEqual(second_status, "200 OK")
         self.assertIn("Record-ID: profile-update-test-008", second_body)
 
     def test_api_update_profile_rejects_duplicate_username_when_flag_is_on(self) -> None:
-        shared_name = "SharedName"
+        shared_name = "shared-name"
         first_generated = self.generate_signing_keypair()
         first_identity_id = build_identity_id(fingerprint_from_public_key_text(first_generated["publicKey"]))
         second_generated = self.generate_signing_keypair()
