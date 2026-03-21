@@ -58,6 +58,9 @@ function forum_asset_request_path(?string $path = null): ?string
     if ($candidate === '/assets/browser_signing.js') {
         return $candidate;
     }
+    if ($candidate === '/assets/copy_field.js') {
+        return $candidate;
+    }
     if ($candidate === '/assets/task_priorities.js') {
         return $candidate;
     }

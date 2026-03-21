@@ -97,6 +97,13 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertEqual(headers.get("Content-Type"), "text/javascript; charset=utf-8")
         self.assertIn("async function loadOpenPgp()", body)
 
+    def test_copy_field_asset_is_served(self) -> None:
+        status, headers, body = self.get("/assets/copy_field.js")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers.get("Content-Type"), "text/javascript; charset=utf-8")
+        self.assertIn('document.addEventListener("click"', body)
+
     def test_site_css_declares_dark_mode_theme_tokens(self) -> None:
         status, headers, body = self.get("/assets/site.css")
 

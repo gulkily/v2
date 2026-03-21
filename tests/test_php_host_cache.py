@@ -222,6 +222,16 @@ process.stdout.write(signature);
         self.assertIn("Cache-Control: public, max-age=3600", response["headers"])
         self.assertEqual(self.cache_files(), [])
 
+    def test_php_host_serves_copy_field_asset_as_javascript(self) -> None:
+        response = self.php_request("/assets/copy_field.js")
+
+        self.assertEqual(response["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", response["headers"])
+        self.assertIn("Cache-Control: public, max-age=3600", response["headers"])
+        self.assertIn("Content-Type: text/javascript; charset=utf-8", response["headers"])
+        self.assertIn('document.addEventListener("click"', response["body"])
+        self.assertEqual(self.cache_files(), [])
+
     def test_successful_write_clears_php_microcache(self) -> None:
         warm = self.php_request("/")
         self.assertIn("X-Forum-Php-Cache: MISS", warm["headers"])

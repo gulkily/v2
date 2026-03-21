@@ -3282,6 +3282,12 @@ def _dispatch_application(environ, start_response):
             start_response("200 OK", headers)
             return [body]
 
+        if path == "/assets/copy_field.js":
+            body = load_asset_text("copy_field.js").encode("utf-8")
+            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [body]
+
         if path == "/assets/username_claim_cta.js":
             body = load_asset_text("username_claim_cta.js").encode("utf-8")
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
