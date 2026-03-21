@@ -232,7 +232,7 @@ class PostIndexStartupTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('/profiles/openpgp-alpha?self=1', body)
 
-    def test_cgi_style_request_does_not_enter_streamed_wait_path(self) -> None:
+    def test_cgi_style_request_returns_buffered_rebuild_status_contract(self) -> None:
         web._INDEX_STARTUP_READY_ROOTS.clear()
 
         readiness = PostIndexReadiness(
@@ -248,12 +248,44 @@ class PostIndexStartupTests(unittest.TestCase):
         with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
             with mock.patch("forum_web.web.rebuild_post_index") as mock_rebuild:
                 with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
-                    status, _, body = self.request("/", extra_environ={"wsgi.run_once": True})
+                    status, headers, body = self.request("/", extra_environ={"wsgi.run_once": True})
 
-        self.assertEqual(status, "200 OK")
-        self.assertNotIn("Refreshing forum data", body)
+        self.assertEqual(status, "503 Service Unavailable")
+        self.assertEqual(headers[web.POST_INDEX_REBUILD_STATUS_HEADER], "required")
+        self.assertEqual(headers[web.POST_INDEX_REBUILD_TARGET_HEADER], "/")
+        self.assertEqual(headers[web.POST_INDEX_REBUILD_REQUEST_HEADER], "/?__forum_rebuild=1")
+        self.assertIn("Refreshing forum data", body)
         mock_rebuild.assert_not_called()
-        mock_startup.assert_called_once_with(self.repo_root)
+        mock_startup.assert_not_called()
+
+    def test_cgi_style_request_preserves_query_string_in_buffered_rebuild_status_contract(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=1,
+            indexed_head="old-head",
+            current_head="new-head",
+            indexed_schema_version=str(POST_INDEX_SCHEMA_VERSION),
+            count_mismatch=False,
+            head_mismatch=True,
+            schema_mismatch=False,
+        )
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                status, headers, _ = self.request(
+                    "/profiles/openpgp-alpha",
+                    query_string="self=1",
+                    extra_environ={"wsgi.run_once": True},
+                )
+
+        self.assertEqual(status, "503 Service Unavailable")
+        self.assertEqual(headers[web.POST_INDEX_REBUILD_TARGET_HEADER], "/profiles/openpgp-alpha?self=1")
+        self.assertEqual(
+            headers[web.POST_INDEX_REBUILD_REQUEST_HEADER],
+            "/profiles/openpgp-alpha?self=1&__forum_rebuild=1",
+        )
+        mock_startup.assert_not_called()
 
 
 if __name__ == "__main__":

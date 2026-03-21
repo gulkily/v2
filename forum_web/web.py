@@ -105,6 +105,10 @@ load_repo_env()
 notify_missing_env_defaults()
 logger = logging.getLogger(__name__)
 _INDEX_STARTUP_READY_ROOTS: set[Path] = set()
+POST_INDEX_REBUILD_STATUS_HEADER = "X-Forum-Post-Index-Status"
+POST_INDEX_REBUILD_TARGET_HEADER = "X-Forum-Post-Index-Target-Path"
+POST_INDEX_REBUILD_REQUEST_HEADER = "X-Forum-Post-Index-Rebuild-Path"
+POST_INDEX_REBUILD_QUERY_PARAM = "__forum_rebuild"
 
 
 def get_repo_root() -> Path:
@@ -259,6 +263,19 @@ def request_supports_streaming(environ: dict[str, object]) -> bool:
     return not bool(environ.get("wsgi.run_once"))
 
 
+def _query_requests_post_index_rebuild(query_params: dict[str, list[str]]) -> bool:
+    values = query_params.get(POST_INDEX_REBUILD_QUERY_PARAM)
+    if not values:
+        return False
+    return values[-1].strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_post_index_rebuild_path(path: str, *, query_string: str) -> str:
+    if not query_string:
+        return f"{path}?{POST_INDEX_REBUILD_QUERY_PARAM}=1"
+    return f"{path}?{query_string}&{POST_INDEX_REBUILD_QUERY_PARAM}=1"
+
+
 def maybe_render_streamed_reindex_feedback_response(
     *,
     environ: dict[str, object],
@@ -303,6 +320,56 @@ def maybe_render_streamed_reindex_feedback_response(
             _INDEX_STARTUP_READY_ROOTS.add(repo_root.resolve())
         logger.warning("streamed post-index refresh completed for %s", repo_root.resolve())
     return streamed_response()
+
+
+def maybe_render_buffered_reindex_feedback_response(
+    *,
+    environ: dict[str, object],
+    repo_root: Path,
+    path: str,
+    query_string: str,
+    query_params: dict[str, list[str]],
+) -> Iterable[bytes] | None:
+    if request_supports_streaming(environ):
+        return None
+    if _query_requests_post_index_rebuild(query_params):
+        return None
+    readiness = post_index_readiness(repo_root)
+    if not readiness.requires_rebuild or readiness.current_head is None:
+        return None
+    target_path = path
+    if query_string:
+        target_path = f"{target_path}?{query_string}"
+    rebuild_path = _build_post_index_rebuild_path(path, query_string=query_string)
+    logger.warning(
+        "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
+        "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
+        "expected_schema_version=%r buffered_refresh=%s",
+        repo_root,
+        readiness.count_mismatch,
+        readiness.indexed_post_count,
+        readiness.expected_post_count,
+        readiness.head_mismatch,
+        readiness.indexed_head,
+        readiness.current_head,
+        readiness.schema_mismatch,
+        readiness.indexed_schema_version,
+        "3",
+        True,
+    )
+    start_response = environ.get("_forum_start_response")
+    if callable(start_response):
+        start_response(
+            "503 Service Unavailable",
+            [
+                ("Content-Type", "text/plain; charset=utf-8"),
+                ("Cache-Control", "no-store"),
+                (POST_INDEX_REBUILD_STATUS_HEADER, "required"),
+                (POST_INDEX_REBUILD_TARGET_HEADER, target_path),
+                (POST_INDEX_REBUILD_REQUEST_HEADER, rebuild_path),
+            ],
+        )
+    return [b"Refreshing forum data.\n"]
 
 
 def load_repository_state():
@@ -2802,6 +2869,15 @@ def _dispatch_application(environ, start_response):
     if _request_supports_reindex_feedback(path, method=method):
         resolved_root = repo_root.resolve()
         if resolved_root not in _INDEX_STARTUP_READY_ROOTS:
+            buffered_response = maybe_render_buffered_reindex_feedback_response(
+                environ=environ,
+                repo_root=repo_root,
+                path=path,
+                query_string=environ.get("QUERY_STRING", ""),
+                query_params=query_params,
+            )
+            if buffered_response is not None:
+                return buffered_response
             streamed_response = maybe_render_streamed_reindex_feedback_response(
                 environ=environ,
                 repo_root=repo_root,
@@ -2813,6 +2889,15 @@ def _dispatch_application(environ, start_response):
                 return streamed_response
     ensure_runtime_post_index_startup(repo_root)
     if _request_supports_reindex_feedback(path, method=method):
+        buffered_response = maybe_render_buffered_reindex_feedback_response(
+            environ=environ,
+            repo_root=repo_root,
+            path=path,
+            query_string=environ.get("QUERY_STRING", ""),
+            query_params=query_params,
+        )
+        if buffered_response is not None:
+            return buffered_response
         streamed_response = maybe_render_streamed_reindex_feedback_response(
             environ=environ,
             repo_root=repo_root,
