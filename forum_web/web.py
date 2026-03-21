@@ -6,11 +6,11 @@ import logging
 import os
 import re
 import subprocess
-import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Iterable, Iterator
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
@@ -105,8 +105,6 @@ load_repo_env()
 notify_missing_env_defaults()
 logger = logging.getLogger(__name__)
 _INDEX_STARTUP_READY_ROOTS: set[Path] = set()
-_INDEX_REBUILD_IN_PROGRESS_ROOTS: set[Path] = set()
-_INDEX_REBUILD_LOCK = threading.Lock()
 
 
 def get_repo_root() -> Path:
@@ -142,35 +140,6 @@ def _request_supports_reindex_feedback(path: str, *, method: str) -> bool:
         or path.endswith("/merge")
         or path.endswith("/merge/action")
     )
-
-
-def start_background_post_index_refresh(repo_root: Path, *, mark_startup_ready: bool) -> bool:
-    resolved_root = repo_root.resolve()
-    with _INDEX_REBUILD_LOCK:
-        if resolved_root in _INDEX_REBUILD_IN_PROGRESS_ROOTS:
-            return False
-        _INDEX_REBUILD_IN_PROGRESS_ROOTS.add(resolved_root)
-
-    def run_refresh() -> None:
-        try:
-            logger.warning("background post-index refresh started for %s", resolved_root)
-            rebuild_post_index(resolved_root)
-            if mark_startup_ready:
-                _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
-            logger.warning("background post-index refresh completed for %s", resolved_root)
-        except Exception:
-            logger.exception("background post-index refresh failed for %s", resolved_root)
-        finally:
-            with _INDEX_REBUILD_LOCK:
-                _INDEX_REBUILD_IN_PROGRESS_ROOTS.discard(resolved_root)
-
-    thread = threading.Thread(
-        target=run_refresh,
-        name=f"post-index-refresh-{resolved_root.name}",
-        daemon=True,
-    )
-    thread.start()
-    return True
 
 
 def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -> str:
@@ -228,38 +197,112 @@ def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -
     )
 
 
-def maybe_render_reindex_feedback_page(
+def render_streamed_post_index_refresh_response(*, target_path: str, status_text: str) -> Iterable[bytes]:
+    target_json = json.dumps(target_path)
+    opening = (
+        "<!doctype html>"
+        '<html lang="en">'
+        "<head>"
+        '<meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        "<title>Refreshing forum data</title>"
+        "<style>"
+        ":root{color-scheme:light dark;}"
+        "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
+        ".wrap{min-height:100vh;display:grid;place-items:center;padding:1.5rem;}"
+        ".card{width:min(38rem,100%);background:#fbfaf5;border:1px solid rgba(82,101,96,.18);"
+        "box-shadow:0 14px 34px rgba(31,42,40,.1);padding:1.25rem 1.2rem;border-radius:.35rem;}"
+        ".kicker{margin:0 0 .45rem;color:#2d5b73;font:0.78rem 'Courier New',Courier,monospace;"
+        "letter-spacing:.08em;text-transform:uppercase;}"
+        "h1{margin:.1rem 0 .65rem;font:2rem Georgia,'Times New Roman',serif;}"
+        "p{margin:.55rem 0;line-height:1.5;}"
+        ".meta{color:#5f6b67;font-size:.96rem;}"
+        ".actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem;}"
+        ".actions a{display:inline-block;padding:.5rem .75rem;border:1px solid rgba(82,101,96,.22);"
+        "color:#1f2a28;text-decoration:none;background:#fffaf1;}"
+        "@media (prefers-color-scheme: dark){"
+        "body{background:#111820;color:#e4ece9;}"
+        ".card{background:#18212b;border-color:rgba(162,184,180,.22);box-shadow:0 14px 34px rgba(0,0,0,.42);}"
+        ".kicker{color:#8fc4df;}"
+        ".meta{color:#b4c0bc;}"
+        ".actions a{border-color:rgba(162,184,180,.22);color:#e4ece9;background:#24313c;}"
+        "}"
+        "</style>"
+        "</head>"
+        "<body>"
+        '<main class="wrap"><section class="card">'
+        '<p class="kicker">Preparing Page</p>'
+        "<h1>Refreshing forum data</h1>"
+        f"<p>{html.escape(status_text)}</p>"
+        '<p class="meta">This page will continue as soon as the rebuild finishes.</p>'
+        '<div class="actions">'
+        f'<a href="{html.escape(target_path)}">retry now</a>'
+        "</div>"
+        "</section></main>"
+    ).encode("utf-8")
+
+    def stream_chunks() -> Iterator[bytes]:
+        yield opening
+        yield b" " * 2048
+        yield (
+            "<script>"
+            f"window.location.replace({target_json});"
+            "</script>"
+            "</body>"
+            "</html>"
+        ).encode("utf-8")
+
+    return stream_chunks()
+
+
+def request_supports_streaming(environ: dict[str, object]) -> bool:
+    return not bool(environ.get("wsgi.run_once"))
+
+
+def maybe_render_streamed_reindex_feedback_response(
     *,
+    environ: dict[str, object],
     repo_root: Path,
     path: str,
     query_string: str,
     mark_startup_ready: bool,
-) -> str | None:
+) -> Iterable[bytes] | None:
+    if not request_supports_streaming(environ):
+        return None
     readiness = post_index_readiness(repo_root)
     if not readiness.requires_rebuild or readiness.current_head is None:
         return None
     target_path = path
     if query_string:
         target_path = f"{target_path}?{query_string}"
-    rebuild_started = start_background_post_index_refresh(repo_root, mark_startup_ready=mark_startup_ready)
-    if rebuild_started:
-        logger.warning(
-            "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
-            "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
-            "expected_schema_version=%r background_refresh=%s",
-            repo_root,
-            readiness.count_mismatch,
-            readiness.indexed_post_count,
-            readiness.expected_post_count,
-            readiness.head_mismatch,
-            readiness.indexed_head,
-            readiness.current_head,
-            readiness.schema_mismatch,
-            readiness.indexed_schema_version,
-            "3",
-            True,
-        )
-    return render_post_index_refresh_page(target_path=target_path, rebuild_started=rebuild_started)
+    logger.warning(
+        "post index rebuild triggered for %s: count_mismatch=%s indexed_count=%s expected_count=%s "
+        "head_mismatch=%s indexed_head=%r current_head=%r schema_mismatch=%s indexed_schema_version=%r "
+        "expected_schema_version=%r streamed_refresh=%s",
+        repo_root,
+        readiness.count_mismatch,
+        readiness.indexed_post_count,
+        readiness.expected_post_count,
+        readiness.head_mismatch,
+        readiness.indexed_head,
+        readiness.current_head,
+        readiness.schema_mismatch,
+        readiness.indexed_schema_version,
+        "3",
+        True,
+    )
+    status_text = "Forum data is being refreshed for this page."
+    start_response = environ.get("_forum_start_response")
+    if callable(start_response):
+        start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
+    def streamed_response() -> Iterator[bytes]:
+        yield from render_streamed_post_index_refresh_response(target_path=target_path, status_text=status_text)
+        logger.warning("streamed post-index refresh started for %s", repo_root.resolve())
+        rebuild_post_index(repo_root.resolve())
+        if mark_startup_ready:
+            _INDEX_STARTUP_READY_ROOTS.add(repo_root.resolve())
+        logger.warning("streamed post-index refresh completed for %s", repo_root.resolve())
+    return streamed_response()
 
 
 def load_repository_state():
@@ -2754,34 +2797,31 @@ def _dispatch_application(environ, start_response):
     path = environ.get("PATH_INFO", "/")
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
     method = environ.get("REQUEST_METHOD", "GET").upper()
+    environ["_forum_start_response"] = start_response
     repo_root = get_repo_root()
     if _request_supports_reindex_feedback(path, method=method):
         resolved_root = repo_root.resolve()
         if resolved_root not in _INDEX_STARTUP_READY_ROOTS:
-            refresh_page = maybe_render_reindex_feedback_page(
+            streamed_response = maybe_render_streamed_reindex_feedback_response(
+                environ=environ,
                 repo_root=repo_root,
                 path=path,
                 query_string=environ.get("QUERY_STRING", ""),
                 mark_startup_ready=True,
             )
-            if refresh_page is not None:
-                body = refresh_page.encode("utf-8")
-                headers = [("Content-Type", "text/html; charset=utf-8")]
-                start_response("200 OK", headers)
-                return [body]
+            if streamed_response is not None:
+                return streamed_response
     ensure_runtime_post_index_startup(repo_root)
     if _request_supports_reindex_feedback(path, method=method):
-        refresh_page = maybe_render_reindex_feedback_page(
+        streamed_response = maybe_render_streamed_reindex_feedback_response(
+            environ=environ,
             repo_root=repo_root,
             path=path,
             query_string=environ.get("QUERY_STRING", ""),
             mark_startup_ready=False,
         )
-        if refresh_page is not None:
-            body = refresh_page.encode("utf-8")
-            headers = [("Content-Type", "text/html; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
+        if streamed_response is not None:
+            return streamed_response
 
     try:
         if path == "/api/create_thread":
@@ -3360,8 +3400,7 @@ def application(environ, start_response):
             except Exception as exc:
                 fail_operation(handle, error_text=str(exc))
                 raise
-            complete_operation(handle)
-            return response
+            return _finalize_response_iterable(response, handle=handle)
     except Exception as exc:  # pragma: no cover - manual smoke checks cover this path
         body = (
             "<!doctype html><title>Server Error</title>"
@@ -3370,3 +3409,21 @@ def application(environ, start_response):
         headers = [("Content-Type", "text/html; charset=utf-8")]
         start_response("500 Internal Server Error", headers)
         return [body]
+
+
+def _finalize_response_iterable(response: Iterable[bytes], *, handle) -> Iterable[bytes]:
+    def wrapped() -> Iterator[bytes]:
+        try:
+            for chunk in response:
+                yield chunk
+        except Exception as exc:
+            fail_operation(handle, error_text=str(exc))
+            raise
+        else:
+            complete_operation(handle)
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                close()
+
+    return wrapped()

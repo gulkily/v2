@@ -24,7 +24,7 @@ class PostIndexStartupTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def request(self, path: str, *, query_string: str = "") -> tuple[str, dict[str, str], str]:
+    def request(self, path: str, *, query_string: str = "", extra_environ: dict[str, object] | None = None) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
             "QUERY_STRING": query_string,
@@ -32,6 +32,8 @@ class PostIndexStartupTests(unittest.TestCase):
             "CONTENT_LENGTH": "0",
             "wsgi.input": BytesIO(b""),
         }
+        if extra_environ:
+            environ.update(extra_environ)
         response: dict[str, object] = {}
 
         def start_response(status: str, headers: list[tuple[str, str]]) -> None:
@@ -144,7 +146,7 @@ class PostIndexStartupTests(unittest.TestCase):
         )
         with self.assertLogs("forum_web.web", level="WARNING") as captured_logs:
             with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
-                with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True) as mock_start:
+                with mock.patch("forum_web.web.rebuild_post_index") as mock_rebuild:
                     with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
                         status, _, body = self.request("/")
 
@@ -155,7 +157,7 @@ class PostIndexStartupTests(unittest.TestCase):
         self.assertNotIn('/assets/site.css', body)
         self.assertNotIn('/assets/username_claim_cta.js', body)
         self.assertTrue(any("post index rebuild triggered for" in message for message in captured_logs.output))
-        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
+        mock_rebuild.assert_called_once_with(self.repo_root.resolve())
         mock_startup.assert_not_called()
 
     def test_board_request_shows_refresh_page_when_index_database_is_missing(self) -> None:
@@ -173,14 +175,14 @@ class PostIndexStartupTests(unittest.TestCase):
         )
         with self.assertLogs("forum_web.web", level="WARNING") as captured_logs:
             with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
-                with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True) as mock_start:
+                with mock.patch("forum_web.web.rebuild_post_index") as mock_rebuild:
                     with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
                         status, _, body = self.request("/")
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Refreshing forum data", body)
         self.assertTrue(any("post index rebuild triggered for" in message for message in captured_logs.output))
-        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=True)
+        mock_rebuild.assert_called_once_with(self.repo_root.resolve())
         mock_startup.assert_not_called()
 
     def test_profile_request_shows_refresh_page_when_index_drifts_after_startup(self) -> None:
@@ -198,40 +200,14 @@ class PostIndexStartupTests(unittest.TestCase):
             schema_mismatch=False,
         )
         with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
-            with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=False) as mock_start:
+            with mock.patch("forum_web.web.rebuild_post_index") as mock_rebuild:
                 with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
                     status, _, body = self.request("/profiles/openpgp-alpha")
 
         self.assertEqual(status, "200 OK")
         self.assertIn("Refreshing forum data", body)
         self.assertIn("/profiles/openpgp-alpha", body)
-        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=False)
-        mock_startup.assert_called_once_with(self.repo_root)
-        
-    def test_in_progress_rebuild_does_not_repeat_trigger_warning(self) -> None:
-        web._INDEX_STARTUP_READY_ROOTS.clear()
-        web._INDEX_STARTUP_READY_ROOTS.add(self.repo_root.resolve())
-
-        readiness = PostIndexReadiness(
-            expected_post_count=1,
-            indexed_post_count=1,
-            indexed_head="old-head",
-            current_head="new-head",
-            indexed_schema_version=str(POST_INDEX_SCHEMA_VERSION),
-            count_mismatch=False,
-            head_mismatch=True,
-            schema_mismatch=False,
-        )
-        with mock.patch("forum_web.web.logger.warning") as mock_warning:
-            with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
-                with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=False) as mock_start:
-                    with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
-                        status, _, body = self.request("/profiles/openpgp-alpha")
-
-        self.assertEqual(status, "200 OK")
-        self.assertIn("Refreshing forum data", body)
-        self.assertFalse(any("post index rebuild triggered for" in str(call) for call in mock_warning.call_args_list))
-        mock_start.assert_called_once_with(self.repo_root, mark_startup_ready=False)
+        mock_rebuild.assert_called_once_with(self.repo_root.resolve())
         mock_startup.assert_called_once_with(self.repo_root)
 
     def test_refresh_page_retry_link_preserves_query_string(self) -> None:
@@ -249,12 +225,35 @@ class PostIndexStartupTests(unittest.TestCase):
             schema_mismatch=False,
         )
         with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
-            with mock.patch("forum_web.web.start_background_post_index_refresh", return_value=True):
+            with mock.patch("forum_web.web.rebuild_post_index"):
                 with mock.patch("forum_web.web.ensure_runtime_post_index_startup"):
                     status, _, body = self.request("/profiles/openpgp-alpha", query_string="self=1")
 
         self.assertEqual(status, "200 OK")
         self.assertIn('/profiles/openpgp-alpha?self=1', body)
+
+    def test_cgi_style_request_does_not_enter_streamed_wait_path(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+
+        readiness = PostIndexReadiness(
+            expected_post_count=1,
+            indexed_post_count=0,
+            indexed_head=None,
+            current_head="test-head",
+            indexed_schema_version=None,
+            count_mismatch=True,
+            head_mismatch=True,
+            schema_mismatch=True,
+        )
+        with mock.patch("forum_web.web.post_index_readiness", return_value=readiness):
+            with mock.patch("forum_web.web.rebuild_post_index") as mock_rebuild:
+                with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+                    status, _, body = self.request("/", extra_environ={"wsgi.run_once": True})
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn("Refreshing forum data", body)
+        mock_rebuild.assert_not_called()
+        mock_startup.assert_called_once_with(self.repo_root)
 
 
 if __name__ == "__main__":
