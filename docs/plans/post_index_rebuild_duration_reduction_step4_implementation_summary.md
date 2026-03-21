@@ -19,3 +19,13 @@
   - Manual smoke check with a disposable git repo and `rebuild_post_index(..., timing_callback=...)` confirmed the rebuild still reports `post_index_commit_timestamp_paths`, `post_index_commit_timestamp_git_logs`, `post_index_commit_timestamps`, `post_index_upsert_all_posts`, and `post_index_commit_sqlite`.
 - Notes:
   - This stage intentionally optimizes only the legitimate full rebuild path; rebuild-triggering policy and stale-index recovery strategy remain unchanged.
+
+## Stage 3 - Lock in rebuild correctness on indexed read surfaces
+- Changes:
+  - Added focused regression coverage that verifies `load_indexed_root_posts(...)` still returns coherent `created_at` and `updated_at` values after a full rebuild on a repo with multiple roots and an edited post.
+  - Reused the Stage 1 timing-surface assertions and Stage 2 helper-path coverage as the deterministic proof that the optimized rebuild still exposes the expected rebuild phases without asserting wall-clock thresholds.
+- Verification:
+  - `python -m unittest tests.test_background_operation_events tests.test_post_index.PostIndexBuildTests.test_rebuild_post_index_stores_commit_derived_timestamps tests.test_post_index.PostIndexBuildTests.test_post_commit_timestamps_uses_shared_per_path_helper_for_full_rebuild tests.test_post_index.PostIndexBuildTests.test_incremental_refresh_uses_touched_path_timestamps_only tests.test_post_index.PostIndexBuildTests.test_load_indexed_root_posts_returns_coherent_timestamps_after_rebuild`
+  - Manual smoke check with a disposable git repo and `load_indexed_root_posts(...)` after `rebuild_post_index(...)` returned the expected root-post IDs.
+- Notes:
+  - Coverage stays focused on correctness and timing-surface presence rather than brittle elapsed-time assertions.

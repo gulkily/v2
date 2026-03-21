@@ -472,6 +472,50 @@ class PostIndexBuildTests(unittest.TestCase):
         finally:
             index.connection.close()
 
+    def test_load_indexed_root_posts_returns_coherent_timestamps_after_rebuild(self) -> None:
+        self.write_post(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: First root
+
+            First body.
+            """,
+        )
+        self.write_post(
+            "records/posts/root-002.txt",
+            """
+            Post-ID: root-002
+            Board-Tags: planning
+            Subject: Second root
+
+            Second body.
+            """,
+        )
+        self.commit_all("Add roots", "2026-03-17T10:00:00+00:00")
+
+        self.write_post(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: First root
+
+            Updated body.
+            """,
+        )
+        self.commit_all("Update root", "2026-03-17T12:00:00+00:00")
+
+        rebuild_post_index(self.repo_root)
+
+        root_posts = load_indexed_root_posts(self.repo_root)
+
+        self.assertEqual(root_posts["root-001"].created_at, "2026-03-17T10:00:00+00:00")
+        self.assertEqual(root_posts["root-001"].updated_at, "2026-03-17T12:00:00+00:00")
+        self.assertEqual(root_posts["root-002"].created_at, "2026-03-17T10:00:00+00:00")
+        self.assertEqual(root_posts["root-002"].updated_at, "2026-03-17T10:00:00+00:00")
+
     def test_rebuild_post_index_populates_normalized_author_rows(self) -> None:
         self.write_post(
             "records/posts/root-001.txt",
