@@ -44,6 +44,8 @@ export async function enhanceUsernameClaimCta(
   if (!link) {
     return;
   }
+  root.hidden = true;
+  link.setAttribute("href", "");
   const publicKey = storedPublicKey(storage);
   if (!publicKey) {
     return;
@@ -63,4 +65,7 @@ export async function enhanceUsernameClaimCta(
 
 if (typeof document !== "undefined") {
   void enhanceUsernameClaimCta();
+  globalThis.addEventListener?.("pageshow", () => {
+    void enhanceUsernameClaimCta();
+  });
 }
