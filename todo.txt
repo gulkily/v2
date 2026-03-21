@@ -112,3 +112,13 @@ things that need to be folded into the dev process:
 - fix display of thread titles wherever they're presented as the slug rather than the title
 
 - user directory
+
+- optimize the indexing
+
+- add an actual perl module to begin with
+
+- faqs to add
+	- why pgp is chosen
+	- why python and perl
+	- why textfiles and git
+	- why make it forkable
