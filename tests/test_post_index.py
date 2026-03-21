@@ -26,6 +26,7 @@ from forum_core.post_index import (
     load_indexed_root_posts,
     load_indexed_username_roots,
     open_post_index,
+    post_commit_timestamps,
     post_index_readiness,
     post_index_path,
     rebuild_post_index,
@@ -383,6 +384,53 @@ class PostIndexBuildTests(unittest.TestCase):
             self.assertEqual(row["body"], "Updated body.")
         finally:
             index.connection.close()
+
+    def test_post_commit_timestamps_uses_shared_per_path_helper_for_full_rebuild(self) -> None:
+        self.write_post(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: First root
+
+            First body.
+            """,
+        )
+        self.write_post(
+            "records/posts/root-002.txt",
+            """
+            Post-ID: root-002
+            Board-Tags: general
+            Subject: Second root
+
+            Second body.
+            """,
+        )
+        self.commit_all("Add roots", "2026-03-17T10:00:00+00:00")
+
+        with mock.patch("forum_core.post_index._full_rebuild_timestamp_worker_count", return_value=1), mock.patch(
+            "forum_core.post_index._post_commit_timestamps_for_relative_path",
+            side_effect=[
+                ("root-001", PostCommitTimestamps(created_at="2026-03-17T10:00:00+00:00", updated_at="2026-03-17T10:00:00+00:00")),
+                ("root-002", PostCommitTimestamps(created_at="2026-03-17T10:00:00+00:00", updated_at="2026-03-17T10:00:00+00:00")),
+            ],
+        ) as mock_path_helper:
+            timestamps = post_commit_timestamps(self.repo_root)
+
+        self.assertEqual(
+            timestamps,
+            {
+                "root-001": PostCommitTimestamps(
+                    created_at="2026-03-17T10:00:00+00:00",
+                    updated_at="2026-03-17T10:00:00+00:00",
+                ),
+                "root-002": PostCommitTimestamps(
+                    created_at="2026-03-17T10:00:00+00:00",
+                    updated_at="2026-03-17T10:00:00+00:00",
+                ),
+            },
+        )
+        self.assertEqual(mock_path_helper.call_count, 2)
 
     def test_rebuild_post_index_normalizes_related_rows(self) -> None:
         self.write_post(

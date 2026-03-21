@@ -324,6 +324,10 @@ def _post_record_relative_paths(repo_root: Path) -> tuple[str, ...]:
     return tuple(sorted(str(path.relative_to(repo_root)) for path in records_posts_dir(repo_root).glob("*.txt")))
 
 
+def _full_rebuild_timestamp_worker_count(path_count: int) -> int:
+    return max(1, min(8, path_count))
+
+
 def _post_commit_timestamps_for_relative_path(
     repo_root: Path,
     *,
@@ -359,13 +363,29 @@ def post_commit_timestamps(
         started_at=started_at,
     )
     started_at = time.perf_counter()
-    timestamps = {
-        post_id: timestamps
-        for post_id, timestamps in (
+    if len(relative_paths) <= 1:
+        timestamp_rows = (
             _post_commit_timestamps_for_relative_path(repo_root, relative_path=relative_path)
             for relative_path in relative_paths
         )
-    }
+    else:
+        worker_count = _full_rebuild_timestamp_worker_count(len(relative_paths))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            timestamp_rows = executor.map(
+                lambda relative_path: _post_commit_timestamps_for_relative_path(
+                    repo_root,
+                    relative_path=relative_path,
+                ),
+                relative_paths,
+            )
+            timestamps = {post_id: post_timestamps for post_id, post_timestamps in timestamp_rows}
+        _record_phase_timing(
+            timing_callback,
+            phase_name="post_index_commit_timestamp_git_logs",
+            started_at=started_at,
+        )
+        return timestamps
+    timestamps = {post_id: post_timestamps for post_id, post_timestamps in timestamp_rows}
     _record_phase_timing(
         timing_callback,
         phase_name="post_index_commit_timestamp_git_logs",
