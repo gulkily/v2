@@ -10,6 +10,27 @@ function updateHrefFromText(bodyText) {
   return match ? match[1].trim() : "";
 }
 
+export function fingerprintFromIdentityId(identityId) {
+  const trimmed = typeof identityId === "string" ? identityId.trim().toLowerCase() : "";
+  return trimmed.startsWith("openpgp:") ? trimmed.slice("openpgp:".length) : "";
+}
+
+export async function syncIdentityHint(fingerprint, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== "function") {
+    return false;
+  }
+  const trimmed = typeof fingerprint === "string" ? fingerprint.trim() : "";
+  const payload = trimmed ? { fingerprint: trimmed } : {};
+  const response = await fetchImpl("/api/set_identity_hint", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return Boolean(response && response.ok);
+}
+
 export async function usernameClaimCtaStateForIdentity(identityId, fetchImpl = globalThis.fetch) {
   const trimmed = typeof identityId === "string" ? identityId.trim() : "";
   if (!trimmed || typeof fetchImpl !== "function") {
@@ -44,16 +65,24 @@ export async function enhanceUsernameClaimCta(
   if (!link) {
     return;
   }
-  root.hidden = true;
-  link.setAttribute("href", "");
   const publicKey = storedPublicKey(storage);
   if (!publicKey) {
+    try {
+      await syncIdentityHint("", fetchImpl);
+    } catch (_error) {
+      // Ignore sync failures and fall back to a hidden banner.
+    }
+    root.hidden = true;
+    link.setAttribute("href", "");
     return;
   }
   try {
     const identityId = await identityIdFromPublicKey(publicKey);
+    await syncIdentityHint(fingerprintFromIdentityId(identityId), fetchImpl);
     const state = await usernameClaimCtaStateForIdentity(identityId, fetchImpl);
     if (!state || !state.canClaimUsername || !state.updateHref) {
+      root.hidden = true;
+      link.setAttribute("href", "");
       return;
     }
     link.setAttribute("href", state.updateHref);

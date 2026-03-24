@@ -76,6 +76,49 @@ process.stdout.write(JSON.stringify(state));
             },
         )
 
+    def test_username_claim_cta_asset_extracts_fingerprint_from_identity_id(self) -> None:
+        asset_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "username_claim_cta.js"
+        ).as_uri()
+        profile_nav_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js"
+        ).as_uri()
+        loader_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js"
+        ).as_uri()
+        vendor_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+        ).as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+const loaderSource = await fs.readFile(new URL({json.dumps(loader_url)}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
+const profileNavSource = await fs.readFile(new URL({json.dumps(profile_nav_url)}), "utf8");
+const rewrittenProfileNavSource = profileNavSource.replace(
+  "./openpgp_loader.js",
+  loaderModuleUrl,
+);
+const profileNavModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenProfileNavSource).toString("base64")}}`;
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const rewrittenAssetSource = assetSource.replace(
+  "./profile_nav.js",
+  profileNavModuleUrl,
+);
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
+const {{ fingerprintFromIdentityId }} = await import(assetModuleUrl);
+
+process.stdout.write(JSON.stringify({{
+  fingerprint: fingerprintFromIdentityId("openpgp:abcd1234ef"),
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertEqual(payload["fingerprint"], "abcd1234ef")
+
     def test_username_claim_cta_asset_reveals_banner_for_eligible_stored_key(self) -> None:
         asset_url = (
             Path(__file__).resolve().parent.parent / "templates" / "assets" / "username_claim_cta.js"
@@ -140,28 +183,43 @@ const storage = {{
     return key === "forum_public_key_armored" ? generated.publicKey : "";
   }},
 }};
-const fetchImpl = async (url) => ({{
-  ok: true,
-  async text() {{
-    return [
-      "Command: get_username_claim_cta",
-      "Identity-ID: derived",
-      "Can-Claim-Username: yes",
-      "Update-Href: /profiles/openpgp-derived/update",
-    ].join("\\n");
-  }},
-}});
+const requests = [];
+const fetchImpl = async (url, options) => {{
+  requests.push({{
+    url,
+    method: options?.method || "GET",
+    body: options?.body || "",
+  }});
+  return {{
+    ok: true,
+    async text() {{
+      return [
+        "Command: get_username_claim_cta",
+        "Identity-ID: derived",
+        "Can-Claim-Username: yes",
+        "Update-Href: /profiles/openpgp-derived/update",
+      ].join("\\n");
+    }},
+  }};
+}};
 
 await enhanceUsernameClaimCta(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
   hidden: root.hidden,
   href: link.href,
+  requests,
 }}));
 """
         payload = json.loads(self.run_node(script))
 
         self.assertFalse(payload["hidden"])
         self.assertEqual(payload["href"], "/profiles/openpgp-derived/update")
+        self.assertEqual(payload["requests"][0]["url"], "/api/set_identity_hint")
+        self.assertEqual(payload["requests"][0]["method"], "POST")
+        self.assertIn("fingerprint", payload["requests"][0]["body"])
+        self.assertTrue(
+            payload["requests"][1]["url"].startswith("/api/get_username_claim_cta?identity_id=openpgp%3A")
+        )
 
     def test_username_claim_cta_asset_keeps_banner_hidden_for_ineligible_response(self) -> None:
         asset_url = (
@@ -409,7 +467,7 @@ process.stdout.write(JSON.stringify({{
 
         self.assertTrue(payload["hidden"])
         self.assertEqual(payload["href"], "")
-        self.assertEqual(payload["fetchCalls"], 0)
+        self.assertEqual(payload["fetchCalls"], 1)
 
 
 if __name__ == "__main__":

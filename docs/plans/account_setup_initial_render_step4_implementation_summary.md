@@ -17,3 +17,13 @@
   - `python -m unittest tests.test_account_setup_initial_render tests.test_board_index_page tests.test_compose_thread_page`
 - Notes:
   - Existing `tests.test_profile_update_page` failures around the profile action link remain outside this slice and were not introduced by the shared-banner change.
+
+## Stage 3 - Update browser enhancement code to maintain the hint cookie and refresh banner state
+- Changes:
+  - Updated `templates/assets/username_claim_cta.js` to derive the active fingerprint from the stored key, sync the signed hint cookie through `/api/set_identity_hint`, and then refresh CTA state from the existing eligibility endpoint.
+  - Kept the banner hidden when the local key is absent or refresh resolves ineligible, while avoiding the previous eager hide-before-refresh behavior for the normal eligible case.
+  - Extended CTA asset coverage to verify fingerprint extraction, hint-cookie sync requests, and no-key fallback behavior.
+- Verification:
+  - `python -m unittest tests.test_username_claim_cta_asset tests.test_account_setup_initial_render`
+- Notes:
+  - The browser still treats the hint cookie as synchronization state only; privileged actions continue using signed request flows.
