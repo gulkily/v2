@@ -118,7 +118,7 @@ things that need to be folded into the dev process:
 - add an actual perl module to begin with
 
 - faqs to add
-	- why pgp is chosen
-	- why python and perl
-	- why textfiles and git
-	- why make it forkable
+	- why pgp is chosen. a: the most widely supported and time-tested pki system.
+	- why python and perl. a: python is widely used and understood, perl for backwards compatibility and ease of running (less likely to break between versions and systems).
+	- why textfiles and git. a: durable and machine- and human-accessible.
+	- why make it forkable. a: this creates an "insurance policy" for users against various non-consensual changes, such as admin mis-behavior, system being taken down, and allows for more creativity in developing the system. think of it as an open-source community.
