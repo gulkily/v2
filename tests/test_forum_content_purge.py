@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
+import zipfile
 
 
 def load_forum_content_purge_module():
@@ -131,6 +134,90 @@ class ForumContentPurgeTests(unittest.TestCase):
         self.assertIn("- records/identity", manifest)
         self.assertIn("- records/posts/root-001.txt", manifest)
         self.assertIn("- records/identity/identity-alpha.txt", manifest)
+
+    def test_run_content_purge_apply_reports_missing_filter_repo(self) -> None:
+        archive_path = self.repo_root.parent / "missing-tool.zip"
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with mock.patch.object(self.module.shutil, "which", return_value=None):
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = self.module.run_content_purge(
+                    self.repo_root,
+                    paths=["records/posts"],
+                    archive_output=archive_path,
+                    dry_run=False,
+                    force=False,
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("git filter-repo", stderr.getvalue())
+        self.assertFalse(archive_path.exists())
+        self.assertFalse(archive_path.with_suffix(".manifest.txt").exists())
+
+    def test_run_content_purge_apply_rewrites_history_with_filter_repo_shim(self) -> None:
+        archive_path = self.repo_root.parent / "apply-success.zip"
+        shim_dir = self.repo_root.parent / "shim-bin"
+        shim_dir.mkdir(parents=True, exist_ok=True)
+        shim_path = shim_dir / "git-filter-repo"
+        shim_path.write_text(
+            "\n".join(
+                [
+                    "#!/bin/sh",
+                    "set -eu",
+                    "paths=\"\"",
+                    "while [ \"$#\" -gt 0 ]; do",
+                    "  case \"$1\" in",
+                    "    --path) paths=\"$paths $2\"; shift 2 ;;",
+                    "    --force|--invert-paths) shift ;;",
+                    "    *) shift ;;",
+                    "  esac",
+                    "done",
+                    "if [ -z \"$paths\" ]; then",
+                    "  echo \"missing paths\" >&2",
+                    "  exit 1",
+                    "fi",
+                    "git filter-branch --force --index-filter \"git rm -r --cached --ignore-unmatch $paths\" --prune-empty --tag-name-filter cat -- --all >/dev/null 2>&1",
+                    "rm -rf .git/refs/original .git/logs/refs/original .git/filter-branch || true",
+                    "git reflog expire --expire=now --all >/dev/null 2>&1 || true",
+                    "git gc --prune=now >/dev/null 2>&1 || true",
+                ]
+            )
+            + "\n",
+            encoding="ascii",
+        )
+        shim_path.chmod(0o755)
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        env_path = os.environ.get("PATH", "")
+        with mock.patch.dict(os.environ, {"PATH": f"{shim_dir}:{env_path}"}):
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = self.module.run_content_purge(
+                    self.repo_root,
+                    paths=["records/posts"],
+                    archive_output=archive_path,
+                    dry_run=False,
+                    force=False,
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertTrue(archive_path.exists())
+        self.assertTrue(archive_path.with_suffix(".manifest.txt").exists())
+        with zipfile.ZipFile(archive_path) as archive:
+            self.assertEqual(archive.namelist(), ["records/posts/root-001.txt"])
+            archive_info = archive.getinfo("records/posts/root-001.txt")
+            self.assertEqual(archive_info.date_time, (2020, 1, 1, 0, 0, 0))
+            self.assertEqual(
+                archive.read("records/posts/root-001.txt").decode("ascii"),
+                "Post-ID: root-001\n\nBody.\n",
+            )
+        self.assertEqual(self.run_git("log", "--all", "--oneline", "--", "records/posts/root-001.txt"), "")
+        self.assertIn("initial", self.run_git("log", "--all", "--oneline", "--", "README.md"))
+        output = stdout.getvalue()
+        self.assertIn("History rewrite completed for the selected paths.", output)
+        self.assertIn("Required follow-up actions:", output)
 
 
 if __name__ == "__main__":

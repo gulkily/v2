@@ -36,3 +36,14 @@
 - Notes:
   - The local machine does not need a globally installed `git-filter-repo` for tests or smoke runs, but real operator use still requires the executable to be present on `PATH`.
   - The archive and manifest are intentionally written before history rewrite so purge failures still leave the exported content behind.
+
+## Stage 4 - Add focused automated coverage for apply-mode behavior
+- Changes:
+  - Extended `tests/test_forum_content_purge.py` with the missing-`git-filter-repo` failure case and a disposable-repo apply test that uses a temporary `git-filter-repo` shim to verify archive creation, manifest creation, normalized zip metadata, and rewritten history.
+  - Kept the existing CLI parser/dispatch coverage in `tests/test_forum_tasks.py` aligned with the helper changes from earlier stages.
+- Verification:
+  - Ran `python3 -m unittest tests.test_forum_content_purge tests.test_forum_tasks`; passed 31 tests.
+  - Ran `python3 scripts/forum_tasks.py content-purge records/posts --apply --archive-output /tmp/content-purge-apply.zip` in the current checkout and confirmed the dirty-worktree guard stops the destructive path before archive creation or history rewriting.
+- Notes:
+  - The current checkout remains intentionally dirty because of unrelated local work, so the direct `./forum` apply smoke here is expected to stop at the safety gate.
+  - The disposable-repo test is now the automated proof that the apply path can complete when the repo is clean and `git-filter-repo` is available on `PATH`.
