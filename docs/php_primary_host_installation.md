@@ -39,6 +39,16 @@ The sample PHP adapter includes a short-lived file microcache for explicitly saf
 
 The adapter allowlist is intentionally narrow. It is meant for public read routes such as `/`, thread pages, post pages, `/instance/`, `/llms.txt`, and selected read APIs. Compose flows, signed submission flows, and request-context-sensitive behavior should not be added to the cache allowlist casually.
 
+## Static HTML Bypass Boundary
+The PHP-primary profile can also serve pre-generated HTML files directly for a narrower set of anonymous public page routes:
+
+- Apache checks for generated `_static_html/.../index.html` artifacts before routing an eligible request through `index.php`
+- the canonical Python application still generates the page body; the adapter only stores and reuses that rendered HTML
+- query-string variants, cookie-bearing requests, authenticated requests, write routes, and request-sensitive pages stay on the dynamic path
+- successful writes routed through the PHP shim clear the generated static HTML tree so later reads materialize fresh artifacts
+
+This direct-serve path is intentionally narrower than the PHP microcache because it is only for stable HTML page routes, not read APIs or request-shaped variants.
+
 ## Planned Public Layout
 The supported installation shape assumes:
 
@@ -53,6 +63,7 @@ The generated `forum_host_config.php` is the primary adapter settings surface fo
 - `app_root`: the deployed application checkout path
 - `repo_root`: the writable forum data repository root
 - `cache_dir`: the writable PHP microcache directory
+- `static_html_dir`: the public artifact directory for generated `_static_html` page files
 - `microcache_ttl`: the short allowlisted read-cache lifetime in seconds
 
 `forum_host_config.example.php` is tracked as the shape reference, while the real `forum_host_config.php` stays ignored by git because it contains host-local paths.
@@ -80,8 +91,9 @@ Any host-specific glue should stay inside the adapter and deployment docs, not s
 5. Confirm the command generated `php_host/public/forum_host_config.php` and attempted to symlink `index.php`, `.htaccess`, and `forum_host_config.php` into the public web root.
 6. If the host rejects symlinks, leave the generated config file in place and follow the command's manual copy or manual linking guidance for the three public files.
 7. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.
-8. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, or identity bootstrap files.
-9. If you need a non-default cache path or TTL, edit the generated `forum_host_config.php` rather than hand-editing `index.php`.
+8. Confirm the public web root either allows the default `_static_html/` artifact directory or set `static_html_dir` to a public writable location under that web root.
+9. Confirm the deployed repository directories are writable anywhere the application stores records, signatures, generated keys, identity bootstrap files, or adapter-owned cache artifacts.
+10. If you need a non-default cache path, static HTML path, or TTL, edit the generated `forum_host_config.php` rather than hand-editing `index.php`.
 
 ## Adapter Config File
 - `php_host/public/forum_host_config.example.php`: tracked example showing the required config keys and file shape.
@@ -92,9 +104,10 @@ Any host-specific glue should stay inside the adapter and deployment docs, not s
 - Request `/` and confirm the board index renders through the PHP front controller.
 - Confirm the public web root contains `index.php`, `.htaccess`, and `forum_host_config.php` as symlinks into the repo checkout when the host allows symlinks.
 - Request `/` twice in quick succession and confirm the second response is served from the PHP cache layer, for example by checking the adapter's `X-Forum-Php-Cache` response header for `HIT`.
+- Request an allowlisted public page such as `/threads/<existing-thread-id>` twice and confirm the host can serve a generated `_static_html/.../index.html` artifact on the second anonymous request.
 - Request `/threads/<existing-thread-id>` and confirm a thread page renders.
 - Request `/assets/site.css` and confirm the canonical asset path still resolves.
 - Confirm `/assets/site.css` includes an explicit `Cache-Control` header.
 - Open `/compose/thread` and confirm the page still targets `/api/create_thread`.
 - Submit one signed thread and one signed reply, then confirm git commits and stored record files appear in the forum repository.
-- After a successful write through the PHP-hosted path, request `/` or the affected thread again and confirm the adapter serves a fresh response rather than a stale cached copy.
+- After a successful write through the PHP-hosted path, request `/` or the affected thread again and confirm the adapter serves a fresh response rather than a stale cached copy or stale static artifact.

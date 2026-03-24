@@ -46,3 +46,14 @@
 - Notes:
   - First-paint visibility now depends on browser-readable state; without local storage, the banner still falls back to hidden unless the current dynamic response can hydrate fresh eligibility into the bootstrap.
   - The profile page no longer embeds a static per-request CTA href for anonymous readers; the shared CTA link is now client-populated.
+
+## Stage 5 - Tighten docs and end-to-end verification
+- Changes:
+  - Updated [`docs/php_primary_host_installation.md`](/home/wsl/v2/docs/php_primary_host_installation.md) to document the `_static_html` bypass boundary, the new `static_html_dir` config expectation, and revised post-install verification for static artifacts plus invalidation.
+  - Ran a combined verification slice across the PHP-host caching/static path, rewrite contract, account-setup bootstrap, affected shared pages, and CTA asset behavior.
+- Verification:
+  - Ran `python -m unittest tests.test_php_host_cache tests.test_php_host_htaccess tests.test_account_setup_initial_render tests.test_board_index_page tests.test_compose_thread_page tests.test_profile_update_page tests.test_username_claim_cta_asset`
+  - Result: 40 tests passed.
+- Notes:
+  - Apache rewrite behavior is still verified indirectly in local tests via `.htaccess` contract assertions; shared-host deployment smoke checks remain important.
+  - The implementation currently clears the full static artifact tree after successful writes rather than doing route-scoped invalidation.
