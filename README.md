@@ -70,11 +70,20 @@ If you prefer a repo-local virtual environment instead of a user-profile install
 - `./forum install`
 - `./forum env-sync`
 - `./forum git-recover`
+- `./forum content-purge records/posts`
 - `./forum rebuild-index`
 - `./forum start`
 - `./forum test`
 
 More command and runtime details are in [docs/developer_commands.md](docs/developer_commands.md).
+
+## Operator Cleanup
+
+For future clean-start resets, operators can archive and purge canonical content from reachable git history with `./forum content-purge ...`.
+
+- Preview one or more record families with `./forum content-purge records/posts records/identity`.
+- Apply the workflow only after reviewing the preview and choosing an archive target outside the repo, for example `./forum content-purge records/posts --apply --archive-output /tmp/forum-posts.zip`.
+- Real apply mode requires `git-filter-repo` on `PATH` and prints required follow-up actions such as force-pushing rewritten refs and rotating old clones.
 
 ## Deployment
 

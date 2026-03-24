@@ -14,3 +14,8 @@ For the current implementation slices, canonical forum state is still text-nativ
 - `moderation/` contains signed moderation records.
 
 Later feature slices may add other record categories, but this loop establishes only the minimal layout needed for post storage.
+
+Operator cleanup note:
+- `./forum content-purge ...` is the canonical operator workflow for archiving and then removing selected canonical content from reachable git history.
+- Purge targets must be specific paths beneath `records/`, such as `records/posts/`, `records/identity/`, or another concrete record family or file.
+- The workflow exports a normalized zip archive plus a manifest outside the repository root before rewriting history.

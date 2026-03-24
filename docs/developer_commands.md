@@ -10,6 +10,8 @@ Use `./forum` as the short repo-root command for common local tasks.
 - `./forum env-sync`: append missing `.env` settings from `.env.example` without overwriting existing values.
 - `./forum git-recover`: diagnose the current checkout for common deploy-sync git failures.
 - `./forum git-recover --apply`: reset the checkout back to local `main` tracking `origin/main`, discarding local commits and working-tree changes when needed.
+- `./forum content-purge records/posts`: preview archival-plus-history purge for one or more canonical `records/` paths.
+- `./forum content-purge records/posts --apply --archive-output /tmp/forum-posts.zip`: archive the selected content outside the repo and rewrite reachable history to remove it.
 - `./forum rebuild-index`: force a full rebuild of the derived post index for the current checkout.
 - `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
 - `./forum start`: run the local read-only forum server.
@@ -22,6 +24,16 @@ The command contract is intentionally small: future backends such as Perl should
 - `./forum git-recover` is the canonical operator diagnosis path when a checkout is failing normal `git pull`.
 - `--apply` resets the checkout to the expected deployment state and may discard local commits, staged changes, tracked edits, and untracked files to get back to `origin/main`.
 - Mid-operation states such as rebase-in-progress and merge-in-progress are diagnosed, but still require explicit operator resolution before rerunning `--apply`.
+
+## Content purge
+- `./forum content-purge <records-path> [...]` previews an operator-only archive-plus-history-rewrite workflow for canonical content under `records/`.
+- Supported selections are repository-relative paths beneath `records/`, such as `records/posts`, `records/identity`, or another specific record family or file.
+- The command rejects the `records/` root itself, non-`records/` paths, duplicate selections, and overlapping selections such as `records/posts` plus `records/posts/root-001.txt`.
+- `--apply` performs the destructive path only after the preview contract is satisfied.
+- `--archive-output` must point outside the repository root so the export artifact does not dirty the repo being rewritten.
+- `--apply` requires a clean worktree unless `--force` is used explicitly.
+- Real apply mode requires the `git-filter-repo` executable on `PATH`.
+- After a successful apply run, operators must force-push rewritten refs and retire or reclone old checkouts; the command prints those follow-up steps explicitly.
 
 ## Direct entrypoints still supported
 - `python3 scripts/forum_tasks.py ...`: direct Python reference runner.

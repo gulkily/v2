@@ -47,3 +47,13 @@
 - Notes:
   - The current checkout remains intentionally dirty because of unrelated local work, so the direct `./forum` apply smoke here is expected to stop at the safety gate.
   - The disposable-repo test is now the automated proof that the apply path can complete when the repo is clean and `git-filter-repo` is available on `PATH`.
+
+## Stage 5 - Document the operator workflow and prerequisites
+- Changes:
+  - Updated `docs/developer_commands.md` with the new `./forum content-purge` command, preview/apply examples, supported selection scope, safety guards, `git-filter-repo` prerequisite, and required post-rewrite follow-up actions.
+  - Updated `README.md` so the command is discoverable from the top-level common-command list and operator-cleanup guidance.
+  - Updated `records/README.md` to point operators at `./forum content-purge` as the canonical cleanup path for record-family history purges.
+- Verification:
+  - Re-read the updated `README.md`, `docs/developer_commands.md`, and `records/README.md` flow to confirm the command can be discovered from the top-level docs, followed to preview/apply examples, and tied back to the canonical `records/` tree.
+- Notes:
+  - The docs intentionally keep the workflow framed as operator-only destructive maintenance rather than casual content cleanup.
