@@ -105,6 +105,19 @@ class AccountSetupInitialRenderTests(unittest.TestCase):
         self.assertIn('data-username-claim-cta hidden', body)
         self.assertIn('data-username-claim-link href=""', body)
 
+    def test_expired_hint_cookie_fails_closed_to_hidden_banner(self) -> None:
+        expired_value = build_identity_hint_cookie_value(
+            IDENTITY_FINGERPRINT,
+            secret="test-secret",
+            now=1,
+            max_age=1,
+        )
+        status, _, body = self.get("/", cookie=self.identity_hint_cookie(raw_value=expired_value))
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('data-username-claim-cta hidden', body)
+        self.assertIn('data-username-claim-link href=""', body)
+
 
 if __name__ == "__main__":
     unittest.main()

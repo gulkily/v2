@@ -27,3 +27,12 @@
   - `python -m unittest tests.test_username_claim_cta_asset tests.test_account_setup_initial_render`
 - Notes:
   - The browser still treats the hint cookie as synchronization state only; privileged actions continue using signed request flows.
+
+## Stage 4 - Add focused regression coverage for cookie validation, initial HTML, and enhancement boundaries
+- Changes:
+  - Added stale-cookie page coverage so expired hint cookies fail closed to the hidden banner state in initial HTML.
+  - Ran the focused end-to-end regression suite covering cookie signing, cookie sync, SSR banner rendering, and representative shared pages.
+- Verification:
+  - `python -m unittest tests.test_identity_hint tests.test_identity_hint_api tests.test_account_setup_initial_render tests.test_username_claim_cta_asset tests.test_board_index_page tests.test_compose_thread_page`
+- Notes:
+  - The focused suite passed.
