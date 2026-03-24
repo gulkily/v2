@@ -484,6 +484,22 @@ def render_rss_feed(*, title: str, description: str, link: str, items: list[Feed
     return "".join(parts).encode("utf-8")
 
 
+def render_feed_link_chip(feed_href: str) -> str:
+    return (
+        '<section class="panel page-section">'
+        '<div class="action-row">'
+        f'<a class="thread-chip" href="{html.escape(feed_href)}">RSS feed</a>'
+        "</div>"
+        "</section>"
+    )
+
+
+def render_feed_head_link(feed_href: str) -> str:
+    return (
+        f'<link rel="alternate" type="application/rss+xml" title="RSS feed" href="{html.escape(feed_href, quote=True)}">'
+    )
+
+
 def activity_filter_mode_from_request(raw_mode: str | None) -> str:
     mode = (raw_mode or "").strip().lower()
     if mode in {"all", "content", "moderation", "code"}:
@@ -1184,6 +1200,9 @@ def render_board_index(*, board_tag: str | None = None) -> str:
     posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
     if board_tag and board_tag not in board_tags:
         raise LookupError(f"unknown board tag: {board_tag}")
+    feed_href = "/?format=rss"
+    if board_tag:
+        feed_href = f"/?board_tag={board_tag}&format=rss"
     context = build_board_index_page_context(
         posts,
         threads,
@@ -1197,13 +1216,14 @@ def render_board_index(*, board_tag: str | None = None) -> str:
         hero_kicker="",
         hero_title="",
         hero_text="",
-        content_html=content,
+        content_html=render_feed_link_chip(feed_href) + content,
         page_header_html=render_site_header(
             hero_kicker="",
             hero_title="",
             hero_text="",
             include_page_intro=False,
         ),
+        head_extras_html=render_feed_head_link(feed_href),
     )
 
 
@@ -1480,6 +1500,7 @@ def render_site_activity_page(*, view_mode: str, page: int) -> str:
         intro_text = "Browse only signed moderation actions for this instance."
     elif view_mode == "code":
         intro_text = "Browse only repository code changes for this instance."
+    feed_href = f"/activity/?view={view_mode}&format=rss"
     content = load_template("activity.html").substitute(
         filter_nav_html=render_activity_filter_nav(current_mode=view_mode),
         activity_intro_text=html.escape(intro_text),
@@ -1501,7 +1522,8 @@ def render_site_activity_page(*, view_mode: str, page: int) -> str:
             hero_text="",
             include_page_intro=False,
         ),
-        content_html=content,
+        content_html=render_feed_link_chip(feed_href) + content,
+        head_extras_html=render_feed_head_link(feed_href),
     )
 
 
@@ -1592,6 +1614,7 @@ def render_thread(thread_id: str) -> str:
             )
             + "</div></section>"
         )
+    feed_href = f"/threads/{thread_id}?format=rss"
 
     content = load_template("thread.html").substitute(
         thread_heading=html.escape(thread.root.subject or thread.root.post_id),
@@ -1618,7 +1641,8 @@ def render_thread(thread_id: str) -> str:
             hero_text="",
             include_page_intro=False,
         ),
-        content_html=content,
+        content_html=render_feed_link_chip(feed_href) + content,
+        head_extras_html=render_feed_head_link(feed_href),
     )
 
 

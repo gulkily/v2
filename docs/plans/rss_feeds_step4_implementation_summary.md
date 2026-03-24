@@ -17,3 +17,13 @@
   - `python -m pytest tests/test_site_activity_page.py tests/test_board_index_page.py tests/test_task_thread_pages.py`
 - Notes:
   - RSS is currently exposed through query-parameter negotiation (`format=rss`) rather than separate feed-only endpoints.
+
+## Stage 3 - Add RSS discovery to HTML pages
+- Changes:
+  - Extended the shared page shell to support head-level feed discovery markup and added `<link rel="alternate" type="application/rss+xml">` metadata for the board index, activity page, and thread pages.
+  - Added one visible `RSS feed` chip to those same HTML pages so the subscription URL is discoverable without inspecting source.
+  - Added HTML assertions in the page test suites to verify both the visible discovery link and the alternate-feed metadata.
+- Verification:
+  - `python -m pytest tests/test_site_activity_page.py tests/test_board_index_page.py tests/test_task_thread_pages.py`
+- Notes:
+  - Board-filtered HTML pages now advertise the board-filtered RSS URL when `board_tag` scope is active.

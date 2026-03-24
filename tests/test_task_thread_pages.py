@@ -133,6 +133,9 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertNotIn("Thread View", body)
         self.assertNotIn("Task threads are typed root posts", body)
         self.assertNotIn('class="breadcrumb"', body)
+        self.assertIn('rel="alternate" type="application/rss+xml"', body)
+        self.assertIn('href="/threads/T01?format=rss"', body)
+        self.assertIn(">RSS feed</a>", body)
 
     def test_thread_page_hides_empty_reply_metadata_and_section(self) -> None:
         self.write_record(

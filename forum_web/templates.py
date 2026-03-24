@@ -131,6 +131,7 @@ def render_page(
     page_header_html: str | None = None,
     page_banner_html: str | None = None,
     page_footer_html: str = "",
+    head_extras_html: str = "",
 ) -> str:
     base = load_template("base.html")
     if page_header_html is None:
@@ -152,6 +153,7 @@ def render_page(
     )
     return base.substitute(
         title=html.escape(title),
+        head_extras_html=head_extras_html,
         page_header_html=page_header_html,
         page_banner_html=page_banner_html,
         content_html=content_html,

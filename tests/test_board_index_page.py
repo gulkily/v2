@@ -139,6 +139,9 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">', body)
         self.assertIn('<link rel="icon" href="/favicon.ico" sizes="any">', body)
         self.assertIn('<link rel="shortcut icon" href="/favicon.ico">', body)
+        self.assertIn('rel="alternate" type="application/rss+xml"', body)
+        self.assertIn('href="/?format=rss"', body)
+        self.assertIn(">RSS feed</a>", body)
 
     def test_board_index_kindness_header_flag_defaults_off_and_can_be_enabled(self) -> None:
         _, _, default_body = self.get("/")
