@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
+import zipfile
 
 @dataclass(frozen=True)
 class PurgePlan:
@@ -49,16 +51,31 @@ def run_content_purge(
         print(f"- {path}")
 
     if not dry_run:
-        if worktree_is_dirty(repo_root) and not force:
+        dirty_worktree = worktree_is_dirty(repo_root)
+        if dirty_worktree and not force:
             print(
                 "Refusing to apply content purge on a dirty worktree. Clean the checkout or re-run with `--force`.",
                 file=sys.stderr,
             )
             return 1
-        if force:
-            print("Force flag recorded: dirty-worktree guard may be bypassed in later stages.")
-        print("Apply mode is not implemented yet. Re-run without `--apply` for preview output.")
-        return 1
+        if dirty_worktree and force:
+            print("Force flag enabled: continuing despite dirty worktree.")
+        try:
+            ensure_filter_repo_available(repo_root)
+            create_normalized_archive(plan, repo_root)
+            write_archive_manifest(plan, repo_root)
+            rewrite_history(repo_root, plan)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+
+        print(f"Archive created: {plan.archive_output}")
+        print(f"Manifest created: {plan.manifest_output}")
+        print("History rewrite completed for the selected paths.")
+        print("Required follow-up actions:")
+        for line in render_post_rewrite_instructions():
+            print(f"- {line}")
+        return 0
 
     print("Preview only: no archive was created and no history was rewritten.")
     return 0
@@ -200,6 +217,58 @@ def build_archive_manifest(plan: PurgePlan, repo_root: Path) -> str:
     lines.extend(f"- {path.relative_to(repo_root).as_posix()}" for path in plan.archived_files)
     lines.append("")
     return "\n".join(lines)
+
+
+def create_normalized_archive(plan: PurgePlan, repo_root: Path) -> None:
+    plan.archive_output.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(plan.archive_output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for source_path in plan.archived_files:
+            archive_name = source_path.relative_to(repo_root).as_posix()
+            archive_info = zipfile.ZipInfo(filename=archive_name, date_time=(2020, 1, 1, 0, 0, 0))
+            archive_info.compress_type = zipfile.ZIP_DEFLATED
+            archive_info.external_attr = 0o100644 << 16
+            archive.writestr(archive_info, source_path.read_bytes())
+
+
+def write_archive_manifest(plan: PurgePlan, repo_root: Path) -> None:
+    plan.manifest_output.parent.mkdir(parents=True, exist_ok=True)
+    plan.manifest_output.write_text(build_archive_manifest(plan, repo_root), encoding="utf-8")
+
+
+def ensure_filter_repo_available(repo_root: Path) -> None:
+    del repo_root
+    executable = shutil.which("git-filter-repo")
+    if executable is None:
+        raise ValueError(
+            "Cannot apply content purge because `git filter-repo` is not available in this environment. "
+            "Install the `git-filter-repo` executable before running `content-purge --apply`."
+        )
+
+
+def rewrite_history(repo_root: Path, plan: PurgePlan) -> None:
+    command = ["git", "-C", str(repo_root), "filter-repo", "--force"]
+    for path in plan.requested_paths:
+        command.extend(["--path", path])
+    command.append("--invert-paths")
+    result = subprocess.run(
+        command,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "git filter-repo failed"
+        raise ValueError(f"History rewrite failed: {detail}")
+
+
+def render_post_rewrite_instructions() -> tuple[str, ...]:
+    return (
+        "Force-push rewritten branches to the canonical remote, for example `git push --force --all origin`.",
+        "Force-push rewritten tags if this repository publishes tags, for example `git push --force --tags origin`.",
+        "Retire or reclone old checkouts so future operators start from the rewritten history.",
+        "Remove or refresh any remote mirrors, caches, or backups that still contain the purged content.",
+    )
 
 
 def worktree_is_dirty(repo_root: Path) -> bool:

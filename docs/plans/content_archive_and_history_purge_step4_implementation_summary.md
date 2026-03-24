@@ -24,3 +24,15 @@
 - Notes:
   - Archive output is now required to live outside the repository root so the workflow does not dirty the repo with its own export artifacts.
   - Apply mode still stops before archive creation or history rewriting; Stage 3 will execute the planned workflow once the guardrails are in place.
+
+## Stage 3 - Execute archive creation and guarded history rewrite
+- Changes:
+  - Extended `scripts/forum_content_purge.py` so `--apply` now creates the normalized zip archive, writes the external manifest, checks for `git-filter-repo`, rewrites history for the selected paths, and prints the required post-rewrite follow-up actions.
+  - Added explicit helper boundaries for archive creation, manifest writing, `git-filter-repo` availability checks, history rewrite execution, and operator follow-up messaging.
+  - Kept the dirty-worktree guard in front of the destructive path, with `--force` reserved as the explicit override.
+- Verification:
+  - Ran `python3 -m unittest tests.test_forum_content_purge tests.test_forum_tasks`; passed 29 tests.
+  - Ran a disposable-repo apply smoke using a temporary `git-filter-repo` shim that rewrites history through `git filter-branch`; confirmed the archive and manifest were created, `git log --all -- records/posts/root-001.txt` returned no reachable history, and unrelated `README.md` history remained reachable.
+- Notes:
+  - The local machine does not need a globally installed `git-filter-repo` for tests or smoke runs, but real operator use still requires the executable to be present on `PATH`.
+  - The archive and manifest are intentionally written before history rewrite so purge failures still leave the exported content behind.
