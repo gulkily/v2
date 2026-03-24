@@ -87,6 +87,14 @@ class ForumTasksTests(unittest.TestCase):
         self.assertFalse(request.content_purge_force)
         self.assertIsNone(request.content_purge_archive_output)
 
+    def test_parse_task_args_accepts_content_purge_without_explicit_paths(self) -> None:
+        _, request = self.module.parse_task_args(["content-purge"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "content-purge")
+        self.assertEqual(request.content_purge_paths, ())
+        self.assertFalse(request.content_purge_apply)
+
     def test_parse_task_args_accepts_content_purge_apply_options(self) -> None:
         _, request = self.module.parse_task_args(
             [

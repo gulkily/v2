@@ -26,7 +26,8 @@ The command contract is intentionally small: future backends such as Perl should
 - Mid-operation states such as rebase-in-progress and merge-in-progress are diagnosed, but still require explicit operator resolution before rerunning `--apply`.
 
 ## Content purge
-- `./forum content-purge <records-path> [...]` previews an operator-only archive-plus-history-rewrite workflow for canonical content under `records/`.
+- `./forum content-purge [<records-path> ...]` previews an operator-only archive-plus-history-rewrite workflow for canonical content under `records/`.
+- When no paths are provided, the command suggests and uses sane defaults from the current `records/` tree, skipping preserved runtime/deployment areas such as `records/instance/` and `records/system/`.
 - Supported selections are repository-relative paths beneath `records/`, such as `records/posts`, `records/identity`, or another specific record family or file.
 - The command rejects the `records/` root itself, non-`records/` paths, duplicate selections, and overlapping selections such as `records/posts` plus `records/posts/root-001.txt`.
 - `--apply` performs the destructive path only after the preview contract is satisfied.

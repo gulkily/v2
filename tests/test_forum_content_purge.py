@@ -76,6 +76,22 @@ class ForumContentPurgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Overlapping purge paths"):
             self.module.resolve_purge_paths(self.repo_root, ["records/posts", "records/posts/root-001.txt"])
 
+    def test_suggest_default_purge_paths_prefers_known_content_families(self) -> None:
+        self.write_text("records/moderation/mod-001.txt", "Record-ID: mod-001\n\nBody.\n")
+        self.write_text("records/instance/public.txt", "keep this\n")
+        self.write_text("records/system/key.asc", "secret\n")
+
+        suggested = self.module.suggest_default_purge_paths(self.repo_root)
+
+        self.assertEqual(
+            suggested,
+            (
+                "records/posts",
+                "records/identity",
+                "records/moderation",
+            ),
+        )
+
     def test_run_content_purge_preview_reports_archive_and_manifest_targets(self) -> None:
         archive_path = self.repo_root.parent / "preview-output.zip"
         stdout = io.StringIO()
@@ -99,6 +115,26 @@ class ForumContentPurgeTests(unittest.TestCase):
         self.assertIn("Preview only: no archive was created and no history was rewritten.", output)
         self.assertFalse(archive_path.exists())
         self.assertFalse(archive_path.with_suffix(".manifest.txt").exists())
+
+    def test_run_content_purge_preview_uses_suggested_defaults_when_paths_missing(self) -> None:
+        archive_path = self.repo_root.parent / "default-preview.zip"
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_content_purge(
+                self.repo_root,
+                paths=[],
+                archive_output=archive_path,
+                dry_run=True,
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        output = stdout.getvalue()
+        self.assertIn("No explicit paths were provided. Using suggested default paths", output)
+        self.assertIn("- records/posts", output)
+        self.assertIn("- records/identity", output)
 
     def test_run_content_purge_apply_refuses_dirty_worktree_without_force(self) -> None:
         self.write_text("records/posts/untracked.txt", "Post-ID: untracked\n\nBody.\n")

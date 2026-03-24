@@ -11,6 +11,21 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 import zipfile
 
+SUGGESTED_PURGE_ORDER = (
+    "records/posts",
+    "records/identity",
+    "records/identity-links",
+    "records/merge-requests",
+    "records/profile-updates",
+    "records/moderation",
+    "records/public-keys",
+)
+PRESERVED_RECORDS_PATHS = {
+    "records/instance",
+    "records/system",
+}
+
+
 @dataclass(frozen=True)
 class PurgePlan:
     requested_paths: tuple[str, ...]
@@ -21,6 +36,7 @@ class PurgePlan:
     generated_at: str
     head_commit: str
     oldest_reachable_commit: str
+    used_default_paths: bool = False
 
 
 def run_content_purge(
@@ -46,6 +62,8 @@ def run_content_purge(
     print(f"Oldest reachable commit: {plan.oldest_reachable_commit}")
     print(f"Selected path count: {len(plan.selected_paths)}")
     print(f"Archived file count: {len(plan.archived_files)}")
+    if plan.used_default_paths:
+        print("No explicit paths were provided. Using suggested default paths from the current records tree.")
     print("Selected paths:")
     for path in plan.requested_paths:
         print(f"- {path}")
@@ -87,20 +105,26 @@ def build_purge_plan(
     requested_paths: list[str],
     archive_output: Path | None = None,
 ) -> PurgePlan:
-    selected_paths = resolve_purge_paths(repo_root, requested_paths)
+    explicit_paths = bool(requested_paths)
+    normalized_paths = (
+        tuple(normalize_requested_path(path) for path in requested_paths)
+        if explicit_paths
+        else suggest_default_purge_paths(repo_root)
+    )
+    selected_paths = resolve_purge_paths(repo_root, list(normalized_paths))
     archived_files = collect_archived_files(selected_paths)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     archive_path = resolve_archive_output_path(
         repo_root,
         archive_output=archive_output,
-        requested_paths=requested_paths,
+        requested_paths=list(normalized_paths),
         generated_at=generated_at,
     )
     manifest_path = archive_path.with_suffix(".manifest.txt")
     head_commit = git_stdout(repo_root, "rev-parse", "HEAD")
     oldest_reachable_commit = git_stdout(repo_root, "rev-list", "--max-parents=0", "HEAD").splitlines()[0]
     return PurgePlan(
-        requested_paths=tuple(normalize_requested_path(path) for path in requested_paths),
+        requested_paths=normalized_paths,
         selected_paths=selected_paths,
         archived_files=archived_files,
         archive_output=archive_path,
@@ -108,6 +132,7 @@ def build_purge_plan(
         generated_at=generated_at,
         head_commit=head_commit,
         oldest_reachable_commit=oldest_reachable_commit,
+        used_default_paths=not explicit_paths,
     )
 
 
@@ -151,6 +176,36 @@ def resolve_purge_paths(repo_root: Path, requested_paths: list[str]) -> tuple[Pa
     return tuple(path for _, path in sorted_pairs)
 
 
+def suggest_default_purge_paths(repo_root: Path) -> tuple[str, ...]:
+    records_root = repo_root / "records"
+    if not records_root.exists():
+        raise ValueError("Repository does not contain a `records/` tree to inspect for purge suggestions.")
+
+    suggestions: list[str] = []
+    known = set()
+    for path_text in SUGGESTED_PURGE_ORDER:
+        candidate = repo_root / path_text
+        if candidate.exists() and directory_contains_purgeable_files(candidate):
+            suggestions.append(path_text)
+            known.add(path_text)
+
+    for child in sorted(records_root.iterdir(), key=lambda path: path.name):
+        normalized = f"records/{child.name}"
+        if normalized in known or normalized in PRESERVED_RECORDS_PATHS:
+            continue
+        if child.is_dir() and directory_contains_purgeable_files(child):
+            suggestions.append(normalized)
+        elif child.is_file() and child.name != "README.md":
+            suggestions.append(normalized)
+
+    if not suggestions:
+        raise ValueError(
+            "No explicit paths were provided and no suggested purge paths were found under `records/`. "
+            "Pass one or more canonical `records/` paths explicitly."
+        )
+    return tuple(suggestions)
+
+
 def normalize_requested_path(raw_path: str) -> str:
     stripped = raw_path.strip()
     if not stripped:
@@ -173,6 +228,13 @@ def collect_archived_files(selected_paths: tuple[Path, ...]) -> tuple[Path, ...]
     if not archived:
         raise ValueError("Selected purge paths do not contain any files to archive.")
     return tuple(sorted(archived))
+
+
+def directory_contains_purgeable_files(directory: Path) -> bool:
+    for path in directory.rglob("*"):
+        if path.is_file() and path.name != "README.md":
+            return True
+    return False
 
 
 def resolve_archive_output_path(

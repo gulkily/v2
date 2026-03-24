@@ -93,8 +93,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     content_purge_parser.add_argument(
         "paths",
-        nargs="+",
-        help="Canonical repository-backed content paths to archive and purge.",
+        nargs="*",
+        help="Canonical repository-backed content paths to archive and purge. Omit to use suggested defaults.",
     )
     content_purge_parser.add_argument(
         "--archive-output",
