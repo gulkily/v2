@@ -34,3 +34,15 @@
 - Notes:
   - The PHP fallback static-hit path is intentionally retained even though Apache should serve these files first in production; it keeps behavior correct when rewrite bypass is unavailable or untested locally.
   - Invalidation is coarse for now and clears the full `_static_html/` tree after successful writes.
+
+## Stage 4 - Make the username CTA static-safe before first paint
+- Changes:
+  - Reworked the shared banner shell in [`forum_web/templates.py`](/home/wsl/v2/forum_web/templates.py) so pages emit a tiny head bootstrap that reads `forum_username_claim_cta` from local storage, hydrates that state from server-known eligibility when available, and applies first-paint CTA visibility through document-level attributes.
+  - Added the shared CTA module to normal page renders and updated [`templates/assets/username_claim_cta.js`](/home/wsl/v2/templates/assets/username_claim_cta.js) to read, write, and apply stored CTA state instead of toggling a server-owned `hidden` attribute after load.
+  - Updated [`templates/assets/site.css`](/home/wsl/v2/templates/assets/site.css) so the banner is hidden by default until the bootstrap marks it visible, and refreshed server/asset tests to match the new client-owned contract.
+- Verification:
+  - Ran `python -m unittest tests.test_account_setup_initial_render tests.test_board_index_page tests.test_compose_thread_page tests.test_profile_update_page tests.test_username_claim_cta_asset`
+  - Result: 31 tests passed.
+- Notes:
+  - First-paint visibility now depends on browser-readable state; without local storage, the banner still falls back to hidden unless the current dynamic response can hydrate fresh eligibility into the bootstrap.
+  - The profile page no longer embeds a static per-request CTA href for anonymous readers; the shared CTA link is now client-populated.

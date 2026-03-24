@@ -159,6 +159,11 @@ body {
   background: linear-gradient(135deg, var(--surface-claim-top), var(--surface-claim-bottom));
 }
 
+html[data-username-claim-visible="0"] .site-username-claim[data-username-claim-cta],
+html:not([data-username-claim-visible]) .site-username-claim[data-username-claim-cta] {
+  display: none;
+}
+
 .site-username-claim-copy {
   display: grid;
   gap: 0.2rem;

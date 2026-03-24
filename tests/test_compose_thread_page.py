@@ -104,7 +104,7 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('data-thread-type=""', body)
         self.assertIn('data-unsigned-fallback-enabled="', body)
         self.assertIn('data-username-claim-cta', body)
-        self.assertNotIn('/assets/username_claim_cta.js', body)
+        self.assertIn('/assets/username_claim_cta.js', body)
         self.assertIn("Choose your username", body)
         self.assertIn("Requirements and limitations", body)
         self.assertIn("ASCII-only canonical text records", body)

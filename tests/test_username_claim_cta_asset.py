@@ -125,19 +125,33 @@ const link = {{
   }},
 }};
 const root = {{
-  hidden: true,
   querySelector(selector) {{
     return selector === "[data-username-claim-link]" ? link : null;
   }},
 }};
+const htmlRoot = {{
+  attrs: {{}},
+  setAttribute(name, value) {{
+    this.attrs[name] = value;
+  }},
+}};
 const doc = {{
+  documentElement: htmlRoot,
   querySelector(selector) {{
     return selector === "[data-username-claim-cta]" ? root : null;
   }},
 }};
+const storageState = {{}};
 const storage = {{
   getItem(key) {{
-    return key === "forum_public_key_armored" ? generated.publicKey : "";
+    if (key === "forum_public_key_armored") return generated.publicKey;
+    return storageState[key] || "";
+  }},
+  setItem(key, value) {{
+    storageState[key] = value;
+  }},
+  removeItem(key) {{
+    delete storageState[key];
   }},
 }};
 const requests = [];
@@ -162,15 +176,21 @@ const fetchImpl = async (url, options) => {{
 
 await enhanceUsernameClaimCta(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
-  hidden: root.hidden,
   href: link.href,
+  htmlAttrs: htmlRoot.attrs,
+  storedState: storageState["forum_username_claim_cta"] || "",
   requests,
 }}));
 """
         payload = json.loads(self.run_node(script))
 
-        self.assertFalse(payload["hidden"])
         self.assertEqual(payload["href"], "/profiles/openpgp-derived/update")
+        self.assertEqual(payload["htmlAttrs"]["data-username-claim-visible"], "1")
+        self.assertEqual(payload["htmlAttrs"]["data-username-claim-href"], "/profiles/openpgp-derived/update")
+        self.assertEqual(
+            json.loads(payload["storedState"]),
+            {"visible": True, "updateHref": "/profiles/openpgp-derived/update"},
+        )
         self.assertEqual(payload["requests"][0]["url"], "/api/set_identity_hint")
         self.assertEqual(payload["requests"][0]["method"], "POST")
         self.assertIn("fingerprint", payload["requests"][0]["body"])
@@ -227,19 +247,33 @@ const link = {{
   }},
 }};
 const root = {{
-  hidden: true,
   querySelector(selector) {{
     return selector === "[data-username-claim-link]" ? link : null;
   }},
 }};
+const htmlRoot = {{
+  attrs: {{}},
+  setAttribute(name, value) {{
+    this.attrs[name] = value;
+  }},
+}};
 const doc = {{
+  documentElement: htmlRoot,
   querySelector(selector) {{
     return selector === "[data-username-claim-cta]" ? root : null;
   }},
 }};
+const storageState = {{}};
 const storage = {{
   getItem(key) {{
-    return key === "forum_public_key_armored" ? generated.publicKey : "";
+    if (key === "forum_public_key_armored") return generated.publicKey;
+    return storageState[key] || "";
+  }},
+  setItem(key, value) {{
+    storageState[key] = value;
+  }},
+  removeItem(key) {{
+    delete storageState[key];
   }},
 }};
 const fetchImpl = async () => ({{
@@ -255,14 +289,17 @@ const fetchImpl = async () => ({{
 
 await enhanceUsernameClaimCta(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
-  hidden: root.hidden,
   href: link.href,
+  htmlAttrs: htmlRoot.attrs,
+  storedState: storageState["forum_username_claim_cta"] || "",
 }}));
 """
         payload = json.loads(self.run_node(script))
 
-        self.assertTrue(payload["hidden"])
         self.assertEqual(payload["href"], "")
+        self.assertEqual(payload["htmlAttrs"]["data-username-claim-visible"], "0")
+        self.assertEqual(payload["htmlAttrs"]["data-username-claim-href"], "")
+        self.assertEqual(payload["storedState"], "")
 
     def test_username_claim_cta_asset_rehides_previously_visible_banner_for_ineligible_response(self) -> None:
         asset_url = (
@@ -313,19 +350,35 @@ const link = {{
   }},
 }};
 const root = {{
-  hidden: false,
   querySelector(selector) {{
     return selector === "[data-username-claim-link]" ? link : null;
   }},
 }};
+const htmlRoot = {{
+  attrs: {{}},
+  setAttribute(name, value) {{
+    this.attrs[name] = value;
+  }},
+}};
 const doc = {{
+  documentElement: htmlRoot,
   querySelector(selector) {{
     return selector === "[data-username-claim-cta]" ? root : null;
   }},
 }};
+const storageState = {{
+  forum_username_claim_cta: JSON.stringify({{ visible: true, updateHref: "/profiles/openpgp-old/update" }}),
+}};
 const storage = {{
   getItem(key) {{
-    return key === "forum_public_key_armored" ? generated.publicKey : "";
+    if (key === "forum_public_key_armored") return generated.publicKey;
+    return storageState[key] || "";
+  }},
+  setItem(key, value) {{
+    storageState[key] = value;
+  }},
+  removeItem(key) {{
+    delete storageState[key];
   }},
 }};
 const fetchImpl = async () => ({{
@@ -341,14 +394,16 @@ const fetchImpl = async () => ({{
 
 await enhanceUsernameClaimCta(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
-  hidden: root.hidden,
   href: link.href,
+  htmlAttrs: htmlRoot.attrs,
+  storedState: storageState["forum_username_claim_cta"] || "",
 }}));
 """
         payload = json.loads(self.run_node(script))
 
-        self.assertTrue(payload["hidden"])
         self.assertEqual(payload["href"], "")
+        self.assertEqual(payload["htmlAttrs"]["data-username-claim-visible"], "0")
+        self.assertEqual(payload["storedState"], "")
 
     def test_username_claim_cta_asset_keeps_banner_hidden_without_stored_key(self) -> None:
         asset_url = (
@@ -392,19 +447,32 @@ const link = {{
   }},
 }};
 const root = {{
-  hidden: true,
   querySelector(selector) {{
     return selector === "[data-username-claim-link]" ? link : null;
   }},
 }};
+const htmlRoot = {{
+  attrs: {{}},
+  setAttribute(name, value) {{
+    this.attrs[name] = value;
+  }},
+}};
 const doc = {{
+  documentElement: htmlRoot,
   querySelector(selector) {{
     return selector === "[data-username-claim-cta]" ? root : null;
   }},
 }};
+const storageState = {{}};
 const storage = {{
   getItem() {{
     return "";
+  }},
+  setItem(key, value) {{
+    storageState[key] = value;
+  }},
+  removeItem(key) {{
+    delete storageState[key];
   }},
 }};
 let fetchCalls = 0;
@@ -415,15 +483,17 @@ const fetchImpl = async () => {{
 
 await enhanceUsernameClaimCta(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
-  hidden: root.hidden,
   href: link.href,
+  htmlAttrs: htmlRoot.attrs,
+  storedState: storageState["forum_username_claim_cta"] || "",
   fetchCalls,
 }}));
 """
         payload = json.loads(self.run_node(script))
 
-        self.assertTrue(payload["hidden"])
         self.assertEqual(payload["href"], "")
+        self.assertEqual(payload["htmlAttrs"]["data-username-claim-visible"], "0")
+        self.assertEqual(payload["storedState"], "")
         self.assertEqual(payload["fetchCalls"], 1)
 
 

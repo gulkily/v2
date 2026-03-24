@@ -72,9 +72,8 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
         self.assertIn('data-username-claim-cta', body)
-        self.assertNotIn('/assets/username_claim_cta.js', body)
+        self.assertIn('/assets/username_claim_cta.js', body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
     def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
@@ -157,8 +156,8 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
         self.assertIn('data-username-claim-cta', body)
+        self.assertIn('/assets/username_claim_cta.js', body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
     def test_profile_page_keeps_shared_cta_mount_when_only_linked_peer_has_claim(self) -> None:

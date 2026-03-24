@@ -3,12 +3,14 @@ from __future__ import annotations
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 import html
+import json
 import os
 from pathlib import Path
 from string import Template
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
+USERNAME_CLAIM_CTA_STORAGE_KEY = "forum_username_claim_cta"
 _CURRENT_USERNAME_CLAIM_BANNER_STATE: ContextVar["UsernameClaimBannerState | None"] = ContextVar(
     "current_username_claim_banner_state",
     default=None,
@@ -129,15 +131,59 @@ def reset_current_username_claim_cta_state(token: Token) -> None:
 def render_username_claim_cta_html(state: UsernameClaimBannerState | None = None) -> str:
     current_state = state if state is not None else _CURRENT_USERNAME_CLAIM_BANNER_STATE.get()
     href = current_state.update_href if current_state is not None and current_state.update_href else ""
-    hidden_attr = "" if current_state is not None and current_state.visible and href else " hidden"
     return (
-        f'<section class="site-username-claim panel" data-username-claim-cta{hidden_attr}>'
+        '<section class="site-username-claim panel" data-username-claim-cta>'
         '<div class="site-username-claim-copy">'
         '<p class="site-username-claim-kicker">Account setup</p>'
         '<p class="site-username-claim-text">Now that you\'re participating, you can choose a username.</p>'
         "</div>"
         f'<a class="thread-chip site-username-claim-link" data-username-claim-link href="{html.escape(href, quote=True)}">Choose your username</a>'
         "</section>"
+        "<script>"
+        "(function () {"
+        "  var root = document.querySelector('[data-username-claim-cta]');"
+        "  if (!root) { return; }"
+        "  var link = root.querySelector('[data-username-claim-link]');"
+        "  if (!link) { return; }"
+        "  var htmlRoot = document.documentElement;"
+        "  var href = htmlRoot.getAttribute('data-username-claim-href') || '';"
+        "  link.setAttribute('href', href);"
+        "}());"
+        "</script>"
+    )
+
+
+def render_username_claim_cta_head_bootstrap(state: UsernameClaimBannerState | None = None) -> str:
+    current_state = state if state is not None else _CURRENT_USERNAME_CLAIM_BANNER_STATE.get()
+    visible = bool(current_state is not None and current_state.visible and current_state.update_href)
+    update_href = current_state.update_href if visible else ""
+    state_json = json.dumps({"visible": visible, "updateHref": update_href})
+    return (
+        "<script>"
+        "(function () {"
+        f"  var serverState = {state_json};"
+        f"  var storageName = {USERNAME_CLAIM_CTA_STORAGE_KEY!r};"
+        "  var htmlRoot = document.documentElement;"
+        "  var state = { visible: false, updateHref: '' };"
+        "  try {"
+        "    var raw = globalThis.localStorage ? globalThis.localStorage.getItem(storageName) : '';"
+        "    if (raw) {"
+        "      var parsed = JSON.parse(raw);"
+        "      if (parsed && parsed.visible === true && typeof parsed.updateHref === 'string' && parsed.updateHref !== '') {"
+        "        state = { visible: true, updateHref: parsed.updateHref };"
+        "      }"
+        "    }"
+        "  } catch (_error) {}"
+        "  if (!state.visible && serverState.visible === true && serverState.updateHref) {"
+        "    state = serverState;"
+        "    try {"
+        "      globalThis.localStorage && globalThis.localStorage.setItem(storageName, JSON.stringify(state));"
+        "    } catch (_error) {}"
+        "  }"
+        "  htmlRoot.setAttribute('data-username-claim-visible', state.visible ? '1' : '0');"
+        "  htmlRoot.setAttribute('data-username-claim-href', state.visible ? state.updateHref : '');"
+        "}());"
+        "</script>"
     )
 
 
@@ -168,8 +214,10 @@ def render_page(
         page_footer_html = render_site_footer()
     if page_banner_html is None:
         page_banner_html = render_username_claim_cta_html()
+    head_extras_html = render_username_claim_cta_head_bootstrap() + head_extras_html
     page_script_html = (
         render_profile_nav_script_tag()
+        + render_username_claim_cta_script_tag()
         + render_copy_field_script_tag()
         + page_script_html
     )
@@ -201,3 +249,7 @@ def render_profile_nav_script_tag() -> str:
 
 def render_copy_field_script_tag() -> str:
     return '<script type="module" src="/assets/copy_field.js"></script>'
+
+
+def render_username_claim_cta_script_tag() -> str:
+    return '<script type="module" src="/assets/username_claim_cta.js"></script>'

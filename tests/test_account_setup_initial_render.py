@@ -87,7 +87,9 @@ class AccountSetupInitialRenderTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn('<section class="site-username-claim panel" data-username-claim-cta>', body)
-        self.assertIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
+        self.assertIn(f'"updateHref": "/profiles/{PROFILE_SLUG}/update"', body)
+        self.assertIn("forum_username_claim_cta", body)
+        self.assertIn('/assets/username_claim_cta.js', body)
         self.assertIn("Account setup", body)
 
     def test_compose_thread_initial_html_renders_visible_banner_for_valid_hint_cookie(self) -> None:
@@ -95,14 +97,15 @@ class AccountSetupInitialRenderTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn('<section class="site-username-claim panel" data-username-claim-cta>', body)
-        self.assertIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
+        self.assertIn(f'"updateHref": "/profiles/{PROFILE_SLUG}/update"', body)
+        self.assertIn('/assets/username_claim_cta.js', body)
 
     def test_invalid_hint_cookie_fails_closed_to_hidden_banner(self) -> None:
         invalid_cookie = self.identity_hint_cookie(raw_value="v1.bad.9999999999.invalid")
         status, _, body = self.get("/", cookie=invalid_cookie)
 
         self.assertEqual(status, "200 OK")
-        self.assertIn('data-username-claim-cta hidden', body)
+        self.assertIn('"visible": false', body)
         self.assertIn('data-username-claim-link href=""', body)
 
     def test_expired_hint_cookie_fails_closed_to_hidden_banner(self) -> None:
@@ -115,7 +118,7 @@ class AccountSetupInitialRenderTests(unittest.TestCase):
         status, _, body = self.get("/", cookie=self.identity_hint_cookie(raw_value=expired_value))
 
         self.assertEqual(status, "200 OK")
-        self.assertIn('data-username-claim-cta hidden', body)
+        self.assertIn('"visible": false', body)
         self.assertIn('data-username-claim-link href=""', body)
 
 
