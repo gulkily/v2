@@ -12,6 +12,9 @@ return [
     // Absolute path to a writable directory for PHP microcache files.
     'cache_dir' => '/absolute/path/to/v2/state/php_host_cache',
 
+    // Absolute path under the public web root for generated static HTML artifacts.
+    'static_html_dir' => '/absolute/path/to/public-web-root/_static_html',
+
     // Optional short TTL in seconds for allowlisted public read routes.
     'microcache_ttl' => 5,
 ];

@@ -1,0 +1,12 @@
+## Stage 1 - Define the static-public-read contract
+- Changes:
+  - Added a distinct static-HTML route eligibility contract in [`cache.php`](/home/wsl/v2/php_host/public/cache.php) with `forum_static_html_request_path(...)`, `forum_static_html_request()`, `forum_static_html_dir()`, and `forum_static_html_public_path(...)`.
+  - Kept the contract narrower than the PHP microcache allowlist by excluding APIs, query-string variants, and profile subroutes such as `/update` and `/merge`.
+  - Extended [`forum_host_config.example.php`](/home/wsl/v2/php_host/public/forum_host_config.example.php) with a `static_html_dir` setting for a public artifact root.
+  - Added focused PHP helper tests in [`test_php_host_cache.py`](/home/wsl/v2/tests/test_php_host_cache.py) for static-route eligibility and path mapping.
+- Verification:
+  - Ran `python -m unittest tests.test_php_host_cache.PhpHostCacheTests.test_static_html_request_only_allows_safe_anonymous_html_routes tests.test_php_host_cache.PhpHostCacheTests.test_static_html_public_path_maps_allowlisted_routes_to_index_files tests.test_php_host_cache.PhpHostCacheTests.test_php_host_caches_allowlisted_reads_and_marks_hit_headers`
+  - Result: 3 tests passed.
+- Notes:
+  - Query-string-bearing routes remain dynamic for now; any future normalized query support needs an explicit artifact-key contract.
+  - The static path contract assumes artifacts live under a public directory tree that Apache can serve directly in later stages.

@@ -70,6 +70,91 @@ function forum_asset_request_path(?string $path = null): ?string
     return null;
 }
 
+function forum_static_html_request_path(?string $path = null): ?string
+{
+    $candidate = $path ?? forum_request_path();
+    if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/') {
+        return $candidate;
+    }
+    if ($candidate === '/planning/task-priorities' || $candidate === '/planning/task-priorities/') {
+        return $candidate;
+    }
+    if (str_starts_with($candidate, '/threads/')) {
+        return str_ends_with($candidate, '/') ? $candidate : $candidate . '/';
+    }
+    if (str_starts_with($candidate, '/posts/')) {
+        return str_ends_with($candidate, '/') ? $candidate : $candidate . '/';
+    }
+    if (str_starts_with($candidate, '/planning/tasks/')) {
+        return str_ends_with($candidate, '/') ? $candidate : $candidate . '/';
+    }
+    if (str_starts_with($candidate, '/profiles/')) {
+        if (str_contains($candidate, '/update') || str_contains($candidate, '/merge')) {
+            return null;
+        }
+        return str_ends_with($candidate, '/') ? $candidate : $candidate . '/';
+    }
+    return null;
+}
+
+function forum_static_html_request(): bool
+{
+    if (forum_request_method() !== 'GET') {
+        return false;
+    }
+    if (forum_post_index_rebuild_request()) {
+        return false;
+    }
+    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
+        return false;
+    }
+    if (forum_request_query_string() !== '') {
+        return false;
+    }
+
+    $path = forum_request_path();
+    if (forum_asset_request_path($path) !== null) {
+        return false;
+    }
+    if (str_starts_with($path, '/api/')) {
+        return false;
+    }
+    if ($path === '/favicon.ico' || $path === '/llms.txt') {
+        return false;
+    }
+    return forum_static_html_request_path($path) !== null;
+}
+
+function forum_static_html_dir(): string
+{
+    $configured = forum_host_config()['static_html_dir'] ?? '';
+    if (is_string($configured) && $configured !== '') {
+        return rtrim($configured, DIRECTORY_SEPARATOR);
+    }
+    return forum_public_dir() . DIRECTORY_SEPARATOR . '_static_html';
+}
+
+function forum_static_html_public_path(string $requestPath, string $queryString = ''): ?string
+{
+    if ($queryString !== '') {
+        return null;
+    }
+    $normalizedPath = forum_static_html_request_path($requestPath);
+    if ($normalizedPath === null || str_contains($normalizedPath, '..')) {
+        return null;
+    }
+    $staticRoot = forum_static_html_dir();
+    if ($normalizedPath === '/') {
+        return $staticRoot . DIRECTORY_SEPARATOR . 'index.html';
+    }
+
+    $trimmed = trim($normalizedPath, '/');
+    if ($trimmed === '') {
+        return $staticRoot . DIRECTORY_SEPARATOR . 'index.html';
+    }
+    return $staticRoot . DIRECTORY_SEPARATOR . $trimmed . DIRECTORY_SEPARATOR . 'index.html';
+}
+
 function forum_cacheable_read_request(): bool
 {
     if (forum_request_method() !== 'GET') {

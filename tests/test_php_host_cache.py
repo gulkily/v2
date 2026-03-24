@@ -20,6 +20,7 @@ class PhpHostCacheTests(unittest.TestCase):
         ).as_uri()
         self.repo_tempdir = tempfile.TemporaryDirectory()
         self.cache_tempdir = tempfile.TemporaryDirectory()
+        self.static_tempdir = tempfile.TemporaryDirectory()
         self.data_repo_root = Path(self.repo_tempdir.name)
         (self.data_repo_root / "records" / "posts").mkdir(parents=True, exist_ok=True)
 
@@ -35,6 +36,7 @@ class PhpHostCacheTests(unittest.TestCase):
             self.config_path.unlink(missing_ok=True)
         else:
             self.config_path.write_text(self.original_config, encoding="utf-8")
+        self.static_tempdir.cleanup()
         self.cache_tempdir.cleanup()
         self.repo_tempdir.cleanup()
 
@@ -50,6 +52,7 @@ class PhpHostCacheTests(unittest.TestCase):
                     f"    'app_root' => {self.repo_root.as_posix()!r},",
                     f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
                     f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
                     "    'microcache_ttl' => 5,",
                     "];",
                     "",
@@ -196,6 +199,34 @@ process.stdout.write(signature);
             return []
         return sorted(path for path in cache_root.glob("*.cgi"))
 
+    def php_cache_helper(self, body: str, *, path: str = "/", query_string: str = "", method: str = "GET", cookie: str = "") -> str:
+        cache_path = (self.repo_root / "php_host" / "public" / "cache.php").as_posix()
+        static_html_root = (Path(self.static_tempdir.name) / "_static_html").as_posix()
+        script = dedent(
+            f"""
+            $_SERVER['REQUEST_METHOD'] = {method!r};
+            $_SERVER['REQUEST_URI'] = {path if not query_string else path + "?" + query_string!r};
+            $_SERVER['QUERY_STRING'] = {query_string!r};
+            if ({cookie!r} !== '') {{
+                $_SERVER['HTTP_COOKIE'] = {cookie!r};
+            }}
+
+            function forum_host_config(): array {{
+                return ['static_html_dir' => {static_html_root!r}];
+            }}
+
+            function forum_public_dir(): string {{
+                return {str((self.repo_root / "php_host" / "public").as_posix())!r};
+            }}
+
+            require {cache_path!r};
+
+            {body}
+            """
+        ).strip()
+        result = self.run_command(["php", "-r", script])
+        return result.stdout
+
     def write_committed_post(self, *, post_id: str, subject: str, body_text: str) -> None:
         relative_path = Path("records") / "posts" / f"{post_id}.txt"
         payload = self.build_thread_payload(post_id=post_id, subject=subject, body_text=body_text)
@@ -231,6 +262,51 @@ process.stdout.write(signature);
         self.assertIn("Content-Type: text/javascript; charset=utf-8", response["headers"])
         self.assertIn('document.addEventListener("click"', response["body"])
         self.assertEqual(self.cache_files(), [])
+
+    def test_static_html_request_only_allows_safe_anonymous_html_routes(self) -> None:
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_request() ? 'yes' : 'no';", path="/threads/example-thread"),
+            "yes",
+        )
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_request() ? 'yes' : 'no';", path="/api/get_thread"),
+            "no",
+        )
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_request() ? 'yes' : 'no';", path="/profiles/example/update"),
+            "no",
+        )
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_request() ? 'yes' : 'no';", path="/threads/example-thread", query_string="page=2"),
+            "no",
+        )
+        self.assertEqual(
+            self.php_cache_helper(
+                "echo forum_static_html_request() ? 'yes' : 'no';",
+                path="/threads/example-thread",
+                cookie="forum_identity_hint=test",
+            ),
+            "no",
+        )
+
+    def test_static_html_public_path_maps_allowlisted_routes_to_index_files(self) -> None:
+        expected_root = (Path(self.static_tempdir.name) / "_static_html").as_posix()
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_public_path('/');"),
+            f"{expected_root}/index.html",
+        )
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_public_path('/threads/example-thread');"),
+            f"{expected_root}/threads/example-thread/index.html",
+        )
+        self.assertEqual(
+            self.php_cache_helper("echo forum_static_html_public_path('/profiles/example-user/');"),
+            f"{expected_root}/profiles/example-user/index.html",
+        )
+        self.assertEqual(
+            self.php_cache_helper("var_export(forum_static_html_public_path('/profiles/example-user/update'));"),
+            "NULL",
+        )
 
     def test_successful_write_clears_php_microcache(self) -> None:
         warm = self.php_request("/")
