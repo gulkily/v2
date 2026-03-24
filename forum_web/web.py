@@ -483,17 +483,6 @@ def render_rss_feed(*, title: str, description: str, link: str, items: list[Feed
     parts.extend(["</channel>", "</rss>"])
     return "".join(parts).encode("utf-8")
 
-
-def render_feed_link_chip(feed_href: str) -> str:
-    return (
-        '<section class="panel page-section">'
-        '<div class="action-row">'
-        f'<a class="thread-chip" href="{html.escape(feed_href)}">RSS feed</a>'
-        "</div>"
-        "</section>"
-    )
-
-
 def render_feed_head_link(feed_href: str) -> str:
     return (
         f'<link rel="alternate" type="application/rss+xml" title="RSS feed" href="{html.escape(feed_href, quote=True)}">'
@@ -1216,13 +1205,13 @@ def render_board_index(*, board_tag: str | None = None) -> str:
         hero_kicker="",
         hero_title="",
         hero_text="",
-        content_html=render_feed_link_chip(feed_href) + content,
         page_header_html=render_site_header(
             hero_kicker="",
             hero_title="",
             hero_text="",
             include_page_intro=False,
         ),
+        content_html=content,
         head_extras_html=render_feed_head_link(feed_href),
     )
 
@@ -1522,7 +1511,7 @@ def render_site_activity_page(*, view_mode: str, page: int) -> str:
             hero_text="",
             include_page_intro=False,
         ),
-        content_html=render_feed_link_chip(feed_href) + content,
+        content_html=content,
         head_extras_html=render_feed_head_link(feed_href),
     )
 
@@ -1641,7 +1630,7 @@ def render_thread(thread_id: str) -> str:
             hero_text="",
             include_page_intro=False,
         ),
-        content_html=render_feed_link_chip(feed_href) + content,
+        content_html=content,
         head_extras_html=render_feed_head_link(feed_href),
     )
 

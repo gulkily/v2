@@ -127,7 +127,7 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("code activity", body)
         self.assertIn('rel="alternate" type="application/rss+xml"', body)
         self.assertIn('href="/activity/?view=content&amp;format=rss"', body)
-        self.assertIn(">RSS feed</a>", body)
+        self.assertNotIn('thread-chip--rss', body)
         self.assertIn('class="post-card"', body)
         self.assertIn("First root", body)
         self.assertIn("root-010", body)
