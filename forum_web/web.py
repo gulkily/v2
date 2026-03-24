@@ -8,7 +8,8 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from pathlib import Path
 from typing import Iterable, Iterator
 from urllib.parse import parse_qs, unquote
@@ -422,7 +423,65 @@ class PagedActivityResult:
     has_next_page: bool
 
 
+@dataclass(frozen=True)
+class FeedItem:
+    title: str
+    link: str
+    description: str
+    guid: str
+    published_at: datetime | None = None
+
+
 ACTIVITY_PAGE_SIZE = 12
+
+
+def ensure_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def format_rss_pubdate(value: datetime) -> str:
+    return format_datetime(ensure_utc_datetime(value))
+
+
+def post_datetime_from_id(post_id: str) -> datetime | None:
+    match = re.search(r"-(\d{14})-", post_id)
+    if match is None:
+        return None
+    try:
+        timestamp = datetime.strptime(match.group(1), "%Y%m%d%H%M%S")
+    except ValueError:
+        return None
+    return timestamp.replace(tzinfo=timezone.utc)
+
+
+def post_feed_link(post: Post) -> str:
+    if post.is_root:
+        return f"/threads/{post.post_id}"
+    return f"/posts/{post.post_id}"
+
+
+def render_rss_feed(*, title: str, description: str, link: str, items: list[FeedItem]) -> bytes:
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<rss version="2.0">',
+        "<channel>",
+        f"<title>{html.escape(title)}</title>",
+        f"<description>{html.escape(description)}</description>",
+        f"<link>{html.escape(link)}</link>",
+    ]
+    for item in items:
+        parts.append("<item>")
+        parts.append(f"<title>{html.escape(item.title)}</title>")
+        parts.append(f"<link>{html.escape(item.link)}</link>")
+        parts.append(f"<guid>{html.escape(item.guid)}</guid>")
+        parts.append(f"<description>{html.escape(item.description)}</description>")
+        if item.published_at is not None:
+            parts.append(f"<pubDate>{html.escape(format_rss_pubdate(item.published_at))}</pubDate>")
+        parts.append("</item>")
+    parts.extend(["</channel>", "</rss>"])
+    return "".join(parts).encode("utf-8")
 
 
 def activity_filter_mode_from_request(raw_mode: str | None) -> str:
@@ -711,6 +770,111 @@ def load_activity_events(
 
 def sort_activity_events(events: list[ActivityEvent]) -> list[ActivityEvent]:
     return sorted(events, key=lambda event: event.sort_timestamp, reverse=True)
+
+
+def load_activity_feed_items(
+    repo_root: Path,
+    *,
+    view_mode: str,
+    page: int = 1,
+    page_size: int = ACTIVITY_PAGE_SIZE,
+) -> list[FeedItem]:
+    posts_index: dict[str, Post] = {}
+    if view_mode != "code":
+        posts = load_posts(repo_root / "records" / "posts")
+        posts_index = build_posts_index(posts, repo_root)
+
+    items: list[FeedItem] = []
+    activity_result = load_activity_events(repo_root, mode=view_mode, page=page, page_size=page_size)
+    for event in activity_result.events:
+        if event.kind == "moderation" and event.moderation_record is not None:
+            target_path = (
+                f"/threads/{event.moderation_record.target_id}"
+                if event.moderation_record.target_type == "thread"
+                else f"/posts/{event.moderation_record.target_id}"
+            )
+            items.append(
+                FeedItem(
+                    title=(
+                        f"Moderation: {event.moderation_record.action} "
+                        f"{event.moderation_record.target_type} {event.moderation_record.target_id}"
+                    ),
+                    link=target_path,
+                    description=event.moderation_record.reason or "Signed moderation action.",
+                    guid=f"moderation:{event.moderation_record.record_id}",
+                    published_at=ensure_utc_datetime(event.sort_timestamp),
+                )
+            )
+            continue
+        if event.commit is None:
+            continue
+        touched_posts = resolve_commit_posts(event.commit, posts_index)
+        link = f"/activity/?view={view_mode}&page={page}"
+        description = event.commit.subject
+        if touched_posts:
+            link = post_feed_link(touched_posts[0])
+            description = first_line(touched_posts[0].body) or event.commit.subject
+        elif event.commit.github_url:
+            link = event.commit.github_url
+        items.append(
+            FeedItem(
+                title=event.commit.subject,
+                link=link,
+                description=description,
+                guid=f"commit:{event.commit.commit_id}",
+                published_at=ensure_utc_datetime(event.sort_timestamp),
+            )
+        )
+    return items
+
+
+def load_board_feed_items(repo_root: Path, *, board_tag: str | None) -> list[FeedItem]:
+    posts = load_posts(repo_root / "records" / "posts")
+    threads = group_threads(posts)
+    moderation_records = load_moderation_records(moderation_records_dir(repo_root))
+    moderation_state = derive_moderation_state(moderation_records)
+    public_threads = visible_threads(threads, moderation_state, board_tag=board_tag, repo_root=repo_root)
+    items: list[FeedItem] = []
+    for thread in public_threads:
+        items.append(
+            FeedItem(
+                title=thread.root.subject or thread.root.post_id,
+                link=f"/threads/{thread.root.post_id}",
+                description=first_line(thread.root.body) or "Thread update.",
+                guid=f"thread:{thread.root.post_id}",
+                published_at=post_datetime_from_id(thread.root.post_id),
+            )
+        )
+    return items
+
+
+def load_thread_feed_items(repo_root: Path, *, thread_id: str) -> list[FeedItem]:
+    posts = load_posts(repo_root / "records" / "posts")
+    grouped_threads = group_threads(posts)
+    moderation_records = load_moderation_records(moderation_records_dir(repo_root))
+    moderation_state = derive_moderation_state(moderation_records)
+    thread = index_threads(grouped_threads).get(thread_id)
+    if thread is None or thread_is_hidden(moderation_state, thread_id):
+        raise LookupError(f"unknown thread: {thread_id}")
+
+    visible_posts = [thread.root]
+    visible_posts.extend(
+        reply
+        for reply in thread.replies
+        if not post_is_hidden(moderation_state, reply.post_id, thread.root.post_id)
+    )
+    items: list[FeedItem] = []
+    for post in visible_posts:
+        items.append(
+            FeedItem(
+                title=post_display_label(post),
+                link=post_feed_link(post),
+                description=first_line(post.body) or "Thread activity.",
+                guid=f"post:{post.post_id}",
+                published_at=post_datetime_from_id(post.post_id),
+            )
+        )
+    return items
 
 
 def indexed_timestamp_value(timestamp_text: str | None) -> float:

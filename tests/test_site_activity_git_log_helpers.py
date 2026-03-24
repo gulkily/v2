@@ -18,7 +18,11 @@ from forum_web.web import (
     fetch_recent_commits,
     fetch_recent_repository_commits,
     github_commit_url_for,
+    load_activity_feed_items,
     load_activity_events,
+    load_board_feed_items,
+    load_thread_feed_items,
+    render_rss_feed,
     resolve_commit_posts,
     summarize_commit_files,
 )
@@ -351,6 +355,133 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
             f"https://github.com/example/forum/commit/{commits[0].commit_id}",
         )
         self.assertEqual(classify_commit_activity(commits[0]), "code")
+
+    def test_render_rss_feed_outputs_channel_and_item_xml(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Root title
+
+            Root body.
+            """,
+        )
+        self.commit("Add root-001")
+        xml_bytes = render_rss_feed(
+            title="Example feed",
+            description="Latest items",
+            link="/activity/",
+            items=[
+                load_activity_feed_items(self.repo_root, view_mode="content", page=1, page_size=1)[0]
+            ],
+        )
+
+        xml_text = xml_bytes.decode("utf-8")
+        self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', xml_text)
+        self.assertIn("<rss version=\"2.0\">", xml_text)
+        self.assertIn("<channel>", xml_text)
+        self.assertIn("<title>Example feed</title>", xml_text)
+        self.assertIn("<link>/activity/</link>", xml_text)
+        self.assertIn("<item>", xml_text)
+        self.assertIn("<guid>commit:", xml_text)
+
+    def test_load_activity_feed_items_maps_content_moderation_and_code(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Root title
+
+            Root body.
+            """,
+        )
+        self.commit("Add root-001")
+        self.write_record(
+            "records/moderation/pin-root-001.txt",
+            """
+            Record-ID: pin-root-001
+            Action: pin
+            Target-Type: thread
+            Target-ID: root-001
+            Timestamp: 2026-03-17T23:00:00Z
+
+            Pin it.
+            """,
+        )
+        self.commit_paths(["records/moderation/pin-root-001.txt"], "Pin root-001")
+        self.write_record("forum_web_stub.py", "print('hello')\n")
+        self.commit_paths(["forum_web_stub.py"], "Add code helper")
+
+        content_items = load_activity_feed_items(self.repo_root, view_mode="content")
+        moderation_items = load_activity_feed_items(self.repo_root, view_mode="moderation")
+        code_items = load_activity_feed_items(self.repo_root, view_mode="code")
+
+        self.assertEqual(content_items[0].title, "Add root-001")
+        self.assertEqual(content_items[0].link, "/threads/root-001")
+        self.assertEqual(moderation_items[0].guid, "moderation:pin-root-001")
+        self.assertEqual(moderation_items[0].link, "/threads/root-001")
+        self.assertEqual(code_items[0].title, "Add code helper")
+        self.assertTrue(code_items[0].link.endswith("/commit/" + code_items[0].guid.removeprefix("commit:")))
+
+    def test_load_board_feed_items_filters_visible_threads_by_board(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: General thread
+
+            Body one.
+            """,
+        )
+        self.write_record(
+            "records/posts/root-002.txt",
+            """
+            Post-ID: root-002
+            Board-Tags: planning
+            Subject: Planning thread
+
+            Body two.
+            """,
+        )
+        self.commit("Add roots")
+
+        planning_items = load_board_feed_items(self.repo_root, board_tag="planning")
+
+        self.assertEqual([item.title for item in planning_items], ["Planning thread"])
+        self.assertEqual(planning_items[0].link, "/threads/root-002")
+
+    def test_load_thread_feed_items_returns_root_and_visible_replies(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Root title
+
+            Root body.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-20260317091500-follow-up-11111111.txt",
+            """
+            Post-ID: reply-20260317091500-follow-up-11111111
+            Board-Tags: general
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Follow-up note.
+            """,
+        )
+        self.commit("Add thread")
+
+        items = load_thread_feed_items(self.repo_root, thread_id="root-001")
+
+        self.assertEqual([item.guid for item in items], ["post:root-001", "post:reply-20260317091500-follow-up-11111111"])
+        self.assertEqual(items[0].link, "/threads/root-001")
+        self.assertEqual(items[1].link, "/posts/reply-20260317091500-follow-up-11111111")
 
 
 if __name__ == "__main__":
