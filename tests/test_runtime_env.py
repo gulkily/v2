@@ -15,10 +15,12 @@ class RuntimeEnvTests(unittest.TestCase):
         self.repo_root = Path(self.tempdir.name)
         self.env_path, self.example_path = runtime_env.repo_env_paths(self.repo_root)
         runtime_env._NOTIFIED_MISSING_DEFAULTS.clear()
+        runtime_env._NOTIFIED_GENERATED_DEFAULTS.clear()
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
         runtime_env._NOTIFIED_MISSING_DEFAULTS.clear()
+        runtime_env._NOTIFIED_GENERATED_DEFAULTS.clear()
 
     def write_env(self, text: str) -> None:
         self.env_path.write_text(text, encoding="utf-8")
@@ -120,6 +122,26 @@ class RuntimeEnvTests(unittest.TestCase):
         self.assertIn("FORUM_SITE_TITLE", status["missing_keys"])
         self.assertIn("FORUM_ENABLE_THREAD_AUTO_REPLY", status["missing_keys"])
         self.assertIn("FORUM_ENABLE_ACCOUNT_MERGE", status["missing_keys"])
+
+    def test_ensure_generated_env_default_persists_value_and_reuses_it(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            first_value, first_created = runtime_env.ensure_generated_env_default(
+                "FORUM_IDENTITY_HINT_SECRET",
+                repo_root=self.repo_root,
+                generator=lambda: "generated-secret",
+            )
+            second_value, second_created = runtime_env.ensure_generated_env_default(
+                "FORUM_IDENTITY_HINT_SECRET",
+                repo_root=self.repo_root,
+                generator=lambda: "different-secret",
+            )
+
+        env_text = self.env_path.read_text(encoding="utf-8")
+        self.assertTrue(first_created)
+        self.assertFalse(second_created)
+        self.assertEqual(first_value, "generated-secret")
+        self.assertEqual(second_value, "generated-secret")
+        self.assertIn("FORUM_IDENTITY_HINT_SECRET=generated-secret", env_text)
 
 
 if __name__ == "__main__":

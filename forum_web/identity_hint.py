@@ -79,6 +79,7 @@ def build_set_identity_hint_cookie_header(
     secret: str,
     now: int | None = None,
     max_age: int = IDENTITY_HINT_COOKIE_MAX_AGE,
+    secure: bool = True,
 ) -> str:
     cookie = SimpleCookie()
     cookie[IDENTITY_HINT_COOKIE_NAME] = build_identity_hint_cookie_value(
@@ -90,20 +91,22 @@ def build_set_identity_hint_cookie_header(
     morsel = cookie[IDENTITY_HINT_COOKIE_NAME]
     morsel["path"] = "/"
     morsel["max-age"] = str(max_age)
-    morsel["secure"] = True
+    if secure:
+        morsel["secure"] = True
     morsel["httponly"] = True
     morsel["samesite"] = "Lax"
     return morsel.OutputString()
 
 
-def build_clear_identity_hint_cookie_header() -> str:
+def build_clear_identity_hint_cookie_header(*, secure: bool = True) -> str:
     cookie = SimpleCookie()
     cookie[IDENTITY_HINT_COOKIE_NAME] = ""
     morsel = cookie[IDENTITY_HINT_COOKIE_NAME]
     morsel["path"] = "/"
     morsel["max-age"] = "0"
     morsel["expires"] = formatdate(0, usegmt=True)
-    morsel["secure"] = True
+    if secure:
+        morsel["secure"] = True
     morsel["httponly"] = True
     morsel["samesite"] = "Lax"
     return morsel.OutputString()

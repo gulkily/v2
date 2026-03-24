@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+import secrets
 from pathlib import Path
 
 try:
@@ -16,8 +18,10 @@ _COMMENTED_ASSIGNMENT_RE = re.compile(
 )
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC_NOTE = "# Added automatically from .env.example via ./forum env-sync."
+_GENERATED_NOTE = "# Added automatically by forum runtime."
 logger = logging.getLogger(__name__)
 _NOTIFIED_MISSING_DEFAULTS: set[tuple[Path, str]] = set()
+_NOTIFIED_GENERATED_DEFAULTS: set[tuple[Path, str]] = set()
 
 
 def repo_env_paths(repo_root: Path | None = None) -> tuple[Path, Path]:
@@ -38,6 +42,19 @@ def parse_env_keys(lines: list[str]) -> list[str]:
         seen.add(key)
         keys.append(key)
     return keys
+
+
+def parse_env_assignments(lines: list[str]) -> dict[str, str]:
+    assignments: dict[str, str] = {}
+    for line in lines:
+        match = _ACTIVE_ASSIGNMENT_RE.match(line)
+        if not match:
+            continue
+        key = match.group(1)
+        if key in assignments:
+            continue
+        assignments[key] = match.group(2).strip()
+    return assignments
 
 
 def _parse_default_entries(lines: list[str]) -> list[tuple[str, str]]:
@@ -180,3 +197,51 @@ def load_repo_env(*, repo_root: Path | None = None, override: bool = False) -> b
     if _load_dotenv is None:
         return False
     return bool(_load_dotenv(dotenv_path=env_path, override=override))
+
+
+def ensure_generated_env_default(
+    key: str,
+    *,
+    repo_root: Path | None = None,
+    generator=None,
+) -> tuple[str, bool]:
+    current = os.environ.get(key, "").strip()
+    if current:
+        return current, False
+
+    env_path, _ = repo_env_paths(repo_root)
+    if env_path.exists():
+        assignments = parse_env_assignments(env_path.read_text(encoding="utf-8").splitlines())
+        existing = assignments.get(key, "").strip()
+        if existing:
+            os.environ[key] = existing
+            return existing, False
+
+    value_generator = generator or (lambda: secrets.token_hex(32))
+    value = value_generator()
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    current_content = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
+    if current_content and not current_content.endswith("\n"):
+        current_content += "\n"
+    if current_content:
+        current_content += "\n"
+    next_content = current_content + f"{_GENERATED_NOTE}\n{key}={value}\n"
+
+    temp_path = env_path.with_name(f".{env_path.name}.tmp")
+    try:
+        temp_path.write_text(next_content, encoding="utf-8")
+        temp_path.replace(env_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+    os.environ[key] = value
+    notification_key = (env_path.resolve(), key)
+    if notification_key not in _NOTIFIED_GENERATED_DEFAULTS:
+        _NOTIFIED_GENERATED_DEFAULTS.add(notification_key)
+        logger.warning(
+            "Generated missing %s and saved it to %s for future runs.",
+            key,
+            env_path,
+        )
+    return value, True

@@ -1,4 +1,9 @@
-import { identityIdFromPublicKey, storedPublicKey } from "./profile_nav.js";
+import {
+  fingerprintFromIdentityId,
+  identityIdFromPublicKey,
+  storedPublicKey,
+  syncIdentityHint,
+} from "./profile_nav.js";
 
 function canClaimUsernameFromText(bodyText) {
   const match = bodyText.match(/^Can-Claim-Username:\s+(yes|no)$/m);
@@ -8,27 +13,6 @@ function canClaimUsernameFromText(bodyText) {
 function updateHrefFromText(bodyText) {
   const match = bodyText.match(/^Update-Href:\s+(.+)$/m);
   return match ? match[1].trim() : "";
-}
-
-export function fingerprintFromIdentityId(identityId) {
-  const trimmed = typeof identityId === "string" ? identityId.trim().toLowerCase() : "";
-  return trimmed.startsWith("openpgp:") ? trimmed.slice("openpgp:".length) : "";
-}
-
-export async function syncIdentityHint(fingerprint, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") {
-    return false;
-  }
-  const trimmed = typeof fingerprint === "string" ? fingerprint.trim() : "";
-  const payload = trimmed ? { fingerprint: trimmed } : {};
-  const response = await fetchImpl("/api/set_identity_hint", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  return Boolean(response && response.ok);
 }
 
 export async function usernameClaimCtaStateForIdentity(identityId, fetchImpl = globalThis.fetch) {

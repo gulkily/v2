@@ -32,7 +32,7 @@ from forum_core.operation_events import (
 from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts, post_index_readiness, rebuild_post_index
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
-from forum_core.runtime_env import load_repo_env, notify_missing_env_defaults
+from forum_core.runtime_env import ensure_generated_env_default, load_repo_env, notify_missing_env_defaults
 from forum_core.merge_requests import derive_merge_management_summary
 from forum_core.moderation import (
     derive_moderation_state,
@@ -131,6 +131,14 @@ def get_repo_root() -> Path:
     if env_root:
         return Path(env_root).resolve()
     return Path(__file__).resolve().parent.parent
+
+
+def ensure_identity_hint_secret() -> str:
+    secret, _created = ensure_generated_env_default(
+        "FORUM_IDENTITY_HINT_SECRET",
+        repo_root=get_repo_root(),
+    )
+    return secret
 
 
 def unsigned_post_fallback_enabled(env: dict[str, str] | None = None) -> bool:
@@ -326,6 +334,14 @@ def _identity_hint_fingerprint_from_request(environ: dict[str, object]) -> str |
         request_cookie_value(environ, IDENTITY_HINT_COOKIE_NAME),
         secret=secret,
     )
+
+
+def request_is_secure(environ: dict[str, object]) -> bool:
+    scheme = str(environ.get("wsgi.url_scheme", "") or "").strip().lower()
+    if scheme:
+        return scheme == "https"
+    forwarded_proto = str(environ.get("HTTP_X_FORWARDED_PROTO", "") or "").strip().lower()
+    return forwarded_proto == "https"
 
 
 def resolve_request_username_claim_banner_state(environ: dict[str, object]) -> UsernameClaimBannerState | None:
@@ -3173,16 +3189,23 @@ def render_api_update_profile(environ, *, default_dry_run: bool) -> tuple[str, s
 def render_api_set_identity_hint(environ) -> tuple[str, str]:
     payload = read_json_request(environ)
     fingerprint = read_optional_text(payload, "fingerprint")
-    secret = identity_hint_secret()
-    if not secret:
-        raise PostingError("bad_request", "identity hint secret is not configured")
+    secret = ensure_identity_hint_secret()
+    secure_cookie = request_is_secure(environ)
     if fingerprint is None:
-        queue_response_header(environ, "Set-Cookie", build_clear_identity_hint_cookie_header())
+        queue_response_header(
+            environ,
+            "Set-Cookie",
+            build_clear_identity_hint_cookie_header(secure=secure_cookie),
+        )
         return "200 OK", "Status: cleared\n"
     queue_response_header(
         environ,
         "Set-Cookie",
-        build_set_identity_hint_cookie_header(fingerprint, secret=secret),
+        build_set_identity_hint_cookie_header(
+            fingerprint,
+            secret=secret,
+            secure=secure_cookie,
+        ),
     )
     return "200 OK", "Status: set\n"
 
@@ -3850,6 +3873,7 @@ def _dispatch_application(environ, start_response):
 
 def application(environ, start_response):
     setup_testing_defaults(environ)
+    ensure_identity_hint_secret()
     path = environ.get("PATH_INFO", "/")
     method = environ.get("REQUEST_METHOD", "GET").upper()
     query_params = parse_qs(environ.get("QUERY_STRING", ""))

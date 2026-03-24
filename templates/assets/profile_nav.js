@@ -2,6 +2,27 @@ import { loadOpenPgp } from "./openpgp_loader.js";
 
 const STORAGE_PUBLIC = "forum_public_key_armored";
 
+export function fingerprintFromIdentityId(identityId) {
+  const trimmed = typeof identityId === "string" ? identityId.trim().toLowerCase() : "";
+  return trimmed.startsWith("openpgp:") ? trimmed.slice("openpgp:".length) : "";
+}
+
+export async function syncIdentityHint(fingerprint, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== "function") {
+    return false;
+  }
+  const trimmed = typeof fingerprint === "string" ? fingerprint.trim() : "";
+  const payload = trimmed ? { fingerprint: trimmed } : {};
+  const response = await fetchImpl("/api/set_identity_hint", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return Boolean(response && response.ok);
+}
+
 export function profileHrefFromIdentityId(identityId) {
   const trimmed = typeof identityId === "string" ? identityId.trim().toLowerCase() : "";
   if (!trimmed.startsWith("openpgp:")) {
@@ -66,10 +87,16 @@ export async function enhanceProfileNav(
   }
   const publicKey = storedPublicKey(storage);
   if (!publicKey) {
+    try {
+      await syncIdentityHint("", fetchImpl);
+    } catch (_error) {
+      // Ignore sync failures and leave the unresolved slot untouched.
+    }
     return;
   }
   try {
     const identityId = await identityIdFromPublicKey(publicKey);
+    await syncIdentityHint(fingerprintFromIdentityId(identityId), fetchImpl);
     const href = profileHrefFromIdentityId(identityId);
     if (!href) {
       return;

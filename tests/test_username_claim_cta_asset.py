@@ -76,49 +76,6 @@ process.stdout.write(JSON.stringify(state));
             },
         )
 
-    def test_username_claim_cta_asset_extracts_fingerprint_from_identity_id(self) -> None:
-        asset_url = (
-            Path(__file__).resolve().parent.parent / "templates" / "assets" / "username_claim_cta.js"
-        ).as_uri()
-        profile_nav_url = (
-            Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js"
-        ).as_uri()
-        loader_url = (
-            Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js"
-        ).as_uri()
-        vendor_url = (
-            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
-        ).as_uri()
-        script = f"""
-import fs from "node:fs/promises";
-const loaderSource = await fs.readFile(new URL({json.dumps(loader_url)}), "utf8");
-const rewrittenLoaderSource = loaderSource.replace(
-  "./vendor/openpgp.min.mjs",
-  {json.dumps(vendor_url)},
-);
-const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
-const profileNavSource = await fs.readFile(new URL({json.dumps(profile_nav_url)}), "utf8");
-const rewrittenProfileNavSource = profileNavSource.replace(
-  "./openpgp_loader.js",
-  loaderModuleUrl,
-);
-const profileNavModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenProfileNavSource).toString("base64")}}`;
-const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
-const rewrittenAssetSource = assetSource.replace(
-  "./profile_nav.js",
-  profileNavModuleUrl,
-);
-const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
-const {{ fingerprintFromIdentityId }} = await import(assetModuleUrl);
-
-process.stdout.write(JSON.stringify({{
-  fingerprint: fingerprintFromIdentityId("openpgp:abcd1234ef"),
-}}));
-"""
-        payload = json.loads(self.run_node(script))
-
-        self.assertEqual(payload["fingerprint"], "abcd1234ef")
-
     def test_username_claim_cta_asset_reveals_banner_for_eligible_stored_key(self) -> None:
         asset_url = (
             Path(__file__).resolve().parent.parent / "templates" / "assets" / "username_claim_cta.js"

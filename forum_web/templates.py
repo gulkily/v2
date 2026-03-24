@@ -171,7 +171,6 @@ def render_page(
     page_script_html = (
         render_profile_nav_script_tag()
         + render_copy_field_script_tag()
-        + render_username_claim_cta_script_tag()
         + page_script_html
     )
     return base.substitute(
@@ -202,7 +201,3 @@ def render_profile_nav_script_tag() -> str:
 
 def render_copy_field_script_tag() -> str:
     return '<script type="module" src="/assets/copy_field.js"></script>'
-
-
-def render_username_claim_cta_script_tag() -> str:
-    return '<script type="module" src="/assets/username_claim_cta.js"></script>'

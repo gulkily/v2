@@ -19,7 +19,13 @@ class IdentityHintApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def post(self, path: str, payload: dict[str, object]) -> tuple[str, dict[str, str], str]:
+    def post(
+        self,
+        path: str,
+        payload: dict[str, object],
+        *,
+        scheme: str = "http",
+    ) -> tuple[str, dict[str, str], str]:
         body = json.dumps(payload).encode("utf-8")
         environ = {
             "PATH_INFO": path,
@@ -27,6 +33,7 @@ class IdentityHintApiTests(unittest.TestCase):
             "REQUEST_METHOD": "POST",
             "CONTENT_LENGTH": str(len(body)),
             "wsgi.input": BytesIO(body),
+            "wsgi.url_scheme": scheme,
         }
         response: dict[str, object] = {}
 
@@ -57,6 +64,17 @@ class IdentityHintApiTests(unittest.TestCase):
         self.assertIn("forum_identity_hint=", set_cookie)
         self.assertIn("HttpOnly", set_cookie)
         self.assertIn("SameSite=Lax", set_cookie)
+        self.assertNotIn("Secure", set_cookie)
+
+    def test_set_identity_hint_sets_secure_cookie_on_https(self) -> None:
+        status, headers, _ = self.post(
+            "/api/set_identity_hint",
+            {"fingerprint": "ABCD1234EF567890"},
+            scheme="https",
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Secure", headers.get("Set-Cookie", ""))
 
     def test_set_identity_hint_clears_cookie_when_fingerprint_missing(self) -> None:
         status, headers, body = self.post("/api/set_identity_hint", {})

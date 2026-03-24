@@ -82,6 +82,17 @@ class IdentityHintTests(unittest.TestCase):
         self.assertIn("Max-Age=0", header)
         self.assertIn("expires=", header.lower())
 
+    def test_cookie_headers_can_omit_secure_flag(self) -> None:
+        set_header = build_set_identity_hint_cookie_header(
+            "ABCD1234EF567890",
+            secret="top-secret",
+            secure=False,
+        )
+        clear_header = build_clear_identity_hint_cookie_header(secure=False)
+
+        self.assertNotIn("Secure", set_header)
+        self.assertNotIn("Secure", clear_header)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -90,6 +90,35 @@ process.stdout.write(JSON.stringify({{ count: mergeNotificationCount(summaryText
 
         self.assertEqual(payload["count"], 5)
 
+    def test_profile_nav_asset_extracts_fingerprint_from_identity_id(self) -> None:
+        asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
+        vendor_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+        ).as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+const loaderSource = await fs.readFile(new URL({json.dumps((Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js").as_uri())}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const rewrittenAssetSource = assetSource.replace(
+  "./openpgp_loader.js",
+  loaderModuleUrl,
+);
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenAssetSource).toString("base64")}}`;
+const {{ fingerprintFromIdentityId }} = await import(assetModuleUrl);
+
+process.stdout.write(JSON.stringify({{
+  fingerprint: fingerprintFromIdentityId("openpgp:abcd1234ef"),
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertEqual(payload["fingerprint"], "abcd1234ef")
+
     def test_profile_nav_asset_points_nav_to_merge_page_when_notifications_exist(self) -> None:
         asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
         vendor_url = (
@@ -143,20 +172,28 @@ const storage = {{
     return key === "forum_public_key_armored" ? generated.publicKey : "";
   }},
 }};
-const fetchImpl = async () => ({{
-  ok: true,
-  async text() {{
-    return [
-      "Command: get_merge_management",
-      "Identity-ID: openpgp:test",
-      "Historical-Match-Count: 1",
-      "Outgoing-Request-Count: 0",
-      "Incoming-Request-Count: 2",
-      "Dismissed-Request-Count: 0",
-      "Approved-Request-Count: 0",
-    ].join("\\n");
-  }},
-}});
+const requests = [];
+const fetchImpl = async (url, options) => {{
+  requests.push({{
+    url,
+    method: options?.method || "GET",
+    body: options?.body || "",
+  }});
+  return {{
+    ok: true,
+    async text() {{
+      return [
+        "Command: get_merge_management",
+        "Identity-ID: openpgp:test",
+        "Historical-Match-Count: 1",
+        "Outgoing-Request-Count: 0",
+        "Incoming-Request-Count: 2",
+        "Dismissed-Request-Count: 0",
+        "Approved-Request-Count: 0",
+      ].join("\\n");
+    }},
+  }};
+}};
 
 await enhanceProfileNav(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
@@ -166,6 +203,7 @@ process.stdout.write(JSON.stringify({{
   href: navLink.href,
   textContent: navLink.textContent,
   fingerprint,
+  requests,
 }}));
 """
         payload = json.loads(self.run_node(script))
@@ -175,6 +213,10 @@ process.stdout.write(JSON.stringify({{
         self.assertEqual(payload["state"], "resolved")
         self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}/merge")
         self.assertEqual(payload["textContent"], "My profile (3)")
+        self.assertEqual(payload["requests"][0]["url"], "/api/set_identity_hint")
+        self.assertEqual(payload["requests"][0]["method"], "POST")
+        self.assertIn("fingerprint", payload["requests"][0]["body"])
+        self.assertTrue(payload["requests"][1]["url"].startswith("/api/get_merge_management?identity_id=openpgp%3A"))
 
     def test_profile_nav_asset_leaves_unresolved_slot_stable_without_stored_key(self) -> None:
         asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
@@ -225,14 +267,20 @@ const storage = {{
     return "";
   }},
 }};
+let fetchCalls = 0;
+const fetchImpl = async () => {{
+  fetchCalls += 1;
+  return {{ ok: true, text: async () => "" }};
+}};
 
-await enhanceProfileNav(doc, storage, async () => ({{ ok: false, text: async () => "" }}));
+await enhanceProfileNav(doc, storage, fetchImpl);
 process.stdout.write(JSON.stringify({{
   ariaDisabled: navLink.attributes["aria-disabled"] || "",
   tabindex: navLink.attributes.tabindex || "",
   state: navLink.attributes["data-profile-nav-state"] || "",
   href: navLink.href,
   textContent: navLink.textContent,
+  fetchCalls,
 }}));
 """
         payload = json.loads(self.run_node(script))
@@ -242,6 +290,7 @@ process.stdout.write(JSON.stringify({{
         self.assertEqual(payload["state"], "unresolved")
         self.assertEqual(payload["href"], "")
         self.assertEqual(payload["textContent"], "My profile")
+        self.assertEqual(payload["fetchCalls"], 1)
 
     def test_profile_nav_asset_skips_merge_notification_fetch_when_feature_disabled(self) -> None:
         asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
@@ -312,7 +361,7 @@ process.stdout.write(JSON.stringify({{
 
         self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}?self=1")
         self.assertEqual(payload["textContent"], "My profile")
-        self.assertEqual(payload["fetchCount"], 0)
+        self.assertEqual(payload["fetchCount"], 1)
 
 
 if __name__ == "__main__":

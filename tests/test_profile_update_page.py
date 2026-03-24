@@ -74,7 +74,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn(f'/profiles/{PROFILE_SLUG}/update', body)
         self.assertIn('data-username-claim-cta', body)
-        self.assertIn('/assets/username_claim_cta.js', body)
+        self.assertNotIn('/assets/username_claim_cta.js', body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
     def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
