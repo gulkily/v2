@@ -3859,6 +3859,8 @@ def application(environ, start_response):
 
     def start_response_with_extra(status, headers, exc_info=None):
         merged_headers = list(headers) + list(extra_headers)
+        if exc_info is None:
+            return start_response(status, merged_headers)
         return start_response(status, merged_headers, exc_info)
 
     banner_state_token = None

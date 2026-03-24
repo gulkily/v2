@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextvars import ContextVar, Token
+from dataclasses import dataclass
 import html
 import os
 from pathlib import Path
@@ -7,6 +9,16 @@ from string import Template
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
+_CURRENT_USERNAME_CLAIM_BANNER_STATE: ContextVar["UsernameClaimBannerState | None"] = ContextVar(
+    "current_username_claim_banner_state",
+    default=None,
+)
+
+
+@dataclass(frozen=True)
+class UsernameClaimBannerState:
+    visible: bool
+    update_href: str = ""
 
 
 def env_flag_enabled(name: str, *, default: bool = False) -> bool:
@@ -106,14 +118,25 @@ def render_site_footer() -> str:
     )
 
 
-def render_username_claim_cta_html() -> str:
+def set_current_username_claim_cta_state(state: UsernameClaimBannerState | None) -> Token:
+    return _CURRENT_USERNAME_CLAIM_BANNER_STATE.set(state)
+
+
+def reset_current_username_claim_cta_state(token: Token) -> None:
+    _CURRENT_USERNAME_CLAIM_BANNER_STATE.reset(token)
+
+
+def render_username_claim_cta_html(state: UsernameClaimBannerState | None = None) -> str:
+    current_state = state if state is not None else _CURRENT_USERNAME_CLAIM_BANNER_STATE.get()
+    href = current_state.update_href if current_state is not None and current_state.update_href else ""
+    hidden_attr = "" if current_state is not None and current_state.visible and href else " hidden"
     return (
-        '<section class="site-username-claim panel" data-username-claim-cta hidden>'
+        f'<section class="site-username-claim panel" data-username-claim-cta{hidden_attr}>'
         '<div class="site-username-claim-copy">'
         '<p class="site-username-claim-kicker">Account setup</p>'
         '<p class="site-username-claim-text">Now that you\'re participating, you can choose a username.</p>'
         "</div>"
-        '<a class="thread-chip site-username-claim-link" data-username-claim-link href="">Choose your username</a>'
+        f'<a class="thread-chip site-username-claim-link" data-username-claim-link href="{html.escape(href, quote=True)}">Choose your username</a>'
         "</section>"
     )
 
