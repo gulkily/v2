@@ -1,0 +1,4 @@
+[submodule "docs/fdp"]
+	path = docs/fdp
+	url = https://github.com/gulkily/fdp.git
+	branch = master
