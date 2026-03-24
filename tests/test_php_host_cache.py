@@ -199,6 +199,12 @@ process.stdout.write(signature);
             return []
         return sorted(path for path in cache_root.glob("*.cgi"))
 
+    def static_html_files(self) -> list[Path]:
+        static_root = Path(self.static_tempdir.name) / "_static_html"
+        if not static_root.exists():
+            return []
+        return sorted(path for path in static_root.rglob("index.html"))
+
     def php_cache_helper(self, body: str, *, path: str = "/", query_string: str = "", method: str = "GET", cookie: str = "") -> str:
         cache_path = (self.repo_root / "php_host" / "public" / "cache.php").as_posix()
         static_html_root = (Path(self.static_tempdir.name) / "_static_html").as_posix()
@@ -235,8 +241,8 @@ process.stdout.write(signature);
         self.run_command(["git", "commit", "-m", f"Add {post_id}"], cwd=self.data_repo_root)
 
     def test_php_host_caches_allowlisted_reads_and_marks_hit_headers(self) -> None:
-        first = self.php_request("/")
-        second = self.php_request("/")
+        first = self.php_request("/api/list_index")
+        second = self.php_request("/api/list_index")
 
         self.assertEqual(first["status"], 200)
         self.assertIn("X-Forum-Php-Cache: MISS", first["headers"])
@@ -244,6 +250,40 @@ process.stdout.write(signature);
         self.assertIn("X-Forum-Php-Cache: HIT", second["headers"])
         self.assertEqual(first["body"], second["body"])
         self.assertEqual(len(self.cache_files()), 1)
+
+    def test_php_host_stores_and_reuses_static_html_for_allowlisted_reads(self) -> None:
+        self.write_committed_post(
+            post_id="thread-php-static-001",
+            subject="Hello static HTML",
+            body_text="This thread should create a static artifact.",
+        )
+
+        first = self.php_request("/threads/thread-php-static-001")
+
+        self.assertEqual(first["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", first["headers"])
+        self.assertIn("Refreshing the forum...", first["body"])
+
+        rebuild = self.php_request("/threads/thread-php-static-001", query_string="__forum_rebuild=1")
+
+        self.assertEqual(rebuild["status"], 200)
+        self.assertIn("Hello static HTML", rebuild["body"])
+
+        materialized = self.php_request("/threads/thread-php-static-001")
+
+        self.assertEqual(materialized["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", materialized["headers"])
+        self.assertIn("Hello static HTML", materialized["body"])
+        self.assertEqual(
+            self.static_html_files(),
+            [Path(self.static_tempdir.name) / "_static_html" / "threads" / "thread-php-static-001" / "index.html"],
+        )
+
+        second = self.php_request("/threads/thread-php-static-001")
+
+        self.assertEqual(second["status"], 200)
+        self.assertIn("X-Forum-Static-Html: HIT", second["headers"])
+        self.assertIn("Hello static HTML", second["body"])
 
     def test_php_host_sets_asset_cache_headers_without_microcaching_assets(self) -> None:
         response = self.php_request("/assets/site.css")
@@ -312,6 +352,7 @@ process.stdout.write(signature);
         warm = self.php_request("/")
         self.assertIn("X-Forum-Php-Cache: MISS", warm["headers"])
         self.assertEqual(len(self.cache_files()), 1)
+        self.assertEqual(len(self.static_html_files()), 1)
 
         payload_text = self.build_thread_payload(
             post_id="thread-php-cache-001",
@@ -328,6 +369,7 @@ process.stdout.write(signature);
         self.assertEqual(write_response["status"], 200)
         self.assertIn("Record-ID: thread-php-cache-001", write_response["body"])
         self.assertEqual(self.cache_files(), [])
+        self.assertEqual(self.static_html_files(), [])
 
         refreshed = self.php_request("/")
         self.assertIn("X-Forum-Php-Cache: MISS", refreshed["headers"])

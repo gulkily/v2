@@ -155,6 +155,68 @@ function forum_static_html_public_path(string $requestPath, string $queryString 
     return $staticRoot . DIRECTORY_SEPARATOR . $trimmed . DIRECTORY_SEPARATOR . 'index.html';
 }
 
+function forum_read_static_html(): ?string
+{
+    if (!forum_static_html_request()) {
+        return null;
+    }
+    $path = forum_static_html_public_path(forum_request_path(), forum_request_query_string());
+    if ($path === null || !is_file($path)) {
+        return null;
+    }
+    $body = @file_get_contents($path);
+    return is_string($body) ? $body : null;
+}
+
+function forum_store_static_html(array $parsedResponse): void
+{
+    if (!forum_static_html_request()) {
+        return;
+    }
+    if ((int) $parsedResponse['status_code'] !== 200) {
+        return;
+    }
+    $contentType = '';
+    foreach ($parsedResponse['headers'] as $header) {
+        if (stripos($header, 'Content-Type:') === 0) {
+            $contentType = trim(substr($header, strlen('Content-Type:')));
+            break;
+        }
+    }
+    if ($contentType === '' || stripos($contentType, 'text/html') !== 0) {
+        return;
+    }
+    $path = forum_static_html_public_path(forum_request_path(), forum_request_query_string());
+    if ($path === null) {
+        return;
+    }
+    $directory = dirname($path);
+    if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+        return;
+    }
+    @file_put_contents($path, (string) $parsedResponse['body'], LOCK_EX);
+}
+
+function forum_clear_static_html(): void
+{
+    $staticRoot = forum_static_html_dir();
+    if (!is_dir($staticRoot)) {
+        return;
+    }
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($staticRoot, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $entry) {
+        if ($entry->isDir()) {
+            @rmdir($entry->getPathname());
+            continue;
+        }
+        @unlink($entry->getPathname());
+    }
+}
+
 function forum_cacheable_read_request(): bool
 {
     if (forum_request_method() !== 'GET') {

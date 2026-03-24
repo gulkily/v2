@@ -503,6 +503,16 @@ function forum_apply_post_index_rebuild_status_response(array $parsed, array $ex
     return $parsed;
 }
 
+function forum_apply_static_html_response(string $body, array $extraHeaders = []): void
+{
+    http_response_code(200);
+    forum_apply_response_headers([
+        'Content-Type: text/html; charset=utf-8',
+    ]);
+    forum_apply_response_headers($extraHeaders);
+    echo $body;
+}
+
 function forum_apply_cgi_response(string $response, array $extraHeaders = []): array
 {
     $parsed = forum_parse_cgi_response($response);
@@ -527,6 +537,12 @@ function forum_input_stream()
         fclose($input);
     }
     return fopen('php://stdin', 'rb');
+}
+
+$staticHtml = forum_read_static_html();
+if (is_string($staticHtml)) {
+    forum_apply_static_html_response($staticHtml, ['X-Forum-Static-Html: HIT']);
+    exit;
 }
 
 $cachedResponse = forum_read_cached_response();
@@ -580,8 +596,10 @@ if (forum_is_post_index_rebuild_status_response($parsed)) {
     forum_apply_post_index_rebuild_status_response($parsed, ['X-Forum-Php-Cache: MISS']);
     exit;
 }
+forum_store_static_html($parsed);
 forum_store_cached_response($parsed, $response);
 forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], forum_asset_cache_headers()));
 if (forum_mutating_request() && (int) $parsed['status_code'] >= 200 && (int) $parsed['status_code'] < 400) {
     forum_clear_cache();
+    forum_clear_static_html();
 }

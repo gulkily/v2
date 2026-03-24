@@ -22,3 +22,15 @@
 - Notes:
   - The direct static hit path now depends on artifacts being published under the public `_static_html/` tree.
   - Shared-host rewrite behavior still needs end-to-end validation once artifact generation lands.
+
+## Stage 3 - Generate and invalidate canonical public HTML artifacts
+- Changes:
+  - Extended [`php_host/public/cache.php`](/home/wsl/v2/php_host/public/cache.php) with `forum_read_static_html()`, `forum_store_static_html(...)`, and `forum_clear_static_html()` so allowlisted public HTML can be materialized into `_static_html/`, reused, and invalidated.
+  - Updated [`php_host/public/index.php`](/home/wsl/v2/php_host/public/index.php) to serve an existing static artifact before CGI work, store canonical Python-rendered HTML after successful allowlisted reads, and clear the static tree after successful mutating requests.
+  - Expanded [`test_php_host_cache.py`](/home/wsl/v2/tests/test_php_host_cache.py) with end-to-end coverage for artifact creation, static-hit reuse, and write-trigger invalidation.
+- Verification:
+  - Ran `python -m unittest tests.test_php_host_cache.PhpHostCacheTests.test_php_host_caches_allowlisted_reads_and_marks_hit_headers tests.test_php_host_cache.PhpHostCacheTests.test_php_host_stores_and_reuses_static_html_for_allowlisted_reads tests.test_php_host_cache.PhpHostCacheTests.test_successful_write_clears_php_microcache`
+  - Result: 3 tests passed.
+- Notes:
+  - The PHP fallback static-hit path is intentionally retained even though Apache should serve these files first in production; it keeps behavior correct when rewrite bypass is unavailable or untested locally.
+  - Invalidation is coarse for now and clears the full `_static_html/` tree after successful writes.
