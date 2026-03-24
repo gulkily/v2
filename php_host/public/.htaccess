@@ -5,5 +5,62 @@ RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
+# Serve generated static HTML for allowlisted anonymous read routes before PHP.
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/index.html -f
+RewriteRule ^$ _static_html/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/instance/index.html -f
+RewriteRule ^instance/?$ _static_html/instance/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/moderation/index.html -f
+RewriteRule ^moderation/?$ _static_html/moderation/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/planning/task-priorities/index.html -f
+RewriteRule ^planning/task-priorities/?$ _static_html/planning/task-priorities/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/threads/$1/index.html -f
+RewriteRule ^threads/([^/]+)/?$ _static_html/threads/$1/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/posts/$1/index.html -f
+RewriteRule ^posts/([^/]+)/?$ _static_html/posts/$1/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/planning/tasks/$1/index.html -f
+RewriteRule ^planning/tasks/([^/]+)/?$ _static_html/planning/tasks/$1/index.html [L]
+
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{QUERY_STRING} ^$
+RewriteCond %{HTTP:Authorization} ^$
+RewriteCond %{HTTP:Cookie} ^$
+RewriteCond %{DOCUMENT_ROOT}/_static_html/profiles/$1/index.html -f
+RewriteRule ^profiles/([^/]+)/?$ _static_html/profiles/$1/index.html [L]
+
 # Route the rest of the public site through the PHP front controller.
 RewriteRule ^ index.php [L,QSA]

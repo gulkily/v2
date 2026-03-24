@@ -10,3 +10,15 @@
 - Notes:
   - Query-string-bearing routes remain dynamic for now; any future normalized query support needs an explicit artifact-key contract.
   - The static path contract assumes artifacts live under a public directory tree that Apache can serve directly in later stages.
+
+## Stage 2 - Add web-server bypass and dynamic fallback
+- Changes:
+  - Extended [`php_host/public/.htaccess`](/home/wsl/v2/php_host/public/.htaccess) with guarded rewrite rules that serve `_static_html/.../index.html` directly for allowlisted anonymous `GET` routes when the generated file exists.
+  - Kept the guards conservative by requiring an empty query string and no `Authorization` or `Cookie` headers before static bypass can apply.
+  - Added [`test_php_host_htaccess.py`](/home/wsl/v2/tests/test_php_host_htaccess.py) to lock the rewrite contract to the allowlisted route set and confirm PHP front-controller fallback remains the terminal rule.
+- Verification:
+  - Ran `python -m unittest tests.test_php_host_htaccess tests.test_php_host_cache.PhpHostCacheTests.test_static_html_request_only_allows_safe_anonymous_html_routes tests.test_php_host_cache.PhpHostCacheTests.test_static_html_public_path_maps_allowlisted_routes_to_index_files`
+  - Result: 3 tests passed.
+- Notes:
+  - The direct static hit path now depends on artifacts being published under the public `_static_html/` tree.
+  - Shared-host rewrite behavior still needs end-to-end validation once artifact generation lands.
