@@ -27,3 +27,12 @@
   - `python -m pytest tests/test_site_activity_page.py tests/test_board_index_page.py tests/test_task_thread_pages.py`
 - Notes:
   - Board-filtered HTML pages now advertise the board-filtered RSS URL when `board_tag` scope is active.
+
+## Stage 4 - Lock RSS behavior into regression coverage
+- Changes:
+  - Added focused edge-case coverage for filtered activity RSS output, unknown board-tag RSS requests, and missing-thread RSS requests.
+  - Re-ran the combined RSS-related helper and page suites so the final stage validates helper shaping, route responses, discovery markup, and error handling together.
+- Verification:
+  - `python -m pytest tests/test_site_activity_git_log_helpers.py tests/test_site_activity_page.py tests/test_board_index_page.py tests/test_task_thread_pages.py`
+- Notes:
+  - Missing-thread RSS requests currently fall back to the existing 404 HTML page, which keeps error handling consistent with the normal thread route.

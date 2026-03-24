@@ -220,6 +220,15 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertIn("Add ui helper", body)
         self.assertIn("Pinning the thread.", body)
 
+    def test_activity_rss_respects_requested_filter(self) -> None:
+        status, headers, body = self.get("/activity/", "view=code&format=rss")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/rss+xml; charset=utf-8")
+        self.assertIn("Add ui helper", body)
+        self.assertNotIn("Add reply", body)
+        self.assertNotIn("Pinning the thread.", body)
+
 
 if __name__ == "__main__":
     unittest.main()

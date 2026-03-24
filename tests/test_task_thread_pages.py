@@ -237,6 +237,13 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn("<guid>post:T01</guid>", body)
         self.assertIn("<guid>post:reply-20260316093045-follow-up-note-12345678</guid>", body)
 
+    def test_missing_thread_rss_returns_not_found_html(self) -> None:
+        status, headers, body = self.get("/threads/missing-thread", "format=rss")
+
+        self.assertEqual(status, "404 Not Found")
+        self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn("The requested thread does not exist in the current repository state.", body)
+
 
 if __name__ == "__main__":
     unittest.main()

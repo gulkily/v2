@@ -290,6 +290,16 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn("Planning thread", body)
         self.assertNotIn("Hello world", body)
 
+    def test_board_index_rss_rejects_unknown_board_tag(self) -> None:
+        self.init_git_repo()
+        self.commit_posts("Add roots", "2026-03-17T09:00:00+00:00")
+
+        status, headers, body = self.get("/", "board_tag=unknown&format=rss")
+
+        self.assertEqual(status, "400 Bad Request")
+        self.assertEqual(headers["Content-Type"], "text/plain; charset=utf-8")
+        self.assertIn("unknown board_tag: unknown", body)
+
 
 if __name__ == "__main__":
     unittest.main()
