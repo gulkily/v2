@@ -136,6 +136,34 @@ class ForumContentPurgeTests(unittest.TestCase):
         self.assertIn("- records/posts", output)
         self.assertIn("- records/identity", output)
 
+    def test_run_content_purge_preview_treats_records_root_as_default_alias(self) -> None:
+        archive_path = self.repo_root.parent / "records-root-preview.zip"
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_content_purge(
+                self.repo_root,
+                paths=["records"],
+                archive_output=archive_path,
+                dry_run=True,
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        output = stdout.getvalue()
+        self.assertIn("Using suggested default paths", output)
+        self.assertIn("- records/posts", output)
+        self.assertIn("- records/identity", output)
+
+    def test_build_purge_plan_rejects_records_root_mixed_with_explicit_paths(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Use `records` by itself"):
+            self.module.build_purge_plan(
+                self.repo_root,
+                requested_paths=["records", "records/posts"],
+                archive_output=self.repo_root.parent / "mixed.zip",
+            )
+
     def test_run_content_purge_apply_refuses_dirty_worktree_without_force(self) -> None:
         self.write_text("records/posts/untracked.txt", "Post-ID: untracked\n\nBody.\n")
         archive_path = self.repo_root.parent / "apply-output.zip"

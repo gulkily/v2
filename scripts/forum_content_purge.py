@@ -105,11 +105,16 @@ def build_purge_plan(
     requested_paths: list[str],
     archive_output: Path | None = None,
 ) -> PurgePlan:
-    explicit_paths = bool(requested_paths)
+    normalized_requested_paths = tuple(normalize_requested_path(path) for path in requested_paths)
+    use_default_paths = not normalized_requested_paths or normalized_requested_paths == ("records",)
+    if "records" in normalized_requested_paths and normalized_requested_paths != ("records",):
+        raise ValueError(
+            "Use `records` by itself to accept suggested defaults, or pass explicit `records/...` paths."
+        )
     normalized_paths = (
-        tuple(normalize_requested_path(path) for path in requested_paths)
-        if explicit_paths
-        else suggest_default_purge_paths(repo_root)
+        suggest_default_purge_paths(repo_root)
+        if use_default_paths
+        else normalized_requested_paths
     )
     selected_paths = resolve_purge_paths(repo_root, list(normalized_paths))
     archived_files = collect_archived_files(selected_paths)
@@ -132,7 +137,7 @@ def build_purge_plan(
         generated_at=generated_at,
         head_commit=head_commit,
         oldest_reachable_commit=oldest_reachable_commit,
-        used_default_paths=not explicit_paths,
+        used_default_paths=use_default_paths,
     )
 
 
