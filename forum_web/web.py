@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hmac
 import json
 import logging
 import os
@@ -10,13 +11,14 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import format_datetime
+from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Iterable, Iterator
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
 from forum_core.instance_info import load_instance_info, render_public_value
-from forum_core.identity import identity_id_from_slug, identity_slug, short_identity_label
+from forum_core.identity import build_identity_id, identity_id_from_slug, identity_slug, short_identity_label
 from forum_core.llm_provider import LLMProviderError, get_llm_model, run_llm
 from forum_core.operation_events import (
     bind_operation,
@@ -69,6 +71,13 @@ from forum_web.api_text import (
     render_thread_text,
     render_username_claim_cta_text,
 )
+from forum_web.identity_hint import (
+    IDENTITY_HINT_COOKIE_NAME,
+    build_clear_identity_hint_cookie_header,
+    build_set_identity_hint_cookie_header,
+    identity_hint_secret,
+    validate_identity_hint_cookie_value,
+)
 from forum_web.profiles import (
     find_profile_summary,
     resolve_username_claim_cta_state,
@@ -99,8 +108,11 @@ from forum_web.templates import (
     merge_feature_enabled,
     render_page,
     render_profile_nav_script_tag,
+    reset_current_username_claim_cta_state,
+    set_current_username_claim_cta_state,
     render_site_header,
     site_title,
+    UsernameClaimBannerState,
 )
 
 load_repo_env()
@@ -111,6 +123,7 @@ POST_INDEX_REBUILD_STATUS_HEADER = "X-Forum-Post-Index-Status"
 POST_INDEX_REBUILD_TARGET_HEADER = "X-Forum-Post-Index-Target-Path"
 POST_INDEX_REBUILD_REQUEST_HEADER = "X-Forum-Post-Index-Rebuild-Path"
 POST_INDEX_REBUILD_QUERY_PARAM = "__forum_rebuild"
+IDENTITY_HINT_SYNC_PATH = "/api/set_identity_hint"
 
 
 def get_repo_root() -> Path:
@@ -276,6 +289,62 @@ def _build_post_index_rebuild_path(path: str, *, query_string: str) -> str:
     if not query_string:
         return f"{path}?{POST_INDEX_REBUILD_QUERY_PARAM}=1"
     return f"{path}?{query_string}&{POST_INDEX_REBUILD_QUERY_PARAM}=1"
+
+
+def _response_extra_headers(environ: dict[str, object]) -> list[tuple[str, str]]:
+    headers = environ.setdefault("_forum_extra_headers", [])
+    if isinstance(headers, list):
+        return headers
+    raise TypeError("_forum_extra_headers must be a list")
+
+
+def queue_response_header(environ: dict[str, object], name: str, value: str) -> None:
+    _response_extra_headers(environ).append((name, value))
+
+
+def request_cookie_value(environ: dict[str, object], name: str) -> str | None:
+    raw_cookie = str(environ.get("HTTP_COOKIE", "") or "")
+    if not raw_cookie.strip():
+        return None
+    cookie = SimpleCookie()
+    try:
+        cookie.load(raw_cookie)
+    except Exception:
+        return None
+    morsel = cookie.get(name)
+    if morsel is None:
+        return None
+    value = morsel.value.strip()
+    return value or None
+
+
+def _identity_hint_fingerprint_from_request(environ: dict[str, object]) -> str | None:
+    secret = identity_hint_secret()
+    if not secret:
+        return None
+    return validate_identity_hint_cookie_value(
+        request_cookie_value(environ, IDENTITY_HINT_COOKIE_NAME),
+        secret=secret,
+    )
+
+
+def resolve_request_username_claim_banner_state(environ: dict[str, object]) -> UsernameClaimBannerState | None:
+    fingerprint = _identity_hint_fingerprint_from_request(environ)
+    if fingerprint is None:
+        return None
+    posts, _, _, _, _, identity_context = load_repository_state()
+    state = resolve_username_claim_cta_state(
+        repo_root=get_repo_root(),
+        posts=posts,
+        identity_id=build_identity_id(fingerprint),
+        identity_context=identity_context,
+    )
+    if state is None:
+        return None
+    return UsernameClaimBannerState(
+        visible=state.can_claim_username and bool(state.update_href),
+        update_href=state.update_href,
+    )
 
 
 def maybe_render_streamed_reindex_feedback_response(
@@ -3101,6 +3170,23 @@ def render_api_update_profile(environ, *, default_dry_run: bool) -> tuple[str, s
     return "200 OK", render_profile_update_result(result)
 
 
+def render_api_set_identity_hint(environ) -> tuple[str, str]:
+    payload = read_json_request(environ)
+    fingerprint = read_optional_text(payload, "fingerprint")
+    secret = identity_hint_secret()
+    if not secret:
+        raise PostingError("bad_request", "identity hint secret is not configured")
+    if fingerprint is None:
+        queue_response_header(environ, "Set-Cookie", build_clear_identity_hint_cookie_header())
+        return "200 OK", "Status: cleared\n"
+    queue_response_header(
+        environ,
+        "Set-Cookie",
+        build_set_identity_hint_cookie_header(fingerprint, secret=secret),
+    )
+    return "200 OK", "Status: set\n"
+
+
 def _dispatch_application(environ, start_response):
     setup_testing_defaults(environ)
     path = environ.get("PATH_INFO", "/")
@@ -3230,6 +3316,18 @@ def _dispatch_application(environ, start_response):
                 start_response("405 Method Not Allowed", headers)
                 return [body]
             status, body_text = render_api_update_profile(environ, default_dry_run=False)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == IDENTITY_HINT_SYNC_PATH:
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body_text = render_api_set_identity_hint(environ)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
@@ -3756,6 +3854,24 @@ def application(environ, start_response):
     method = environ.get("REQUEST_METHOD", "GET").upper()
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
     repo_root = get_repo_root()
+    extra_headers: list[tuple[str, str]] = []
+    environ["_forum_extra_headers"] = extra_headers
+
+    def start_response_with_extra(status, headers, exc_info=None):
+        merged_headers = list(headers) + list(extra_headers)
+        return start_response(status, merged_headers, exc_info)
+
+    banner_state_token = None
+    if (
+        method == "GET"
+        and not request_wants_rss(query_params)
+        and not path.startswith("/api/")
+        and not path.startswith("/assets/")
+        and path not in {"/favicon.ico", "/llms.txt", "/moderation/"}
+    ):
+        banner_state_token = set_current_username_claim_cta_state(
+            resolve_request_username_claim_banner_state(environ)
+        )
     try:
         metadata = {"method": method, "path": path}
         if path == "/activity/":
@@ -3769,7 +3885,7 @@ def application(environ, start_response):
         )
         with bind_operation(handle):
             try:
-                response = _dispatch_application(environ, start_response)
+                response = _dispatch_application(environ, start_response_with_extra)
             except Exception as exc:
                 fail_operation(handle, error_text=str(exc))
                 raise
@@ -3782,6 +3898,9 @@ def application(environ, start_response):
         headers = [("Content-Type", "text/html; charset=utf-8")]
         start_response("500 Internal Server Error", headers)
         return [body]
+    finally:
+        if banner_state_token is not None:
+            reset_current_username_claim_cta_state(banner_state_token)
 
 
 def _finalize_response_iterable(response: Iterable[bytes], *, handle) -> Iterable[bytes]:
