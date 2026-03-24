@@ -98,10 +98,10 @@ class BoardIndexPageTests(unittest.TestCase):
         self.run_git("add", "records/posts", env=env)
         self.run_git("commit", "-m", message, env=env)
 
-    def get(self, path: str) -> tuple[str, dict[str, str], str]:
+    def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": "GET",
             "CONTENT_LENGTH": "0",
             "wsgi.input": BytesIO(b""),
@@ -260,6 +260,32 @@ class BoardIndexPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertTrue(body.index("/threads/root-001") < body.index("/threads/root-002"))
+
+    def test_board_index_route_can_render_rss_feed(self) -> None:
+        self.init_git_repo()
+        self.commit_posts("Add roots", "2026-03-17T09:00:00+00:00")
+
+        status, headers, body = self.get("/", "format=rss")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/rss+xml; charset=utf-8")
+        self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', body)
+        self.assertIn("threads</title>", body)
+        self.assertIn("<link>/</link>", body)
+        self.assertIn("<guid>thread:root-001</guid>", body)
+
+    def test_board_index_rss_can_filter_to_one_board_tag(self) -> None:
+        self.init_git_repo()
+        self.commit_posts("Add roots", "2026-03-17T09:00:00+00:00")
+
+        status, headers, body = self.get("/", "board_tag=planning&format=rss")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/rss+xml; charset=utf-8")
+        self.assertIn("/planning/ threads</title>", body)
+        self.assertIn("<link>/?board_tag=planning</link>", body)
+        self.assertIn("Planning thread", body)
+        self.assertNotIn("Hello world", body)
 
 
 if __name__ == "__main__":

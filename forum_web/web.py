@@ -504,6 +504,11 @@ def activity_page_from_request(raw_page: str | None) -> int:
     return page
 
 
+def request_wants_rss(query_params: dict[str, list[str]]) -> bool:
+    raw_value = query_params.get("format", [""])[0].strip().lower()
+    return raw_value == "rss"
+
+
 def parse_activity_sort_timestamp(raw_value: str) -> datetime:
     normalized = raw_value.strip()
     if normalized.endswith("Z"):
@@ -1174,10 +1179,18 @@ def render_account_key_page() -> str:
     )
 
 
-def render_board_index() -> str:
+def render_board_index(*, board_tag: str | None = None) -> str:
     repo_root = get_repo_root()
-    posts, threads, _, _, moderation_state, _ = load_repository_state()
-    context = build_board_index_page_context(posts, threads, moderation_state, repo_root=repo_root)
+    posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
+    if board_tag and board_tag not in board_tags:
+        raise LookupError(f"unknown board tag: {board_tag}")
+    context = build_board_index_page_context(
+        posts,
+        threads,
+        moderation_state,
+        repo_root=repo_root,
+        board_tag=board_tag,
+    )
     content = load_template("board_index.html").substitute(context)
     return render_page(
         title=site_title(),
@@ -1194,8 +1207,8 @@ def render_board_index() -> str:
     )
 
 
-def build_board_index_page_context(posts, threads, moderation_state, *, repo_root: Path) -> dict[str, str]:
-    public_threads = visible_threads(threads, moderation_state, repo_root=repo_root)
+def build_board_index_page_context(posts, threads, moderation_state, *, repo_root: Path, board_tag: str | None = None) -> dict[str, str]:
+    public_threads = visible_threads(threads, moderation_state, board_tag=board_tag, repo_root=repo_root)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
     return {
         "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
@@ -1492,6 +1505,24 @@ def render_site_activity_page(*, view_mode: str, page: int) -> str:
     )
 
 
+def render_activity_rss(*, view_mode: str, page: int) -> bytes:
+    repo_root = get_repo_root()
+    items = load_activity_feed_items(repo_root, view_mode=view_mode, page=page)
+    description = "Recent activity for this instance."
+    if view_mode == "content":
+        description = "Recent content activity for this instance."
+    elif view_mode == "moderation":
+        description = "Recent moderation activity for this instance."
+    elif view_mode == "code":
+        description = "Recent code activity for this instance."
+    return render_rss_feed(
+        title=f"{site_title()} activity ({view_mode})",
+        description=description,
+        link=f"/activity/?view={view_mode}",
+        items=items,
+    )
+
+
 def render_board_section(tag: str, threads, moderation_state) -> str:
     thread_cards = "".join(
         "<article class=\"thread-card\">"
@@ -1591,6 +1622,17 @@ def render_thread(thread_id: str) -> str:
     )
 
 
+def render_thread_rss(thread_id: str) -> bytes:
+    repo_root = get_repo_root()
+    items = load_thread_feed_items(repo_root, thread_id=thread_id)
+    return render_rss_feed(
+        title=f"{site_title()} thread {thread_id}",
+        description="Recent posts in this thread.",
+        link=f"/threads/{thread_id}",
+        items=items,
+    )
+
+
 def render_post(post_id: str) -> str:
     posts, _, _, _, moderation_state, identity_context = load_repository_state()
     posts_index = index_posts(posts)
@@ -1634,6 +1676,28 @@ def render_post(post_id: str) -> str:
             include_page_intro=False,
         ),
         content_html=content,
+    )
+
+
+def render_board_index_rss(*, board_tag: str | None = None) -> bytes:
+    repo_root = get_repo_root()
+    posts = load_posts(repo_root / "records" / "posts")
+    board_tags = list_board_tags(posts)
+    if board_tag and board_tag not in board_tags:
+        raise LookupError(f"unknown board tag: {board_tag}")
+    items = load_board_feed_items(repo_root, board_tag=board_tag)
+    link = "/"
+    title = f"{site_title()} threads"
+    description = "Recent visible threads across the board index."
+    if board_tag:
+        link = f"/?board_tag={board_tag}"
+        title = f"{site_title()} /{board_tag}/ threads"
+        description = f"Recent visible threads for /{board_tag}/."
+    return render_rss_feed(
+        title=title,
+        description=description,
+        link=link,
+        items=items,
     )
 
 
@@ -3029,9 +3093,10 @@ def _dispatch_application(environ, start_response):
     path = environ.get("PATH_INFO", "/")
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
     method = environ.get("REQUEST_METHOD", "GET").upper()
+    wants_rss = request_wants_rss(query_params)
     environ["_forum_start_response"] = start_response
     repo_root = get_repo_root()
-    if _request_supports_reindex_feedback(path, method=method):
+    if not wants_rss and _request_supports_reindex_feedback(path, method=method):
         resolved_root = repo_root.resolve()
         if resolved_root not in _INDEX_STARTUP_READY_ROOTS:
             buffered_response = maybe_render_buffered_reindex_feedback_response(
@@ -3053,7 +3118,7 @@ def _dispatch_application(environ, start_response):
             if streamed_response is not None:
                 return streamed_response
     ensure_runtime_post_index_startup(repo_root)
-    if _request_supports_reindex_feedback(path, method=method):
+    if not wants_rss and _request_supports_reindex_feedback(path, method=method):
         buffered_response = maybe_render_buffered_reindex_feedback_response(
             environ=environ,
             repo_root=repo_root,
@@ -3242,10 +3307,27 @@ def _dispatch_application(environ, start_response):
             return [body]
 
         if path == "/":
-            body = render_board_index().encode("utf-8")
-            headers = [("Content-Type", "text/html; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
+            board_tag = query_params.get("board_tag", [""])[0].strip() or None
+            try:
+                if request_wants_rss(query_params):
+                    body = render_board_index_rss(board_tag=board_tag)
+                    headers = [("Content-Type", "application/rss+xml; charset=utf-8")]
+                    start_response("200 OK", headers)
+                    return [body]
+                body = render_board_index(board_tag=board_tag).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except LookupError:
+                if request_wants_rss(query_params):
+                    body = render_bad_request_text(f"unknown board_tag: {board_tag}").encode("utf-8")
+                    headers = [("Content-Type", "text/plain; charset=utf-8")]
+                    start_response("400 Bad Request", headers)
+                    return [body]
+                body = render_missing_resource("board").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
 
         if path == "/account/key/":
             body = render_account_key_page().encode("utf-8")
@@ -3268,6 +3350,11 @@ def _dispatch_application(environ, start_response):
         if path == "/activity/":
             view_mode = activity_filter_mode_from_request(query_params.get("view", [""])[0])
             page = activity_page_from_request(query_params.get("page", [""])[0])
+            if request_wants_rss(query_params):
+                body = render_activity_rss(view_mode=view_mode, page=page)
+                headers = [("Content-Type", "application/rss+xml; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
             body = render_site_activity_page(view_mode=view_mode, page=page).encode("utf-8")
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
@@ -3516,6 +3603,11 @@ def _dispatch_application(environ, start_response):
         if path.startswith("/threads/"):
             thread_id = path.removeprefix("/threads/")
             try:
+                if request_wants_rss(query_params):
+                    body = render_thread_rss(thread_id)
+                    headers = [("Content-Type", "application/rss+xml; charset=utf-8")]
+                    start_response("200 OK", headers)
+                    return [body]
                 body = render_thread(thread_id).encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
                 start_response("200 OK", headers)

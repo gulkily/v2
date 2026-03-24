@@ -204,6 +204,19 @@ class SiteActivityPageTests(unittest.TestCase):
         self.assertNotIn("Add root 102", page_one)
         self.assertIn("Add root 102", page_two)
 
+    def test_activity_route_can_render_rss_feed(self) -> None:
+        status, headers, body = self.get("/activity/", "view=all&format=rss")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/rss+xml; charset=utf-8")
+        self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', body)
+        self.assertIn("activity (all)</title>", body)
+        self.assertIn("<link>/activity/?view=all</link>", body)
+        self.assertIn("<guid>commit:", body)
+        self.assertIn("<guid>moderation:", body)
+        self.assertIn("Add ui helper", body)
+        self.assertIn("Pinning the thread.", body)
+
 
 if __name__ == "__main__":
     unittest.main()

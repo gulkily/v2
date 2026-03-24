@@ -223,6 +223,17 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn("This task is already marked done.", detail_body)
         self.assertNotIn("/planning/tasks/T01/mark-done", detail_body)
 
+    def test_thread_route_can_render_rss_feed(self) -> None:
+        status, headers, body = self.get("/threads/T01", "format=rss")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/rss+xml; charset=utf-8")
+        self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', body)
+        self.assertIn("thread T01</title>", body)
+        self.assertIn("<link>/threads/T01</link>", body)
+        self.assertIn("<guid>post:T01</guid>", body)
+        self.assertIn("<guid>post:reply-20260316093045-follow-up-note-12345678</guid>", body)
+
 
 if __name__ == "__main__":
     unittest.main()
