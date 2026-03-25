@@ -96,6 +96,18 @@ def run_content_purge(
         return 0
 
     print("Preview only: no archive was created and no history was rewritten.")
+    print("Possible next commands:")
+    selection_args = "records" if plan.used_default_paths else " ".join(plan.requested_paths)
+    print(f"- Apply this purge: `./forum content-purge {selection_args} --apply`")
+    if archive_output is None:
+        print(
+            f"- Choose an explicit archive path: `./forum content-purge {selection_args} --archive-output /tmp/forum-content-purge.zip`"
+        )
+        print(
+            f"- Apply with an explicit archive path: `./forum content-purge {selection_args} --apply --archive-output /tmp/forum-content-purge.zip`"
+        )
+    if worktree_is_dirty(repo_root):
+        print(f"- Current worktree is dirty; if intentional, re-run apply with `--force`.")
     return 0
 
 

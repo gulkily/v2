@@ -113,6 +113,8 @@ class ForumContentPurgeTests(unittest.TestCase):
         self.assertIn("Manifest output:", output)
         self.assertIn("Archived file count: 2", output)
         self.assertIn("Preview only: no archive was created and no history was rewritten.", output)
+        self.assertIn("Possible next commands:", output)
+        self.assertIn("./forum content-purge records/posts records/identity --apply", output)
         self.assertFalse(archive_path.exists())
         self.assertFalse(archive_path.with_suffix(".manifest.txt").exists())
 
@@ -135,6 +137,26 @@ class ForumContentPurgeTests(unittest.TestCase):
         self.assertIn("No explicit paths were provided. Using suggested default paths", output)
         self.assertIn("- records/posts", output)
         self.assertIn("- records/identity", output)
+        self.assertIn("./forum content-purge records --apply", output)
+
+    def test_run_content_purge_preview_suggests_archive_output_and_force_when_needed(self) -> None:
+        self.write_text("records/posts/untracked.txt", "Post-ID: untracked\n\nBody.\n")
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_content_purge(
+                self.repo_root,
+                paths=["records/posts"],
+                archive_output=None,
+                dry_run=True,
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        output = stdout.getvalue()
+        self.assertIn("--archive-output /tmp/forum-content-purge.zip", output)
+        self.assertIn("re-run apply with `--force`", output)
 
     def test_run_content_purge_preview_treats_records_root_as_default_alias(self) -> None:
         archive_path = self.repo_root.parent / "records-root-preview.zip"
