@@ -10,6 +10,34 @@ class OpenPgpUnavailableError extends Error {
 let openpgpModulePromise = null;
 let openpgpModuleFailure = null;
 const OPENPGP_IMPORT_TIMEOUT_MS = 2000;
+const OPENPGP_DEBUG_STORAGE_KEY = "forum_debug_signing";
+
+function openPgpDebugEnabled() {
+  try {
+    const pageFlag = globalThis.document?.querySelector?.("[data-signing-debug-enabled='true']");
+    if (pageFlag) {
+      return true;
+    }
+  } catch (_error) {
+    // Ignore DOM lookup failures and fall back to local storage.
+  }
+  try {
+    return globalThis.localStorage?.getItem(OPENPGP_DEBUG_STORAGE_KEY) === "1";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function logOpenPgpDebug(event, details = {}) {
+  if (!openPgpDebugEnabled()) {
+    return;
+  }
+  try {
+    console.debug("[openpgp_loader]", event, details);
+  } catch (_error) {
+    // Ignore console failures in restricted environments.
+  }
+}
 
 function formatDiagnosticMessage(error) {
   if (!error) {
@@ -28,6 +56,9 @@ function classifyOpenPgpError(error) {
   if (error instanceof OpenPgpUnavailableError) {
     return error;
   }
+  logOpenPgpDebug("classify_runtime_error", {
+    diagnosticMessage: formatDiagnosticMessage(error),
+  });
   return new OpenPgpUnavailableError(
     "openpgp_runtime_failed",
     "Browser signing is unavailable because the local signing library failed.",
@@ -55,10 +86,17 @@ function describeOpenPgpFailure(error) {
 
 async function loadOpenPgp() {
   if (openpgpModuleFailure) {
+    logOpenPgpDebug("cached_failure", {
+      code: openpgpModuleFailure.code,
+      diagnosticMessage: formatDiagnosticMessage(openpgpModuleFailure),
+    });
     throw openpgpModuleFailure;
   }
 
   if (typeof BigInt !== "function") {
+    logOpenPgpDebug("missing_bigint", {
+      bigIntType: typeof BigInt,
+    });
     openpgpModuleFailure = new OpenPgpUnavailableError(
       "missing_bigint",
       "Browser signing is unavailable because this browser does not support JavaScript BigInt.",
@@ -67,6 +105,10 @@ async function loadOpenPgp() {
   }
 
   if (typeof globalThis.crypto !== "object" || typeof globalThis.crypto.getRandomValues !== "function") {
+    logOpenPgpDebug("crypto_unavailable", {
+      cryptoType: typeof globalThis.crypto,
+      hasGetRandomValues: typeof globalThis.crypto?.getRandomValues === "function",
+    });
     openpgpModuleFailure = new OpenPgpUnavailableError(
       "crypto_unavailable",
       "Browser signing is unavailable because browser cryptography APIs are missing.",
@@ -75,6 +117,10 @@ async function loadOpenPgp() {
   }
 
   if (globalThis.isSecureContext === false) {
+    logOpenPgpDebug("insecure_context", {
+      isSecureContext: globalThis.isSecureContext,
+      locationHref: globalThis.location?.href || "",
+    });
     openpgpModuleFailure = new OpenPgpUnavailableError(
       "insecure_context",
       "Browser signing is unavailable on this insecure HTTP page.",
@@ -84,13 +130,25 @@ async function loadOpenPgp() {
 
   if (!openpgpModulePromise) {
     let importPromise;
+    const moduleSpecifier = "./vendor/openpgp.min.mjs";
+    logOpenPgpDebug("begin_import", {
+      moduleSpecifier,
+      isSecureContext: globalThis.isSecureContext,
+      hasBigInt: typeof BigInt === "function",
+      hasCryptoGetRandomValues: typeof globalThis.crypto?.getRandomValues === "function",
+      locationHref: globalThis.location?.href || "",
+    });
     try {
       const importModule = globalThis.Function(
         "specifier",
         "return import(specifier);",
       );
-      importPromise = importModule("./vendor/openpgp.min.mjs");
+      importPromise = importModule(moduleSpecifier);
     } catch (error) {
+      logOpenPgpDebug("import_setup_failed", {
+        moduleSpecifier,
+        diagnosticMessage: formatDiagnosticMessage(error),
+      });
       openpgpModuleFailure = new OpenPgpUnavailableError(
         "openpgp_import_failed",
         "Browser signing is unavailable because the OpenPGP module failed to load.",
@@ -100,6 +158,10 @@ async function loadOpenPgp() {
     }
     const timeoutPromise = new Promise((_, reject) => {
       globalThis.setTimeout(() => {
+        logOpenPgpDebug("import_timeout", {
+          moduleSpecifier,
+          timeoutMs: OPENPGP_IMPORT_TIMEOUT_MS,
+        });
         reject(
           new OpenPgpUnavailableError(
             "openpgp_import_failed",
@@ -110,6 +172,10 @@ async function loadOpenPgp() {
       }, OPENPGP_IMPORT_TIMEOUT_MS);
     });
     openpgpModulePromise = Promise.race([importPromise, timeoutPromise]).catch((error) => {
+      logOpenPgpDebug("import_failed", {
+        moduleSpecifier,
+        diagnosticMessage: formatDiagnosticMessage(error),
+      });
       openpgpModuleFailure = new OpenPgpUnavailableError(
         "openpgp_import_failed",
         "Browser signing is unavailable because the OpenPGP module failed to load.",
@@ -120,7 +186,9 @@ async function loadOpenPgp() {
   }
 
   try {
-    return await openpgpModulePromise;
+    const module = await openpgpModulePromise;
+    logOpenPgpDebug("import_succeeded");
+    return module;
   } catch (error) {
     throw classifyOpenPgpError(error);
   }

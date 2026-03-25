@@ -107,6 +107,7 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('data-command="create_thread"', body)
         self.assertIn('data-thread-type=""', body)
         self.assertIn('data-unsigned-fallback-enabled="', body)
+        self.assertIn('data-signing-debug-enabled="false"', body)
         self.assertIn('data-username-claim-cta', body)
         self.assertIn('/assets/username_claim_cta.js', body)
         self.assertIn("Choose your username", body)
@@ -189,6 +190,15 @@ class ComposeThreadPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn('data-unsigned-fallback-enabled="true"', body)
+
+    def test_compose_thread_page_exposes_signing_debug_flag_when_enabled(self) -> None:
+        status, _, body = self.get_with_env(
+            "/compose/thread",
+            extra_env={"FORUM_ENABLE_SIGNING_DEBUG_LOGS": "1"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('data-signing-debug-enabled="true"', body)
 
     def test_compose_thread_page_source_uses_multiline_shared_shell_blocks(self) -> None:
         status, _, body = self.get("/compose/thread")

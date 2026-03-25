@@ -236,6 +236,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="profile-update-form"', body)
         self.assertIn('data-command="update_profile"', body)
         self.assertIn('data-dry-run="false"', body)
+        self.assertIn('data-signing-debug-enabled="false"', body)
         self.assertIn('href="/account/key/"', body)
         self.assertIn('/assets/browser_signing.js', body)
         self.assertIn('id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"', body)
@@ -265,6 +266,29 @@ class ProfileUpdatePageTests(unittest.TestCase):
 
         self.assertLess(input_index, submit_status_index)
         self.assertLess(submit_status_index, key_status_index)
+
+    def test_profile_update_page_exposes_signing_debug_flag_when_enabled(self) -> None:
+        environ = {
+            "PATH_INFO": f"/profiles/{PROFILE_SLUG}/update",
+            "QUERY_STRING": "",
+            "REQUEST_METHOD": "GET",
+            "CONTENT_LENGTH": "0",
+            "wsgi.input": BytesIO(b""),
+        }
+        response: dict[str, object] = {}
+
+        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+            response["status"] = status
+            response["headers"] = headers
+
+        with mock.patch.dict(
+            os.environ,
+            {"FORUM_REPO_ROOT": str(self.repo_root), "FORUM_ENABLE_SIGNING_DEBUG_LOGS": "1"},
+        ):
+            body = b"".join(application(environ, start_response)).decode("utf-8")
+
+        self.assertEqual(response["status"], "200 OK")
+        self.assertIn('data-signing-debug-enabled="true"', body)
 
 
 if __name__ == "__main__":

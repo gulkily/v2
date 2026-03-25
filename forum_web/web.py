@@ -148,6 +148,12 @@ def unsigned_post_fallback_enabled(env: dict[str, str] | None = None) -> bool:
     return raw_value in {"1", "true", "yes", "on"}
 
 
+def signing_debug_logging_enabled(env: dict[str, str] | None = None) -> bool:
+    source_env = os.environ if env is None else env
+    raw_value = source_env.get("FORUM_ENABLE_SIGNING_DEBUG_LOGS", "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
 def _html_block(raw_text: str) -> str:
     return dedent(raw_text).strip()
 
@@ -2082,6 +2088,7 @@ def render_profile_update_page(identity_id: str) -> str:
         dry_run_value="false",
         source_identity_id=html.escape(summary.identity_id),
         profile_slug=html.escape(profile_slug),
+        signing_debug_enabled_value="true" if signing_debug_logging_enabled() else "false",
         display_name_value="",
         submit_label="Submit update",
     )
@@ -3069,6 +3076,7 @@ def render_compose_page(
         pow_enabled_value="true" if first_post_pow_enabled() else "false",
         pow_difficulty_value=str(first_post_pow_difficulty()),
         unsigned_fallback_enabled_value="true" if unsigned_post_fallback_enabled() else "false",
+        signing_debug_enabled_value="true" if signing_debug_logging_enabled() else "false",
         body_value="",
         extra_fields_html=extra_fields_html,
         submit_label="Submit preview" if dry_run else "Submit post",
