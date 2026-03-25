@@ -14,14 +14,17 @@ function $(id) {
   return document.getElementById(id);
 }
 
-function setStatus(id, message, { tone } = {}) {
-  const element = $(id);
+function applyStatusUpdate(element, message, { tone } = {}) {
   if (element) {
     element.textContent = message;
     if (typeof tone === "string" && tone) {
       element.dataset.statusTone = tone;
     }
   }
+}
+
+function setStatus(id, message, options = {}) {
+  applyStatusUpdate($(id), message, options);
 }
 
 function setSubmitStatus(message, { tone = "idle" } = {}) {
@@ -1243,6 +1246,7 @@ if (typeof document !== "undefined") {
 }
 
 export {
+  applyStatusUpdate,
   ensureLocalKeys,
   formatSigningStatus,
   normalizeComposeAscii,

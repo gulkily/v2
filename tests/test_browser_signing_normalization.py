@@ -156,6 +156,30 @@ process.stdout.write(JSON.stringify(result));
 
         self.assertEqual(result["fingerprint"], result["fingerprint"].upper())
 
+    def test_apply_status_update_sets_message_and_active_tone(self) -> None:
+        result = self.run_expression(
+            """(() => {
+  const element = { textContent: "", dataset: {} };
+  mod.applyStatusUpdate(element, "Computing proof-of-work...", { tone: "active" });
+  return element;
+})()"""
+        )
+
+        self.assertEqual(result["textContent"], "Computing proof-of-work...")
+        self.assertEqual(result["dataset"]["statusTone"], "active")
+
+    def test_apply_status_update_leaves_existing_tone_when_not_overridden(self) -> None:
+        result = self.run_expression(
+            """(() => {
+  const element = { textContent: "", dataset: { statusTone: "active" } };
+  mod.applyStatusUpdate(element, "Signed post accepted.");
+  return element;
+})()"""
+        )
+
+        self.assertEqual(result["textContent"], "Signed post accepted.")
+        self.assertEqual(result["dataset"]["statusTone"], "active")
+
 
 if __name__ == "__main__":
     unittest.main()

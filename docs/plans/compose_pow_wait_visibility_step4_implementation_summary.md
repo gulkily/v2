@@ -17,3 +17,13 @@
   - Ran `python3 -m unittest tests.test_browser_signing_normalization tests.test_compose_thread_page tests.test_compose_reply_page`.
 - Notes:
   - This stage keeps the same user-facing copy and DOM ids; it only adds the state transition needed for the new visual emphasis contract.
+
+## Stage 3 - regression coverage for submit-status tone behavior
+- Changes:
+  - Extracted a small pure helper in [browser_signing.js](/home/wsl/v2/templates/assets/browser_signing.js) so status text-plus-tone updates can be covered directly in Node-based asset tests.
+  - Extended [test_browser_signing_normalization.py](/home/wsl/v2/tests/test_browser_signing_normalization.py) with focused assertions that active tone updates set `data-status-tone` and that later updates can preserve an existing tone when no override is provided.
+  - Reused the compose page tests as the structural regression gate for the action-area status surface introduced in Stage 1.
+- Verification:
+  - Ran `python3 -m unittest tests.test_browser_signing_normalization tests.test_compose_thread_page tests.test_compose_reply_page`.
+- Notes:
+  - Coverage remains deliberately lightweight: it locks in the status-tone contract and the compose markup placement without introducing a browser end-to-end test harness.
