@@ -26,3 +26,12 @@
   - `python -m unittest tests.test_post_index_startup.PostIndexStartupTests.test_board_request_shows_refresh_page_when_startup_index_is_stale tests.test_request_operation_events.RequestOperationEventsTests.test_request_failure_is_recorded_as_failed_operation tests.test_php_host_missing_config_page.PhpHostMissingConfigPageTests.test_missing_config_page_is_styled_and_actionable tests.test_php_host_cache.PhpHostCacheTests.test_php_host_shows_status_page_before_blocking_rebuild_request`
 - Notes:
   - The PHP host page implementations were already structurally readable, so Stage 3 mainly locks that behavior in with regression coverage while bringing the remaining Python-only direct responses up to the same standard.
+
+## Stage 4 - Add regression coverage and presentability guardrails
+- Changes:
+  - Added an explicit emitted-HTML readability guardrail to [`docs/plans/code_style_guidelines.md`](/home/wsl/v2/docs/plans/code_style_guidelines.md) so future render work has one documented expectation for browser-readable source output.
+  - Closed the loop with a full touched-surface verification pass across shared-shell, template-backed, direct-response, and PHP-host pages.
+- Verification:
+  - `python -m unittest tests.test_compose_thread_page.ComposeThreadPageTests.test_compose_thread_page_renders_shared_draft_status_hook tests.test_compose_thread_page.ComposeThreadPageTests.test_compose_thread_page_source_uses_multiline_shared_shell_blocks tests.test_board_index_page.BoardIndexPageTests.test_board_index_uses_shared_page_shell tests.test_board_index_page.BoardIndexPageTests.test_board_index_source_uses_multiline_stats_and_thread_rows tests.test_task_thread_pages.TaskThreadPagesTests.test_task_thread_page_renders_structured_metadata tests.test_task_thread_pages.TaskThreadPagesTests.test_thread_page_source_uses_multiline_post_cards tests.test_post_index_startup.PostIndexStartupTests.test_board_request_shows_refresh_page_when_startup_index_is_stale tests.test_request_operation_events.RequestOperationEventsTests.test_request_failure_is_recorded_as_failed_operation tests.test_php_host_missing_config_page.PhpHostMissingConfigPageTests.test_missing_config_page_is_styled_and_actionable tests.test_php_host_cache.PhpHostCacheTests.test_php_host_shows_status_page_before_blocking_rebuild_request`
+- Notes:
+  - The remaining untracked file `docs/zenmemes_alignment_brainstorm.md` is unrelated user work and was left untouched throughout the feature branch.

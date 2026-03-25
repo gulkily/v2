@@ -48,3 +48,8 @@
 ## 10. Write Comments Sparingly But Precisely
 - Add comments where canonical behavior, normalization, or portability constraints are easy to misread.
 - Do not add comments that only restate the code literally.
+
+## 11. Keep Emitted HTML Source Readable
+- HTML responses should preserve meaningful line breaks around major document and component boundaries so browser page-source views stay readable.
+- Prefer shared render helpers and multiline templates over long concatenated one-line HTML strings when the response is meant for humans to inspect.
+- If a route must build HTML in code, keep the structure explicit enough that future tests can assert durable formatting boundaries without snapshotting entire pages.
