@@ -218,6 +218,15 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('>My profile</a>', body)
         self.assertIn('/assets/profile_nav.js', body)
         self.assertIn('data-username-claim-cta', body)
+
+    def test_board_index_source_uses_multiline_stats_and_thread_rows(self) -> None:
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('<div class="stat-grid">\n', body)
+        self.assertIn('<article class="board-index-thread-row">\n', body)
+        self.assertIn('<p>First line preview.</p>\n', body)
+        self.assertIn('</article>\n<article class="board-index-thread-row">', body)
         self.assertIn('/assets/username_claim_cta.js', body)
         self.assertIn('Choose your username', body)
         self.assertIn('Now that you\'re participating, you can choose a username.', body)

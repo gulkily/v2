@@ -183,6 +183,14 @@ class TaskThreadPagesTests(unittest.TestCase):
             body.index("reply to this post"),
         )
 
+    def test_thread_page_source_uses_multiline_post_cards(self) -> None:
+        status, _, body = self.get("/threads/T01")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('<article class="post-card">\n', body)
+        self.assertIn('<div class="post-body">\n<p>Ship a task thread through the normal discussion flow.</p>\n</div>', body)
+        self.assertIn('</article>\n  <div class="link-cluster">', body)
+
     def test_task_detail_page_shows_mark_done_action(self) -> None:
         status, _, body = self.get("/planning/tasks/T01")
 

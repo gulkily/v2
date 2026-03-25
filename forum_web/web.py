@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from http.cookies import SimpleCookie
 from pathlib import Path
+from textwrap import dedent
 from typing import Iterable, Iterator
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
@@ -145,6 +146,14 @@ def unsigned_post_fallback_enabled(env: dict[str, str] | None = None) -> bool:
     source_env = os.environ if env is None else env
     raw_value = source_env.get("FORUM_ENABLE_UNSIGNED_POST_FALLBACK", "").strip().lower()
     return raw_value in {"1", "true", "yes", "on"}
+
+
+def _html_block(raw_text: str) -> str:
+    return dedent(raw_text).strip()
+
+
+def _join_html_blocks(*blocks: str) -> str:
+    return "\n".join(block.strip() for block in blocks if block and block.strip())
 
 
 def ensure_runtime_post_index_startup(repo_root: Path) -> None:
@@ -1311,17 +1320,22 @@ def build_board_index_page_context(posts, threads, moderation_state, *, repo_roo
 
 
 def render_board_index_stats(post_count: int, thread_count: int, board_tag_count: int) -> str:
-    return (
-        '<div class="stat-grid">'
-        f'<article class="stat-card"><span class="stat-number">{post_count}</span><span class="stat-label">posts loaded</span></article>'
-        f'<article class="stat-card"><span class="stat-number">{thread_count}</span><span class="stat-label">visible threads</span></article>'
-        f'<article class="stat-card"><span class="stat-number">{board_tag_count}</span><span class="stat-label">board tags</span></article>'
-        "</div>"
+    return _html_block(
+        f"""
+        <div class="stat-grid">
+          <article class="stat-card"><span class="stat-number">{post_count}</span><span class="stat-label">posts loaded</span></article>
+          <article class="stat-card"><span class="stat-number">{thread_count}</span><span class="stat-label">visible threads</span></article>
+          <article class="stat-card"><span class="stat-number">{board_tag_count}</span><span class="stat-label">board tags</span></article>
+        </div>
+        """
     )
 
 
 def render_board_index_thread_rows(threads, moderation_state) -> str:
-    return "".join(render_board_index_thread_row(index, thread, moderation_state) for index, thread in enumerate(threads, start=1))
+    return "\n".join(
+        render_board_index_thread_row(index, thread, moderation_state)
+        for index, thread in enumerate(threads, start=1)
+    )
 
 
 def render_board_index_thread_row(rank: int, thread, moderation_state) -> str:
@@ -1347,16 +1361,24 @@ def render_board_index_thread_row(rank: int, thread, moderation_state) -> str:
     meta_html = ""
     if meta_text:
         meta_html = f'<p class="thread-meta">{meta_text}</p>'
-    return (
-        '<article class="board-index-thread-row">'
-        f'<p class="board-index-thread-rank">{rank}.</p>'
-        '<div class="board-index-thread-main">'
-        f'<h3><a href="/threads/{html.escape(thread.root.post_id)}">{html.escape(subject)}</a></h3>'
-        f"{tags_line_html}"
-        f"{preview_html}"
-        f"{meta_html}"
-        "</div>"
-        "</article>"
+    return _join_html_blocks(
+        _html_block(
+            f"""
+            <article class="board-index-thread-row">
+              <p class="board-index-thread-rank">{rank}.</p>
+              <div class="board-index-thread-main">
+                <h3><a href="/threads/{html.escape(thread.root.post_id)}">{html.escape(subject)}</a></h3>
+            """
+        ),
+        tags_line_html,
+        preview_html,
+        meta_html,
+        _html_block(
+            """
+              </div>
+            </article>
+            """
+        ),
     )
 def load_recent_records(*, limit: int = 12):
     posts, _, _, _, _, identity_context = load_repository_state()
@@ -1468,15 +1490,18 @@ def render_commit_card(
         details.append(
             f'<p><a class="thread-chip" href="{html.escape(commit.github_url)}">view on GitHub</a></p>'
         )
-    return (
-        '<article class="commit-card">'
-        '<div class="commit-card-meta">'
-        f'{"".join(details)}'
-        "</div>"
-        '<div class="commit-posts">'
-        f"{post_cards}"
-        "</div>"
-        "</article>"
+    details_html = "\n            ".join(details)
+    return _html_block(
+        f"""
+        <article class="commit-card">
+          <div class="commit-card-meta">
+            {details_html}
+          </div>
+          <div class="commit-posts">
+            {post_cards}
+          </div>
+        </article>
+        """
     )
 
 
@@ -1493,7 +1518,7 @@ def render_activity_filter_nav(*, current_mode: str) -> str:
         if mode == current_mode:
             classes += " thread-chip-active"
         parts.append(f'<a class="{classes}" href="{href}">{html.escape(label)}</a>')
-    return "".join(parts)
+    return "\n".join(parts)
 
 
 def render_activity_pagination_nav(*, current_mode: str, page: int, has_next_page: bool) -> str:
@@ -1506,7 +1531,7 @@ def render_activity_pagination_nav(*, current_mode: str, page: int, has_next_pag
         parts.append(
             f'<a class="thread-chip" href="/activity/?view={html.escape(current_mode)}&page={page + 1}">older activity</a>'
         )
-    return "".join(parts)
+    return "\n".join(parts)
 
 
 def render_activity_event_card(
@@ -1672,11 +1697,15 @@ def render_thread(thread_id: str) -> str:
         thread_meta_html = f'<p class="thread-meta">{thread_meta}</p>'
     replies_section_html = ""
     if visible_replies > 0:
-        replies_section_html = (
-            '<section class="panel page-section">'
-            '<div class="section-head page-lede"><h2>Replies</h2></div>'
-            '<div class="post-stack">'
-            + "".join(
+        replies_section_html = _join_html_blocks(
+            _html_block(
+                """
+                <section class="panel page-section">
+                  <div class="section-head page-lede"><h2>Replies</h2></div>
+                  <div class="post-stack">
+                """
+            ),
+            "\n".join(
                 render_post_card(
                     reply,
                     root_thread_id=thread.root.post_id,
@@ -1685,8 +1714,13 @@ def render_thread(thread_id: str) -> str:
                     compact_thread_view=True,
                 )
                 for reply in thread.replies
-            )
-            + "</div></section>"
+            ),
+            _html_block(
+                """
+                  </div>
+                </section>
+                """
+            ),
         )
     feed_href = f"/threads/{thread_id}?format=rss"
 
@@ -2300,9 +2334,19 @@ def render_post_card(
         )
 
     body_html = (
-        '<div class="post-body"><p class="moderation-note">This post is hidden by moderation.</p></div>'
+        _html_block(
+            """
+            <div class="post-body">
+              <p class="moderation-note">This post is hidden by moderation.</p>
+            </div>
+            """
+        )
         if hidden
-        else f'<div class="post-body">{render_body_html(post.body)}</div>'
+        else _join_html_blocks(
+            '<div class="post-body">',
+            render_body_html(post.body),
+            "</div>",
+        )
     )
     hidden_class = " post-card--hidden" if hidden else ""
     meta_html = ""
@@ -2318,15 +2362,15 @@ def render_post_card(
         )
     permalink_label = format_post_permalink_label(post.post_id)
 
-    return (
-        f'<article class="post-card{hidden_class}">'
-        f"{meta_html}"
-        f"{subject_html}"
-        f"{identity_html}"
-        f"{relation_html}"
-        f"{body_html}"
-        f'<p class="post-link"><a href="/posts/{html.escape(post.post_id)}">{html.escape(permalink_label)}</a></p>'
-        "</article>"
+    return _join_html_blocks(
+        f'<article class="post-card{hidden_class}">',
+        meta_html,
+        subject_html,
+        identity_html,
+        relation_html,
+        body_html,
+        f'<p class="post-link"><a href="/posts/{html.escape(post.post_id)}">{html.escape(permalink_label)}</a></p>',
+        "</article>",
     )
 
 
@@ -2353,14 +2397,23 @@ def format_post_timestamp(post_id: str) -> str:
 
 
 def render_compose_reference(post, *, root_thread_id: str, identity_context) -> str:
-    return (
-        '<section class="panel compose-reference">'
-        '<div class="section-head">'
-        "<h2>Replying to</h2>"
-        "<p>This is the visible post your signed reply will target.</p>"
-        "</div>"
-        f"{render_post_card(post, root_thread_id=root_thread_id, identity_context=identity_context, compact_thread_view=True)}"
-        "</section>"
+    return _join_html_blocks(
+        _html_block(
+            """
+            <section class="panel compose-reference">
+              <div class="section-head">
+                <h2>Replying to</h2>
+                <p>This is the visible post your signed reply will target.</p>
+              </div>
+            """
+        ),
+        render_post_card(
+            post,
+            root_thread_id=root_thread_id,
+            identity_context=identity_context,
+            compact_thread_view=True,
+        ),
+        "</section>",
     )
 
 
@@ -2408,7 +2461,7 @@ def render_body_html(body: str) -> str:
             rendered.append(f'<p class="quote-line">{escaped}</p>')
         else:
             rendered.append(f"<p>{escaped}</p>")
-    return "".join(rendered)
+    return "\n".join(rendered)
 
 
 def render_breadcrumb(items: list[tuple[str, str]]) -> str:
