@@ -34,9 +34,11 @@ from forum_core.runtime_env import (
 )
 from forum_core.php_host_setup import (
     PhpHostSetupRequest,
+    default_php_host_static_html_dir,
     confirm_php_host_setup,
     load_php_host_runtime_config,
     publish_php_host_public_files,
+    php_host_public_dir,
     php_host_config_path,
     resolve_public_web_root,
     resolve_php_host_setup_config,
@@ -405,7 +407,11 @@ def run_php_host_refresh(request: TaskRequest) -> int:
     static_html_dir = (
         Path(request.php_host_refresh_static_html_dir).expanduser()
         if request.php_host_refresh_static_html_dir
-        else runtime_config.static_html_dir if runtime_config else None
+        else (
+            runtime_config.static_html_dir
+            if runtime_config and runtime_config.static_html_dir
+            else default_php_host_static_html_dir(php_host_public_dir(REPO_ROOT))
+        )
     )
 
     if cache_dir is None and static_html_dir is None:
@@ -426,13 +432,10 @@ def run_php_host_refresh(request: TaskRequest) -> int:
     else:
         print("Skipped PHP microcache clearing because no cache_dir was configured.")
 
-    if static_html_dir is not None:
-        removed_files, removed_dirs = clear_directory_contents(static_html_dir)
-        print(
-            f"Cleared static HTML artifacts at {static_html_dir} ({removed_files} files, {removed_dirs} directories removed)."
-        )
-    else:
-        print("Skipped static HTML clearing because no static_html_dir was configured.")
+    removed_files, removed_dirs = clear_directory_contents(static_html_dir)
+    print(
+        f"Cleared static HTML artifacts at {static_html_dir} ({removed_files} files, {removed_dirs} directories removed)."
+    )
     return 0
 
 

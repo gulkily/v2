@@ -463,6 +463,43 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Missing PHP host config", stderr.getvalue())
 
+    def test_run_php_host_refresh_uses_default_static_html_fallback_when_not_configured(self) -> None:
+        config_dir = self.repo_root / "php_host" / "public"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir = self.repo_root / "state" / "php_host_cache"
+        static_html_dir = config_dir / "_static_html"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        static_html_dir.mkdir(parents=True, exist_ok=True)
+        (cache_dir / "page.cgi").write_text("cached", encoding="utf-8")
+        (static_html_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+        (config_dir / "forum_host_config.php").write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "return [",
+                    f"    'repo_root' => {self.repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {cache_dir.as_posix()!r},",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        request = self.module.TaskRequest(command="php-host-refresh")
+        with mock.patch.object(self.module, "rebuild_post_index") as mocked:
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = self.module.run_php_host_refresh(request)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        mocked.assert_called_once_with(self.repo_root.resolve())
+        self.assertEqual(list(cache_dir.iterdir()), [])
+        self.assertEqual(list(static_html_dir.iterdir()), [])
+        self.assertIn(str(static_html_dir), stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
