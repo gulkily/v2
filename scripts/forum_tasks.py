@@ -63,6 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="forum",
         description="Forum task runner.",
+        epilog=(
+            "Recent operator notes: `content-purge --apply` accepts `git-filter-repo` from PATH or "
+            "`$HOME/.local/bin/git-filter-repo`; if the records tree was purged, new posts recreate the "
+            "needed `records/...` directories automatically."
+        ),
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -90,6 +95,10 @@ def build_parser() -> argparse.ArgumentParser:
     content_purge_parser = subparsers.add_parser(
         "content-purge",
         help="Preview or apply archival-plus-history purge for selected records paths.",
+        description=(
+            "Preview or apply archival-plus-history purge for selected records paths. Apply mode requires "
+            "`git-filter-repo`, discovered from PATH or `$HOME/.local/bin/git-filter-repo`."
+        ),
     )
     content_purge_parser.add_argument(
         "paths",

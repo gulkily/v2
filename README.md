@@ -83,7 +83,17 @@ For future clean-start resets, operators can archive and purge canonical content
 
 - Preview one or more record families with `./forum content-purge records/posts records/identity`.
 - Apply the workflow only after reviewing the preview and choosing an archive target outside the repo, for example `./forum content-purge records/posts --apply --archive-output /tmp/forum-posts.zip`.
-- Real apply mode requires `git-filter-repo` on `PATH`; if it is missing, the command now suggests a no-sudo install path with `python3 -m pip install --user git-filter-repo` and adding `$HOME/.local/bin` to `PATH`.
+- Real apply mode requires `git-filter-repo`; the command looks on `PATH` first and then checks `$HOME/.local/bin/git-filter-repo` directly.
+- If `git-filter-repo` is missing, the command suggests a no-sudo install path with `python3 -m pip install --user git-filter-repo`.
+- After a purge removes `records/posts/` and related record families, new writes recreate the needed directories automatically, so signed posting can resume without manual directory repair.
+
+## PHP Shim Refresh
+
+If the PHP-primary frontend still shows stale threads after a history rewrite or large cleanup:
+
+- Rebuild the derived index with `./forum rebuild-index`.
+- Clear the PHP microcache directory configured as `cache_dir` in `forum_host_config.php`.
+- Clear the generated static HTML tree configured as `static_html_dir` in `forum_host_config.php`.
 
 ## Deployment
 

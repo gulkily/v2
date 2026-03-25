@@ -33,8 +33,15 @@ The command contract is intentionally small: future backends such as Perl should
 - `--apply` performs the destructive path only after the preview contract is satisfied.
 - `--archive-output` must point outside the repository root so the export artifact does not dirty the repo being rewritten.
 - `--apply` requires a clean worktree unless `--force` is used explicitly.
-- Real apply mode requires the `git-filter-repo` executable on `PATH`; if it is missing, the command suggests installing it without sudo via `python3 -m pip install --user git-filter-repo` and ensuring `$HOME/.local/bin` is on `PATH`.
+- Real apply mode requires the `git-filter-repo` executable. The command first checks `PATH`, then falls back to `$HOME/.local/bin/git-filter-repo`.
+- If `git-filter-repo` is still missing, the command suggests installing it without sudo via `python3 -m pip install --user git-filter-repo`.
 - After a successful apply run, operators must force-push rewritten refs and retire or reclone old checkouts; the command prints those follow-up steps explicitly.
+- After a purge removes `records/posts/` and other mutable record families, later signed writes recreate the missing directories automatically.
+
+## PHP-host refresh after purge or rewrite
+- For the Python read path, run `./forum rebuild-index` after a destructive history rewrite so the derived SQLite post index matches the new checkout.
+- For the PHP-primary path, also clear the configured PHP microcache directory (`cache_dir`) and generated static HTML tree (`static_html_dir`) from `forum_host_config.php`.
+- The PHP shim launches the Python CGI bridge per request, so stale frontend output after a purge is usually cached data, not a long-lived Python worker.
 
 ## Direct entrypoints still supported
 - `python3 scripts/forum_tasks.py ...`: direct Python reference runner.
