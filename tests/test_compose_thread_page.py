@@ -183,6 +183,23 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('data-unsigned-fallback-enabled="true"', body)
 
+    def test_compose_thread_page_source_uses_multiline_shared_shell_blocks(self) -> None:
+        status, _, body = self.get("/compose/thread")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('<header class="site-header site-header--page">\n', body)
+        self.assertIn('<nav class="site-header-nav" aria-label="Primary">\n', body)
+        self.assertIn('</section>\n    <script>\n', body)
+        self.assertIn('</nav>\n', body)
+        self.assertIn('</header>\n    <main class="content-shell">', body)
+        self.assertIn(
+            '<script type="module" src="/assets/profile_nav.js"></script>\n'
+            '  <script type="module" src="/assets/username_claim_cta.js"></script>\n'
+            '  <script type="module" src="/assets/copy_field.js"></script>\n'
+            '  <script type="module" src="/assets/browser_signing.js"></script>',
+            body,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
