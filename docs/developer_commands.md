@@ -33,7 +33,7 @@ The command contract is intentionally small: future backends such as Perl should
 - `--apply` performs the destructive path only after the preview contract is satisfied.
 - `--archive-output` must point outside the repository root so the export artifact does not dirty the repo being rewritten.
 - `--apply` requires a clean worktree unless `--force` is used explicitly.
-- Real apply mode requires the `git-filter-repo` executable on `PATH`.
+- Real apply mode requires the `git-filter-repo` executable on `PATH`; if it is missing, the command suggests installing it without sudo via `python3 -m pip install --user git-filter-repo` and ensuring `$HOME/.local/bin` is on `PATH`.
 - After a successful apply run, operators must force-push rewritten refs and retire or reclone old checkouts; the command prints those follow-up steps explicitly.
 
 ## Direct entrypoints still supported

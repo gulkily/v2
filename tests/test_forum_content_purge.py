@@ -216,8 +216,24 @@ class ForumContentPurgeTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("git filter-repo", stderr.getvalue())
+        self.assertIn("python3 -m pip install --user git-filter-repo", stderr.getvalue())
+        self.assertIn("$HOME/.local/bin/git-filter-repo", stderr.getvalue())
         self.assertFalse(archive_path.exists())
         self.assertFalse(archive_path.with_suffix(".manifest.txt").exists())
+
+    def test_ensure_filter_repo_available_falls_back_to_user_local_bin(self) -> None:
+        fake_home = self.repo_root.parent / "fake-home"
+        local_bin = fake_home / ".local" / "bin"
+        local_bin.mkdir(parents=True, exist_ok=True)
+        executable = local_bin / "git-filter-repo"
+        executable.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+        executable.chmod(0o755)
+
+        with mock.patch.object(self.module.shutil, "which", return_value=None):
+            with mock.patch.object(self.module.Path, "home", return_value=fake_home):
+                resolved = self.module.ensure_filter_repo_available(self.repo_root)
+
+        self.assertEqual(resolved, executable)
 
     def test_run_content_purge_apply_rewrites_history_with_filter_repo_shim(self) -> None:
         archive_path = self.repo_root.parent / "apply-success.zip"
@@ -230,9 +246,11 @@ class ForumContentPurgeTests(unittest.TestCase):
                     "#!/bin/sh",
                     "set -eu",
                     "paths=\"\"",
+                    "source_repo=\"\"",
                     "while [ \"$#\" -gt 0 ]; do",
                     "  case \"$1\" in",
                     "    --path) paths=\"$paths $2\"; shift 2 ;;",
+                    "    --source) source_repo=\"$2\"; shift 2 ;;",
                     "    --force|--invert-paths) shift ;;",
                     "    *) shift ;;",
                     "  esac",
@@ -240,6 +258,9 @@ class ForumContentPurgeTests(unittest.TestCase):
                     "if [ -z \"$paths\" ]; then",
                     "  echo \"missing paths\" >&2",
                     "  exit 1",
+                    "fi",
+                    "if [ -n \"$source_repo\" ]; then",
+                    "  cd \"$source_repo\"",
                     "fi",
                     "git filter-branch --force --index-filter \"git rm -r --cached --ignore-unmatch $paths\" --prune-empty --tag-name-filter cat -- --all >/dev/null 2>&1",
                     "rm -rf .git/refs/original .git/logs/refs/original .git/filter-branch || true",

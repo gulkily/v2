@@ -79,10 +79,10 @@ def run_content_purge(
         if dirty_worktree and force:
             print("Force flag enabled: continuing despite dirty worktree.")
         try:
-            ensure_filter_repo_available(repo_root)
+            filter_repo_executable = ensure_filter_repo_available(repo_root)
             create_normalized_archive(plan, repo_root)
             write_archive_manifest(plan, repo_root)
-            rewrite_history(repo_root, plan)
+            rewrite_history(repo_root, plan, filter_repo_executable)
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -302,18 +302,24 @@ def write_archive_manifest(plan: PurgePlan, repo_root: Path) -> None:
     plan.manifest_output.write_text(build_archive_manifest(plan, repo_root), encoding="utf-8")
 
 
-def ensure_filter_repo_available(repo_root: Path) -> None:
+def ensure_filter_repo_available(repo_root: Path) -> Path:
     del repo_root
     executable = shutil.which("git-filter-repo")
-    if executable is None:
-        raise ValueError(
-            "Cannot apply content purge because `git filter-repo` is not available in this environment. "
-            "Install the `git-filter-repo` executable before running `content-purge --apply`."
-        )
+    if executable is not None:
+        return Path(executable)
+    user_local_executable = Path.home() / ".local" / "bin" / "git-filter-repo"
+    if user_local_executable.is_file():
+        return user_local_executable
+    raise ValueError(
+        "Cannot apply content purge because `git filter-repo` is not available in this environment. "
+        "Install it without sudo with `python3 -m pip install --user git-filter-repo`; the command also checks "
+        "`$HOME/.local/bin/git-filter-repo` directly, but if you install elsewhere ensure the executable is on "
+        "`PATH`, then re-run `content-purge --apply`."
+    )
 
 
-def rewrite_history(repo_root: Path, plan: PurgePlan) -> None:
-    command = ["git", "-C", str(repo_root), "filter-repo", "--force"]
+def rewrite_history(repo_root: Path, plan: PurgePlan, filter_repo_executable: Path) -> None:
+    command = [str(filter_repo_executable), "--force", "--source", str(repo_root)]
     for path in plan.requested_paths:
         command.extend(["--path", path])
     command.append("--invert-paths")

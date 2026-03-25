@@ -83,7 +83,7 @@ For future clean-start resets, operators can archive and purge canonical content
 
 - Preview one or more record families with `./forum content-purge records/posts records/identity`.
 - Apply the workflow only after reviewing the preview and choosing an archive target outside the repo, for example `./forum content-purge records/posts --apply --archive-output /tmp/forum-posts.zip`.
-- Real apply mode requires `git-filter-repo` on `PATH` and prints required follow-up actions such as force-pushing rewritten refs and rotating old clones.
+- Real apply mode requires `git-filter-repo` on `PATH`; if it is missing, the command now suggests a no-sudo install path with `python3 -m pip install --user git-filter-repo` and adding `$HOME/.local/bin` to `PATH`.
 
 ## Deployment
 
