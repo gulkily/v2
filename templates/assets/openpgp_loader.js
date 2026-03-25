@@ -33,11 +33,16 @@ function logOpenPgpDebug(event, details = {}) {
     return;
   }
   try {
-    console.debug("[openpgp_loader]", event, details);
+    console.warn("[openpgp_loader]", event, details);
   } catch (_error) {
     // Ignore console failures in restricted environments.
   }
 }
+
+logOpenPgpDebug("module_loaded", {
+  hasDocument: typeof globalThis.document !== "undefined",
+  locationHref: globalThis.location?.href || "",
+});
 
 function formatDiagnosticMessage(error) {
   if (!error) {

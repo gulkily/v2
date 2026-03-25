@@ -10,6 +10,33 @@ const STORAGE_DRAFT_PREFIX = "forum_compose_draft_v1:";
 const STORAGE_PENDING_PREFIX = "forum_pending_submission_v1:";
 const DRAFT_SAVE_DELAY_MS = 400;
 
+function signingDebugEnabled() {
+  try {
+    const pageFlag = globalThis.document?.querySelector?.("[data-signing-debug-enabled='true']");
+    if (pageFlag) {
+      return true;
+    }
+  } catch (_error) {
+    // Ignore DOM lookup failures and fall back to local storage.
+  }
+  try {
+    return globalThis.localStorage?.getItem("forum_debug_signing") === "1";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function logSigningDebug(event, details = {}) {
+  if (!signingDebugEnabled()) {
+    return;
+  }
+  try {
+    console.warn("[browser_signing]", event, details);
+  } catch (_error) {
+    // Ignore console failures in restricted environments.
+  }
+}
+
 function $(id) {
   return document.getElementById(id);
 }
@@ -727,6 +754,11 @@ function errorMessage(error) {
   return String(error);
 }
 
+logSigningDebug("module_loaded", {
+  hasDocument: typeof document !== "undefined",
+  locationHref: globalThis.location?.href || "",
+});
+
 function responseMessageText(responseText) {
   const trimmed = typeof responseText === "string" ? responseText.trim() : "";
   if (!trimmed) {
@@ -740,8 +772,13 @@ function responseMessageText(responseText) {
 }
 
 async function main() {
+  logSigningDebug("main_enter");
   const root = $("compose-app") || $("profile-update-app");
   if (!root) {
+    logSigningDebug("main_no_root", {
+      hasComposeApp: Boolean($("compose-app")),
+      hasProfileUpdateApp: Boolean($("profile-update-app")),
+    });
     return;
   }
 
@@ -768,6 +805,15 @@ async function main() {
   let currentKeys = null;
   let pendingDraftTimer = 0;
 
+  logSigningDebug("main_root_found", {
+    rootId: root.id || "",
+    commandName,
+    endpoint,
+    dryRun,
+    allowUnsignedFallback,
+    signingDebugEnabled: root.dataset.signingDebugEnabled === "true",
+  });
+
   if (
     !form
     || !privateKeyInput
@@ -777,8 +823,24 @@ async function main() {
     || !responseOutput
     || !signSubmitButton
   ) {
+    logSigningDebug("main_missing_required_elements", {
+      hasForm: Boolean(form),
+      hasPrivateKeyInput: Boolean(privateKeyInput),
+      hasPublicKeyOutput: Boolean(publicKeyOutput),
+      hasPayloadOutput: Boolean(payloadOutput),
+      hasSignatureOutput: Boolean(signatureOutput),
+      hasResponseOutput: Boolean(responseOutput),
+      hasSignSubmitButton: Boolean(signSubmitButton),
+    });
     return;
   }
+
+  logSigningDebug("main_required_elements_ready", {
+    hasClearPendingSubmissionButton: Boolean(clearPendingSubmissionButton),
+    hasRemoveUnsupportedButton: Boolean(removeUnsupportedButton),
+    canStoreDraft,
+    canStorePendingSubmission,
+  });
 
   function defaultSubmitLabel() {
     if (dryRun) {
@@ -919,9 +981,13 @@ async function main() {
   }
 
   async function prepareInitialKeys() {
+    logSigningDebug("prepare_initial_keys_start", {
+      commandName,
+    });
     if (commandName === "update_profile") {
       const stored = await deriveStoredKeys();
       if (!stored) {
+        logSigningDebug("prepare_initial_keys_no_stored_profile_key");
         setStatus(
           "key-status",
           "Import the private key for this profile, or generate a new one only if it matches this identity.",
@@ -930,25 +996,40 @@ async function main() {
       }
       applyKeys(stored);
       setStatus("key-status", "Loaded the stored local signing key.");
+      logSigningDebug("prepare_initial_keys_loaded_profile_key");
       return stored;
     }
-    return prepareKeys({}, "Local signing key is ready.");
+    const keys = await prepareKeys({}, "Local signing key is ready.");
+    logSigningDebug("prepare_initial_keys_ready", {
+      hasPublicKey: Boolean(keys?.publicKey),
+    });
+    return keys;
   }
 
   async function resolveSubmitKeys() {
+    logSigningDebug("resolve_submit_keys_start", {
+      commandName,
+      hasCurrentKeys: Boolean(currentKeys),
+    });
     if (currentKeys) {
+      logSigningDebug("resolve_submit_keys_using_cached_keys");
       return currentKeys;
     }
     if (commandName === "update_profile") {
       const stored = await deriveStoredKeys();
       if (stored) {
         applyKeys(stored);
+        logSigningDebug("resolve_submit_keys_loaded_profile_key");
         return stored;
       }
+      logSigningDebug("resolve_submit_keys_missing_profile_key");
       throw new Error("Load or import the private key for this profile before signing.");
     }
     const keys = await ensureLocalKeys();
     applyKeys(keys);
+    logSigningDebug("resolve_submit_keys_generated_or_loaded_keys", {
+      hasPublicKey: Boolean(keys.publicKey),
+    });
     return keys;
   }
 
@@ -1100,6 +1181,10 @@ async function main() {
   updatePayloadPreview(state, commandName, defaults);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    logSigningDebug("submit_start", {
+      commandName,
+      dryRun,
+    });
     signSubmitButton.disabled = true;
     setActiveSubmitStatus("Building canonical payload...");
     responseOutput.value = "";
@@ -1126,6 +1211,7 @@ async function main() {
             setPendingSubmissionButtonVisible(true);
           }
         setActiveSubmitStatus("Signing payload...");
+        logSigningDebug("submit_sign_profile_payload");
         signature = await signPayload(built.payload, keys.privateKey);
         publicKey = keys.publicKey;
         signatureOutput.value = signature;
@@ -1134,10 +1220,14 @@ async function main() {
           const keys = await resolveSubmitKeys();
           if (defaults.powEnabled) {
             setActiveSubmitStatus("Checking whether proof-of-work is required...");
+            logSigningDebug("submit_check_pow_requirement");
             const signerFingerprint = await publicKeyFingerprint(keys.publicKey);
             const requirement = await fetchPowRequirement(signerFingerprint);
             if (requirement.required) {
               setActiveSubmitStatus(`Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
+              logSigningDebug("submit_pow_required", {
+                difficulty: requirement.difficulty,
+              });
               const proofOfWork = await solveProofOfWork({
                 fingerprint: requirement.signerFingerprint,
                 postId: built.postId,
@@ -1168,11 +1258,16 @@ async function main() {
             setPendingSubmissionButtonVisible(true);
           }
           setActiveSubmitStatus("Signing payload...");
+          logSigningDebug("submit_sign_post_payload");
           signature = await signPayload(built.payload, keys.privateKey);
           publicKey = keys.publicKey;
           signatureOutput.value = signature;
         } catch (error) {
           const classified = classifyOpenPgpError(error);
+          logSigningDebug("submit_signing_path_failed", {
+            message: errorMessage(classified),
+            code: classified.code || "",
+          });
           if (!allowUnsignedFallback) {
             throw classified;
           }
@@ -1206,10 +1301,17 @@ async function main() {
         signature,
         publicKey,
       });
+      logSigningDebug("submit_request_sent", {
+        commandName,
+      });
       const responseText = await response.text();
       responseOutput.value = responseText;
 
       if (!response.ok) {
+        logSigningDebug("submit_response_not_ok", {
+          status: response.status,
+          message: responseMessageText(responseText),
+        });
         throw new Error(responseMessageText(responseText) || `Request failed with status ${response.status}`);
       }
 
@@ -1235,15 +1337,24 @@ async function main() {
         }
       }
     } catch (error) {
+      logSigningDebug("submit_failed", {
+        message: errorMessage(error),
+      });
       setSubmitStatus(`${failurePrefix()}: ${errorMessage(error)}`);
     } finally {
+      logSigningDebug("submit_finished");
       signSubmitButton.disabled = false;
     }
   });
 
   setStatus("key-status", "Checking browser signing support...");
+  logSigningDebug("prepare_initial_keys_dispatch");
   void prepareInitialKeys().catch((error) => {
     const classified = classifyOpenPgpError(error);
+    logSigningDebug("prepare_initial_keys_failed", {
+      message: errorMessage(classified),
+      code: classified.code || "",
+    });
     setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
     if (allowUnsignedFallback) {
       applySubmitLabel("unsigned");
@@ -1254,6 +1365,7 @@ async function main() {
 }
 
 if (typeof document !== "undefined") {
+  logSigningDebug("main_dispatch");
   main();
 }
 
