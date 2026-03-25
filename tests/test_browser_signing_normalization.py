@@ -180,6 +180,17 @@ process.stdout.write(JSON.stringify(result));
         self.assertEqual(result["textContent"], "Signed post accepted.")
         self.assertEqual(result["dataset"]["statusTone"], "active")
 
+    def test_response_message_text_extracts_message_field(self) -> None:
+        result = self.run_expression(
+            """{
+  message: mod.responseMessageText(
+    "Error-Code: conflict\\nMessage: That username is already taken. Choose a different username.",
+  ),
+}"""
+        )
+
+        self.assertEqual(result["message"], "That username is already taken. Choose a different username.")
+
 
 if __name__ == "__main__":
     unittest.main()

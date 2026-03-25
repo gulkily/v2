@@ -332,7 +332,7 @@ process.stdout.write(signature);
         self.assertEqual(first_status, "200 OK")
         self.assertEqual(second_status, "403 Forbidden")
         self.assertIn("Error-Code: forbidden", second_body)
-        self.assertIn("username/display name can only be claimed once per signer identity", second_body)
+        self.assertIn("This account has already claimed a username.", second_body)
 
         profile_status, _, profile_body = self.request(f"/profiles/{identity_slug(self.identity_id)}")
 
@@ -479,7 +479,8 @@ process.stdout.write(signature);
         self.assertEqual(first_status, "200 OK")
         self.assertEqual(second_status, "409 Conflict")
         self.assertIn("Error-Code: conflict", second_body)
-        self.assertIn("username/display name is already claimed by another account", second_body)
+        self.assertIn("That username is already taken. Choose a different username.", second_body)
+        self.assertNotIn("FORUM_PREVENT_DUPLICATE_USERNAMES", second_body)
         self.assertFalse((self.repo_root / "records/profile-updates/profile-update-test-010.txt").exists())
 
 

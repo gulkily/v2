@@ -727,6 +727,18 @@ function errorMessage(error) {
   return String(error);
 }
 
+function responseMessageText(responseText) {
+  const trimmed = typeof responseText === "string" ? responseText.trim() : "";
+  if (!trimmed) {
+    return "";
+  }
+  const messageMatch = trimmed.match(/^Message:\s+(.+)$/m);
+  if (messageMatch) {
+    return messageMatch[1].trim();
+  }
+  return trimmed;
+}
+
 async function main() {
   const root = $("compose-app") || $("profile-update-app");
   if (!root) {
@@ -951,7 +963,7 @@ async function main() {
   }
 
   function failurePrefix() {
-    return commandName === "update_profile" ? "Signed profile update failed" : "Signed posting failed";
+    return commandName === "update_profile" ? "Username update failed" : "Signed posting failed";
   }
 
   function successMessage() {
@@ -1198,7 +1210,7 @@ async function main() {
       responseOutput.value = responseText;
 
       if (!response.ok) {
-        throw new Error(responseText.trim() || `Request failed with status ${response.status}`);
+        throw new Error(responseMessageText(responseText) || `Request failed with status ${response.status}`);
       }
 
       const recordId = responseRecordId(responseText);
@@ -1252,5 +1264,6 @@ export {
   normalizeComposeAscii,
   pendingSubmissionStorageKey,
   publicKeyFingerprint,
+  responseMessageText,
   requiresSigningSubmitLabel,
 };

@@ -12,17 +12,24 @@
       <span>Choose a username:</span>
       <input id="display-name-input" name="display_name" type="text" maxlength="32" value="${display_name_value}" required>
     </label>
-    <div class="action-row">
-      <button id="sign-submit-button" type="submit">${submit_label}</button>
-      <a class="thread-chip" href="/profiles/${profile_slug}">back to profile</a>
-      <a class="thread-chip" href="/account/key/">view browser key</a>
+    <div class="compose-submit-area">
+      <div class="action-row">
+        <button id="sign-submit-button" type="submit">${submit_label}</button>
+        <a class="thread-chip" href="/profiles/${profile_slug}">back to profile</a>
+        <a class="thread-chip" href="/account/key/">view browser key</a>
+      </div>
+      <p
+        id="submit-status"
+        class="status-note compose-submit-status"
+        data-status-tone="idle"
+        aria-live="polite"
+      >Waiting for submission.</p>
     </div>
   </form>
   <div class="action-row">
     <button id="clear-pending-submission-button" type="button" hidden>Clear saved submission</button>
   </div>
   <p id="key-status" class="status-note">Checking browser signing support...</p>
-  <p id="submit-status" class="status-note">Waiting for submission.</p>
 </section>
 
 <details class="panel compose-details page-section">

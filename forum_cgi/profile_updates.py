@@ -9,7 +9,6 @@ from forum_core.identity import build_identity_id
 from forum_core.operation_events import emit_operation_timing
 from forum_core.post_index import load_indexed_username_claims
 from forum_core.profile_updates import (
-    PREVENT_DUPLICATE_USERNAMES_ENV,
     ProfileUpdateRecord,
     has_visible_profile_update_for_source_identity,
     load_profile_update_records,
@@ -107,7 +106,7 @@ def validate_profile_update_record(
     ):
         raise PostingError(
             "forbidden",
-            "username/display name can only be claimed once per signer identity",
+            "This account has already claimed a username.",
             status="403 Forbidden",
         )
     if prevent_duplicate_usernames_enabled():
@@ -116,7 +115,7 @@ def validate_profile_update_record(
         if any(claim.canonical_identity_id != canonical_identity_id for claim in duplicate_claims):
             raise PostingError(
                 "conflict",
-                f"username/display name is already claimed by another account; disable {PREVENT_DUPLICATE_USERNAMES_ENV} to allow duplicates",
+                "That username is already taken. Choose a different username.",
                 status="409 Conflict",
             )
 

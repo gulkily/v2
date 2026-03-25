@@ -242,6 +242,10 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="public-key-output" class="technical-textarea key-display profile-public-key-textarea" rows="8" spellcheck="false" wrap="off" readonly', body)
         self.assertIn('id="payload-output"', body)
         self.assertIn('id="clear-pending-submission-button"', body)
+        self.assertIn('class="compose-submit-area"', body)
+        self.assertIn('id="submit-status"', body)
+        self.assertIn('class="status-note compose-submit-status"', body)
+        self.assertIn('data-status-tone="idle"', body)
         self.assertIn("Submit update", body)
         self.assertNotIn("Sign and submit", body)
         self.assertIn(">Technical details<", body)
@@ -254,6 +258,13 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertNotIn('class="breadcrumb"', body)
         self.assertNotIn("Enter a new display name", body)
         self.assertNotIn(f'value="{DISPLAY_NAME}"', body)
+
+        input_index = body.index('id="display-name-input"')
+        submit_status_index = body.index('id="submit-status"')
+        key_status_index = body.index('id="key-status"')
+
+        self.assertLess(input_index, submit_status_index)
+        self.assertLess(submit_status_index, key_status_index)
 
 
 if __name__ == "__main__":
