@@ -449,8 +449,13 @@ class ForumTasksTests(unittest.TestCase):
         mocked.assert_called_once_with(self.repo_root.resolve())
         self.assertEqual(list(cache_dir.iterdir()), [])
         self.assertFalse(static_html_dir.exists() and any(static_html_dir.iterdir()))
+        self.assertIn("PHP host refresh plan", stdout.getvalue())
+        self.assertIn("Step 1/3: rebuilding derived post index...", stdout.getvalue())
+        self.assertIn("Step 2/3: clearing PHP microcache...", stdout.getvalue())
+        self.assertIn("Step 3/3: clearing generated static HTML artifacts...", stdout.getvalue())
         self.assertIn("Cleared PHP microcache", stdout.getvalue())
         self.assertIn("Cleared static HTML artifacts", stdout.getvalue())
+        self.assertIn("PHP host refresh complete.", stdout.getvalue())
 
     def test_run_php_host_refresh_requires_resolvable_cache_paths(self) -> None:
         stdout = io.StringIO()
@@ -498,6 +503,7 @@ class ForumTasksTests(unittest.TestCase):
         mocked.assert_called_once_with(self.repo_root.resolve())
         self.assertEqual(list(cache_dir.iterdir()), [])
         self.assertEqual(list(static_html_dir.iterdir()), [])
+        self.assertIn("Step 3/3: clearing generated static HTML artifacts...", stdout.getvalue())
         self.assertIn(str(static_html_dir), stdout.getvalue())
 
 

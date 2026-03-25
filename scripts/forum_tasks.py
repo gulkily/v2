@@ -421,21 +421,34 @@ def run_php_host_refresh(request: TaskRequest) -> int:
         )
         return 1
 
+    print("PHP host refresh plan")
+    print(f"- Config path: {config_path}")
     print(f"PHP host refresh target repo: {repo_root}")
+    print(f"- Rebuild index: {'yes' if not request.php_host_refresh_skip_rebuild_index else 'no'}")
+    print(f"- PHP microcache dir: {cache_dir if cache_dir is not None else 'not configured'}")
+    print(f"- Static HTML dir: {static_html_dir}")
+
     if not request.php_host_refresh_skip_rebuild_index:
+        print("Step 1/3: rebuilding derived post index...")
         rebuild_post_index(repo_root)
         print(f"Rebuilt post index for {repo_root}")
+    else:
+        print("Step 1/3: skipping derived post index rebuild.")
 
     if cache_dir is not None:
+        print("Step 2/3: clearing PHP microcache...")
         removed_files, removed_dirs = clear_directory_contents(cache_dir)
         print(f"Cleared PHP microcache at {cache_dir} ({removed_files} files, {removed_dirs} directories removed).")
     else:
+        print("Step 2/3: skipping PHP microcache clearing.")
         print("Skipped PHP microcache clearing because no cache_dir was configured.")
 
+    print("Step 3/3: clearing generated static HTML artifacts...")
     removed_files, removed_dirs = clear_directory_contents(static_html_dir)
     print(
         f"Cleared static HTML artifacts at {static_html_dir} ({removed_files} files, {removed_dirs} directories removed)."
     )
+    print("PHP host refresh complete.")
     return 0
 
 
