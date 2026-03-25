@@ -178,114 +178,163 @@ def _request_supports_reindex_feedback(path: str, *, method: str) -> bool:
     )
 
 
+def render_refresh_page_style_block() -> str:
+    return _html_block(
+        """
+        <style>
+          :root { color-scheme: light dark; }
+          body {
+            margin: 0;
+            font-family: Verdana, Tahoma, Geneva, sans-serif;
+            background: #f3f1ea;
+            color: #1f2a28;
+          }
+          .wrap {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 1.5rem;
+          }
+          .card {
+            width: min(38rem, 100%);
+            background: #fbfaf5;
+            border: 1px solid rgba(82, 101, 96, 0.18);
+            box-shadow: 0 14px 34px rgba(31, 42, 40, 0.1);
+            padding: 1.25rem 1.2rem;
+            border-radius: 0.35rem;
+          }
+          .kicker {
+            margin: 0 0 0.45rem;
+            color: #2d5b73;
+            font: 0.78rem "Courier New", Courier, monospace;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          h1 {
+            margin: 0.1rem 0 0.65rem;
+            font: 2rem Georgia, "Times New Roman", serif;
+          }
+          p {
+            margin: 0.55rem 0;
+            line-height: 1.5;
+          }
+          .meta {
+            color: #5f6b67;
+            font-size: 0.96rem;
+          }
+          .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+            margin-top: 1rem;
+          }
+          .actions a {
+            display: inline-block;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid rgba(82, 101, 96, 0.22);
+            color: #1f2a28;
+            text-decoration: none;
+            background: #fffaf1;
+          }
+          @media (prefers-color-scheme: dark) {
+            body {
+              background: #111820;
+              color: #e4ece9;
+            }
+            .card {
+              background: #18212b;
+              border-color: rgba(162, 184, 180, 0.22);
+              box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+            }
+            .kicker { color: #8fc4df; }
+            .meta { color: #b4c0bc; }
+            .actions a {
+              border-color: rgba(162, 184, 180, 0.22);
+              color: #e4ece9;
+              background: #24313c;
+            }
+          }
+        </style>
+        """
+    )
+
+
 def render_post_index_refresh_page(*, target_path: str, rebuild_started: bool) -> str:
     status_text = (
         "A small interval of stillness while the next page arrives."
         if rebuild_started
         else "A small interval of stillness while the next page arrives."
     )
-    return (
-        "<!doctype html>"
-        '<html lang="en">'
-        "<head>"
-        '<meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>Refreshing the forum</title>"
-        "<style>"
-        ":root{color-scheme:light dark;}"
-        "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
-        ".wrap{min-height:100vh;display:grid;place-items:center;padding:1.5rem;}"
-        ".card{width:min(38rem,100%);background:#fbfaf5;border:1px solid rgba(82,101,96,.18);"
-        "box-shadow:0 14px 34px rgba(31,42,40,.1);padding:1.25rem 1.2rem;border-radius:.35rem;}"
-        ".kicker{margin:0 0 .45rem;color:#2d5b73;font:0.78rem 'Courier New',Courier,monospace;"
-        "letter-spacing:.08em;text-transform:uppercase;}"
-        "h1{margin:.1rem 0 .65rem;font:2rem Georgia,'Times New Roman',serif;}"
-        "p{margin:.55rem 0;line-height:1.5;}"
-        ".meta{color:#5f6b67;font-size:.96rem;}"
-        ".actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem;}"
-        ".actions a{display:inline-block;padding:.5rem .75rem;border:1px solid rgba(82,101,96,.22);"
-        "color:#1f2a28;text-decoration:none;background:#fffaf1;}"
-        "@media (prefers-color-scheme: dark){"
-        "body{background:#111820;color:#e4ece9;}"
-        ".card{background:#18212b;border-color:rgba(162,184,180,.22);box-shadow:0 14px 34px rgba(0,0,0,.42);}"
-        ".kicker{color:#8fc4df;}"
-        ".meta{color:#b4c0bc;}"
-        ".actions a{border-color:rgba(162,184,180,.22);color:#e4ece9;background:#24313c;}"
-        "}"
-        "</style>"
-        '<meta http-equiv="refresh" content="1;url=' + html.escape(target_path, quote=True) + '">'
-        "</head>"
-        "<body>"
-        '<main class="wrap"><section class="card">'
-        '<p class="kicker">zenmemes</p>'
-        "<h1>Refreshing the forum...</h1>"
-        f"<p>{html.escape(status_text)}</p>"
-        '<p class="meta">This page retries automatically in a moment.</p>'
-        '<div class="actions">'
-        f'<a href="{html.escape(target_path)}">retry now</a>'
-        "</div>"
-        "</section></main>"
-        "<script>"
-        f'window.setTimeout(function () {{ window.location.replace({json.dumps(target_path)}); }}, 1200);'
-        "</script>"
-        "</body>"
-        "</html>"
+    return _html_block(
+        f"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Refreshing the forum</title>
+          {render_refresh_page_style_block()}
+          <meta http-equiv="refresh" content="1;url={html.escape(target_path, quote=True)}">
+        </head>
+        <body>
+          <main class="wrap">
+            <section class="card">
+              <p class="kicker">zenmemes</p>
+              <h1>Refreshing the forum...</h1>
+              <p>{html.escape(status_text)}</p>
+              <p class="meta">This page retries automatically in a moment.</p>
+              <div class="actions">
+                <a href="{html.escape(target_path)}">retry now</a>
+              </div>
+            </section>
+          </main>
+          <script>
+            window.setTimeout(function () {{ window.location.replace({json.dumps(target_path)}); }}, 1200);
+          </script>
+        </body>
+        </html>
+        """
     )
 
 
 def render_streamed_post_index_refresh_response(*, target_path: str, status_text: str) -> Iterable[bytes]:
     target_json = json.dumps(target_path)
-    opening = (
-        "<!doctype html>"
-        '<html lang="en">'
-        "<head>"
-        '<meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>Refreshing the forum</title>"
-        "<style>"
-        ":root{color-scheme:light dark;}"
-        "body{margin:0;font-family:Verdana,Tahoma,Geneva,sans-serif;background:#f3f1ea;color:#1f2a28;}"
-        ".wrap{min-height:100vh;display:grid;place-items:center;padding:1.5rem;}"
-        ".card{width:min(38rem,100%);background:#fbfaf5;border:1px solid rgba(82,101,96,.18);"
-        "box-shadow:0 14px 34px rgba(31,42,40,.1);padding:1.25rem 1.2rem;border-radius:.35rem;}"
-        ".kicker{margin:0 0 .45rem;color:#2d5b73;font:0.78rem 'Courier New',Courier,monospace;"
-        "letter-spacing:.08em;text-transform:uppercase;}"
-        "h1{margin:.1rem 0 .65rem;font:2rem Georgia,'Times New Roman',serif;}"
-        "p{margin:.55rem 0;line-height:1.5;}"
-        ".meta{color:#5f6b67;font-size:.96rem;}"
-        ".actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem;}"
-        ".actions a{display:inline-block;padding:.5rem .75rem;border:1px solid rgba(82,101,96,.22);"
-        "color:#1f2a28;text-decoration:none;background:#fffaf1;}"
-        "@media (prefers-color-scheme: dark){"
-        "body{background:#111820;color:#e4ece9;}"
-        ".card{background:#18212b;border-color:rgba(162,184,180,.22);box-shadow:0 14px 34px rgba(0,0,0,.42);}"
-        ".kicker{color:#8fc4df;}"
-        ".meta{color:#b4c0bc;}"
-        ".actions a{border-color:rgba(162,184,180,.22);color:#e4ece9;background:#24313c;}"
-        "}"
-        "</style>"
-        "</head>"
-        "<body>"
-        '<main class="wrap"><section class="card">'
-        '<p class="kicker">zenmemes</p>'
-        "<h1>Refreshing the forum...</h1>"
-        f"<p>{html.escape(status_text)}</p>"
-        '<p class="meta">This page will continue in a moment.</p>'
-        '<div class="actions">'
-        f'<a href="{html.escape(target_path)}">retry now</a>'
-        "</div>"
-        "</section></main>"
+    opening = _html_block(
+        f"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Refreshing the forum</title>
+          {render_refresh_page_style_block()}
+        </head>
+        <body>
+          <main class="wrap">
+            <section class="card">
+              <p class="kicker">zenmemes</p>
+              <h1>Refreshing the forum...</h1>
+              <p>{html.escape(status_text)}</p>
+              <p class="meta">This page will continue in a moment.</p>
+              <div class="actions">
+                <a href="{html.escape(target_path)}">retry now</a>
+              </div>
+            </section>
+          </main>
+        """
     ).encode("utf-8")
 
     def stream_chunks() -> Iterator[bytes]:
         yield opening
         yield b" " * 2048
-        yield (
-            "<script>"
-            f"window.location.replace({target_json});"
-            "</script>"
-            "</body>"
-            "</html>"
+        yield _html_block(
+            f"""
+            <script>
+              window.location.replace({target_json});
+            </script>
+            </body>
+            </html>
+            """
         ).encode("utf-8")
 
     return stream_chunks()
@@ -3970,9 +4019,19 @@ def application(environ, start_response):
                 raise
             return _finalize_response_iterable(response, handle=handle)
     except Exception as exc:  # pragma: no cover - manual smoke checks cover this path
-        body = (
-            "<!doctype html><title>Server Error</title>"
-            f"<pre>{html.escape(str(exc))}</pre>"
+        body = _html_block(
+            f"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>Server Error</title>
+            </head>
+            <body>
+              <pre>{html.escape(str(exc))}</pre>
+            </body>
+            </html>
+            """
         ).encode("utf-8")
         headers = [("Content-Type", "text/html; charset=utf-8")]
         start_response("500 Internal Server Error", headers)

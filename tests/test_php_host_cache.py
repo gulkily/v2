@@ -389,6 +389,8 @@ process.stdout.write(signature);
         self.assertIn("Refreshing the forum...", status_page["body"])
         self.assertIn("A small interval of stillness while the next page arrives.", status_page["body"])
         self.assertIn("__forum_rebuild=1", status_page["body"])
+        self.assertIn('<main class="wrap">\n    <section class="card">', status_page["body"])
+        self.assertIn('</main>\n  <iframe id="forum-reindex-worker"', status_page["body"])
         self.assertEqual(self.cache_files(), [])
 
         rebuild_response = self.php_request("/", query_string="__forum_rebuild=1")

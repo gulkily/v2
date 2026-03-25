@@ -156,6 +156,8 @@ class PostIndexStartupTests(unittest.TestCase):
         self.assertNotIn("recent slow operations", body)
         self.assertNotIn('/assets/site.css', body)
         self.assertNotIn('/assets/username_claim_cta.js', body)
+        self.assertIn('<main class="wrap">\n', body)
+        self.assertIn('<script>\n  window.location.replace("/")', body)
         self.assertTrue(any("post index rebuild triggered for" in message for message in captured_logs.output))
         mock_rebuild.assert_called_once_with(self.repo_root.resolve())
         mock_startup.assert_not_called()

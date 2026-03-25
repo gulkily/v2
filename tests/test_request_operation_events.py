@@ -219,6 +219,8 @@ process.stdout.write(signature);
 
         self.assertEqual(status, "500 Internal Server Error")
         self.assertIn("broken page", body)
+        self.assertIn("<title>Server Error</title>", body)
+        self.assertIn("</head>\n<body>\n", body)
         operations = load_recent_operations(self.repo_root)
         failed_operation = next(event for event in operations if event.operation_name == "GET /instance/")
         self.assertEqual(failed_operation.state, "failed")

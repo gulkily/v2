@@ -17,3 +17,12 @@
   - `python -m unittest tests.test_board_index_page.BoardIndexPageTests.test_board_index_uses_shared_page_shell tests.test_board_index_page.BoardIndexPageTests.test_board_index_source_uses_multiline_stats_and_thread_rows tests.test_task_thread_pages.TaskThreadPagesTests.test_task_thread_page_renders_structured_metadata tests.test_task_thread_pages.TaskThreadPagesTests.test_thread_page_source_uses_multiline_post_cards`
 - Notes:
   - This stage stays inside template-backed routes only; refresh pages, top-level error HTML, and PHP host pages are still reserved for Stage 3.
+
+## Stage 3 - Bring direct-response and host-side HTML pages onto the same standard
+- Changes:
+  - Refactored the Python refresh-page and streamed-refresh HTML in [`forum_web/web.py`](/home/wsl/v2/forum_web/web.py) into readable multiline documents with a shared refresh-page style block, and reformatted the top-level fallback server-error page to stop emitting a single-line HTML body.
+  - Added direct-response source assertions in [`tests/test_post_index_startup.py`](/home/wsl/v2/tests/test_post_index_startup.py) and [`tests/test_request_operation_events.py`](/home/wsl/v2/tests/test_request_operation_events.py), plus explicit host-page source assertions in [`tests/test_php_host_missing_config_page.py`](/home/wsl/v2/tests/test_php_host_missing_config_page.py) and [`tests/test_php_host_cache.py`](/home/wsl/v2/tests/test_php_host_cache.py).
+- Verification:
+  - `python -m unittest tests.test_post_index_startup.PostIndexStartupTests.test_board_request_shows_refresh_page_when_startup_index_is_stale tests.test_request_operation_events.RequestOperationEventsTests.test_request_failure_is_recorded_as_failed_operation tests.test_php_host_missing_config_page.PhpHostMissingConfigPageTests.test_missing_config_page_is_styled_and_actionable tests.test_php_host_cache.PhpHostCacheTests.test_php_host_shows_status_page_before_blocking_rebuild_request`
+- Notes:
+  - The PHP host page implementations were already structurally readable, so Stage 3 mainly locks that behavior in with regression coverage while bringing the remaining Python-only direct responses up to the same standard.

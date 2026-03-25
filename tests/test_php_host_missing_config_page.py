@@ -69,6 +69,7 @@ class PhpHostMissingConfigPageTests(unittest.TestCase):
         self.assertIn(str(self.public_dir / "forum_host_config.php"), body)
         self.assertIn("./forum php-host-setup /absolute/path/to/public-web-root", body)
         self.assertIn("docs/php_primary_host_installation.md", body)
+        self.assertIn("<main>\n    <section class=\"hero\">", body)
 
 
 if __name__ == "__main__":
