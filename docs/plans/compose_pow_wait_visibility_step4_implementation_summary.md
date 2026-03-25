@@ -7,3 +7,13 @@
   - Ran `python3 -m unittest tests.test_compose_thread_page tests.test_compose_reply_page`.
 - Notes:
   - This stage changes structure and styling only. Browser status behavior still uses the existing text updates and will be wired into the new active-state hook in Stage 2.
+
+## Stage 2 - active submit-status tone wiring
+- Changes:
+  - Extended the shared status helper in [browser_signing.js](/home/wsl/v2/templates/assets/browser_signing.js) with a small tone-aware path so status updates can set `data-status-tone` when needed.
+  - Added `setSubmitStatus(...)` and `setActiveSubmitStatus(...)` helpers in [browser_signing.js](/home/wsl/v2/templates/assets/browser_signing.js) and switched the compose submission flow to use the active tone during payload building, PoW requirement checks, PoW solving, signing, unsigned fallback submission, and network submission.
+  - Returned the action-area status to the idle tone for cleared-pending, success, and failure messages so the stronger treatment is reserved for work-in-progress states.
+- Verification:
+  - Ran `python3 -m unittest tests.test_browser_signing_normalization tests.test_compose_thread_page tests.test_compose_reply_page`.
+- Notes:
+  - This stage keeps the same user-facing copy and DOM ids; it only adds the state transition needed for the new visual emphasis contract.

@@ -14,11 +14,22 @@ function $(id) {
   return document.getElementById(id);
 }
 
-function setStatus(id, message) {
+function setStatus(id, message, { tone } = {}) {
   const element = $(id);
   if (element) {
     element.textContent = message;
+    if (typeof tone === "string" && tone) {
+      element.dataset.statusTone = tone;
+    }
   }
+}
+
+function setSubmitStatus(message, { tone = "idle" } = {}) {
+  setStatus("submit-status", message, { tone });
+}
+
+function setActiveSubmitStatus(message) {
+  setSubmitStatus(message, { tone: "active" });
 }
 
 function setButtonLabel(button, label) {
@@ -869,7 +880,7 @@ async function main() {
       setPendingSubmissionButtonVisible(false);
       responseOutput.value = "";
       setDraftStatus(idleDraftStatus());
-      setStatus("submit-status", "Cleared the saved local submission snapshot.");
+      setSubmitStatus("Cleared the saved local submission snapshot.");
     });
   }
 
@@ -1075,7 +1086,7 @@ async function main() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     signSubmitButton.disabled = true;
-    setStatus("submit-status", "Building canonical payload...");
+    setActiveSubmitStatus("Building canonical payload...");
     responseOutput.value = "";
     signatureOutput.value = "";
 
@@ -1099,7 +1110,7 @@ async function main() {
             });
             setPendingSubmissionButtonVisible(true);
           }
-        setStatus("submit-status", "Signing payload...");
+        setActiveSubmitStatus("Signing payload...");
         signature = await signPayload(built.payload, keys.privateKey);
         publicKey = keys.publicKey;
         signatureOutput.value = signature;
@@ -1107,18 +1118,17 @@ async function main() {
         try {
           const keys = await resolveSubmitKeys();
           if (defaults.powEnabled) {
-            setStatus("submit-status", "Checking whether proof-of-work is required...");
+            setActiveSubmitStatus("Checking whether proof-of-work is required...");
             const signerFingerprint = await publicKeyFingerprint(keys.publicKey);
             const requirement = await fetchPowRequirement(signerFingerprint);
             if (requirement.required) {
-              setStatus("submit-status", `Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
+              setActiveSubmitStatus(`Computing proof-of-work (${requirement.difficulty} leading zero bits)...`);
               const proofOfWork = await solveProofOfWork({
                 fingerprint: requirement.signerFingerprint,
                 postId: built.postId,
                 difficulty: requirement.difficulty,
                 onProgress: (attempts) => {
-                  setStatus(
-                    "submit-status",
+                  setActiveSubmitStatus(
                     `Computing proof-of-work (${requirement.difficulty} leading zero bits, ${attempts} attempts)...`,
                   );
                 },
@@ -1142,7 +1152,7 @@ async function main() {
             setDraftStatus("Saved the current submission locally until the server confirms it.");
             setPendingSubmissionButtonVisible(true);
           }
-          setStatus("submit-status", "Signing payload...");
+          setActiveSubmitStatus("Signing payload...");
           signature = await signPayload(built.payload, keys.privateKey);
           publicKey = keys.publicKey;
           signatureOutput.value = signature;
@@ -1168,12 +1178,12 @@ async function main() {
           }
           signatureOutput.value = "";
           setStatus("key-status", formatSigningStatus(commandName, classified, { allowUnsignedFallback }));
-          setStatus("submit-status", formatFallbackSubmitStatus(classified));
+          setActiveSubmitStatus(formatFallbackSubmitStatus(classified));
         }
       }
 
       if (!usedUnsignedFallback) {
-        setStatus("submit-status", submittingMessage());
+        setActiveSubmitStatus(submittingMessage());
       }
 
       const response = await submitPayload({
@@ -1190,7 +1200,7 @@ async function main() {
 
       const recordId = responseRecordId(responseText);
       if (dryRun) {
-        setStatus("submit-status", usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
+        setSubmitStatus(usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
       } else {
         if (draftContext && canStoreDraft) {
           window.clearTimeout(pendingDraftTimer);
@@ -1201,7 +1211,7 @@ async function main() {
           clearPendingSubmission(pendingSubmissionKey);
           setPendingSubmissionButtonVisible(false);
         }
-        setStatus("submit-status", usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
+        setSubmitStatus(usedUnsignedFallback ? unsignedSuccessMessage() : successMessage());
         const target = redirectTarget(commandName, recordId, defaults);
         if (target) {
           window.setTimeout(() => {
@@ -1210,7 +1220,7 @@ async function main() {
         }
       }
     } catch (error) {
-      setStatus("submit-status", `${failurePrefix()}: ${errorMessage(error)}`);
+      setSubmitStatus(`${failurePrefix()}: ${errorMessage(error)}`);
     } finally {
       signSubmitButton.disabled = false;
     }
