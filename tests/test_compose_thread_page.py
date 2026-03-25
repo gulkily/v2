@@ -97,6 +97,10 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertIn('id="clear-pending-submission-button"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
+        self.assertIn('class="compose-submit-area"', body)
+        self.assertIn('id="submit-status"', body)
+        self.assertIn('class="status-note compose-submit-status"', body)
+        self.assertIn('data-status-tone="idle"', body)
         self.assertIn('id="public-key-output" class="technical-textarea key-display profile-public-key-textarea"', body)
         self.assertIn('id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"', body)
         self.assertIn('id="public-key-output" class="technical-textarea key-display profile-public-key-textarea" rows="8" spellcheck="false" wrap="off" readonly', body)
@@ -117,10 +121,13 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertNotIn(">Advanced<", body)
 
         textarea_index = body.index('id="body-input"')
+        submit_status_index = body.index('id="submit-status"')
         draft_status_index = body.index('id="draft-status"')
         requirements_index = body.index("Requirements and limitations")
 
         self.assertLess(textarea_index, draft_status_index)
+        self.assertLess(textarea_index, submit_status_index)
+        self.assertLess(submit_status_index, draft_status_index)
         self.assertLess(draft_status_index, requirements_index)
 
     def test_openpgp_loader_asset_is_served(self) -> None:

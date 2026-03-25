@@ -854,8 +854,31 @@ details.panel.page-section[open] > summary {
   gap: 0.65rem;
 }
 
+.compose-submit-area {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .status-note {
   min-height: 1.4rem;
+}
+
+.compose-submit-status {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--accent-soft);
+  border-radius: 0.75rem;
+  background: var(--surface-elevated);
+}
+
+.compose-submit-status[data-status-tone="idle"] {
+  color: var(--muted);
+}
+
+.compose-submit-status[data-status-tone="active"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface-elevated));
+  color: var(--ink);
 }
 
 .table-shell {

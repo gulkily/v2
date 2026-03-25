@@ -7,8 +7,16 @@ ${reply_target_html}
       <textarea id="body-input" name="body" rows="10" spellcheck="true" required>${body_value}</textarea>
     </label>
     ${extra_fields_html}
-    <div class="action-row">
+    <div class="compose-submit-area">
+      <div class="action-row">
       <button id="sign-submit-button" type="submit">${submit_label}</button>
+      </div>
+      <p
+        id="submit-status"
+        class="status-note compose-submit-status"
+        data-status-tone="idle"
+        aria-live="polite"
+      >Waiting for submission.</p>
     </div>
   </form>
   <p id="draft-status" class="status-note">Drafts are saved locally in this browser.</p>
@@ -20,7 +28,6 @@ ${reply_target_html}
   <div id="compose-normalization-actions" class="action-row" hidden>
     <button id="remove-unsupported-button" type="button" disabled>Remove unsupported characters</button>
   </div>
-  <p id="submit-status" class="status-note">Waiting for submission.</p>
 </section>
 
 <section class="panel page-section requirements-section">

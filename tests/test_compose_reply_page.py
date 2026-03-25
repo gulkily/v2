@@ -97,6 +97,10 @@ class ComposeReplyPageTests(unittest.TestCase):
         self.assertIn('id="draft-status"', body)
         self.assertIn('id="remove-unsupported-button"', body)
         self.assertIn('id="compose-normalization-status"', body)
+        self.assertIn('class="compose-submit-area"', body)
+        self.assertIn('id="submit-status"', body)
+        self.assertIn('class="status-note compose-submit-status"', body)
+        self.assertIn('data-status-tone="idle"', body)
         self.assertIn('data-unsigned-fallback-enabled="', body)
         self.assertIn("Requirements and limitations", body)
         self.assertIn("ASCII-only canonical text records", body)
@@ -106,11 +110,14 @@ class ComposeReplyPageTests(unittest.TestCase):
 
         reference_index = body.index("Replying to")
         textarea_index = body.index('id="body-input"')
+        submit_status_index = body.index('id="submit-status"')
         draft_status_index = body.index('id="draft-status"')
         requirements_index = body.index("Requirements and limitations")
 
         self.assertLess(reference_index, textarea_index)
         self.assertLess(textarea_index, draft_status_index)
+        self.assertLess(textarea_index, submit_status_index)
+        self.assertLess(submit_status_index, draft_status_index)
         self.assertLess(draft_status_index, requirements_index)
 
     def test_compose_reply_page_exposes_pow_settings_when_enabled(self) -> None:
