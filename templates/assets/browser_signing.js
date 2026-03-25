@@ -763,7 +763,7 @@ async function main() {
   const draftContext = composeDraftContext(commandName, defaults);
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
   const pendingSubmissionKey = pendingSubmissionStorageKey(commandName, defaults, { dryRun });
-  const canStorePendingSubmission = draftStorageAvailable() && !dryRun;
+  const canStorePendingSubmission = commandName !== "update_profile" && draftStorageAvailable() && !dryRun;
   const allowUnsignedFallback = root.dataset.unsignedFallbackEnabled === "true";
   let currentKeys = null;
   let pendingDraftTimer = 0;

@@ -241,7 +241,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertIn('id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"', body)
         self.assertIn('id="public-key-output" class="technical-textarea key-display profile-public-key-textarea" rows="8" spellcheck="false" wrap="off" readonly', body)
         self.assertIn('id="payload-output"', body)
-        self.assertIn('id="clear-pending-submission-button"', body)
+        self.assertNotIn('id="clear-pending-submission-button"', body)
         self.assertIn('class="compose-submit-area"', body)
         self.assertIn('id="submit-status"', body)
         self.assertIn('class="status-note compose-submit-status"', body)
