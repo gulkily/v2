@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -691,6 +692,24 @@ class PostIndexBuildTests(unittest.TestCase):
             self.assertEqual(row["subject"], "Stored post")
         finally:
             index.connection.close()
+
+    def test_store_post_recreates_missing_posts_directory_after_purge(self) -> None:
+        shutil.rmtree(self.repo_root / "records" / "posts")
+
+        payload_text = dedent(
+            """
+            Post-ID: root-201
+            Board-Tags: general
+            Subject: Stored after purge
+
+            Stored body.
+            """
+        ).lstrip()
+
+        post = parse_post_text(payload_text)
+        store_post("create_thread", post, self.repo_root, payload_text)
+
+        self.assertTrue((self.repo_root / "records" / "posts" / "root-201.txt").exists())
 
     def test_ensure_post_index_current_fast_forwards_head_drift_without_full_rebuild(self) -> None:
         self.write_post(

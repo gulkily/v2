@@ -150,6 +150,7 @@ def build_preview(command_name: str, post: Post, repo_root: Path) -> CommandPrev
 
 def write_post_file(post: Post, repo_root: Path, payload_text: str) -> Path:
     post_path = resolve_storage_path(repo_root, post.post_id)
+    post_path.parent.mkdir(parents=True, exist_ok=True)
     post_path.write_text(payload_text, encoding="ascii")
     return post_path
 
@@ -167,6 +168,7 @@ def resolve_identity_bootstrap_path(repo_root: Path, identity_id: str) -> Path:
 
 
 def write_ascii_file(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="ascii")
     return path
 
