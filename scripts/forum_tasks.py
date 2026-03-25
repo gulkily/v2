@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -34,7 +35,9 @@ from forum_core.runtime_env import (
 from forum_core.php_host_setup import (
     PhpHostSetupRequest,
     confirm_php_host_setup,
+    load_php_host_runtime_config,
     publish_php_host_public_files,
+    php_host_config_path,
     resolve_public_web_root,
     resolve_php_host_setup_config,
     write_php_host_config,
@@ -57,6 +60,11 @@ class TaskRequest:
     repo_root: str | None = None
     cache_dir: str | None = None
     non_interactive: bool = False
+    php_host_refresh_config_path: str | None = None
+    php_host_refresh_repo_root: str | None = None
+    php_host_refresh_cache_dir: str | None = None
+    php_host_refresh_static_html_dir: str | None = None
+    php_host_refresh_skip_rebuild_index: bool = False
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -144,6 +152,31 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use derived defaults and fail on invalid explicit values instead of prompting.",
     )
+    php_host_refresh_parser = subparsers.add_parser(
+        "php-host-refresh",
+        help="Rebuild the post index and clear PHP-host caches.",
+    )
+    php_host_refresh_parser.add_argument(
+        "--config-path",
+        help="Override the PHP host config path. Defaults to php_host/public/forum_host_config.php.",
+    )
+    php_host_refresh_parser.add_argument(
+        "--repo-root",
+        help="Override the forum data repository path used for rebuild-index.",
+    )
+    php_host_refresh_parser.add_argument(
+        "--cache-dir",
+        help="Override the PHP microcache directory to clear.",
+    )
+    php_host_refresh_parser.add_argument(
+        "--static-html-dir",
+        help="Override the generated static HTML directory to clear.",
+    )
+    php_host_refresh_parser.add_argument(
+        "--skip-rebuild-index",
+        action="store_true",
+        help="Clear caches only and skip the derived post-index rebuild.",
+    )
     subparsers.add_parser("start", help="Start the local read-only forum server.")
 
     test_parser = subparsers.add_parser("test", help="Run the unittest suite.")
@@ -187,6 +220,15 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
             cache_dir=args.cache_dir,
             non_interactive=bool(args.non_interactive),
         )
+    if args.command == "php-host-refresh":
+        return parser, TaskRequest(
+            command="php-host-refresh",
+            php_host_refresh_config_path=args.config_path,
+            php_host_refresh_repo_root=args.repo_root,
+            php_host_refresh_cache_dir=args.cache_dir,
+            php_host_refresh_static_html_dir=args.static_html_dir,
+            php_host_refresh_skip_rebuild_index=bool(args.skip_rebuild_index),
+        )
     if args.command == "start":
         return parser, TaskRequest(command="start")
     if args.command == "test":
@@ -217,6 +259,8 @@ def run_task(request: TaskRequest) -> int:
         return run_rebuild_index(repo_root_text=request.rebuild_index_repo_root)
     if request.command == "php-host-setup":
         return run_php_host_setup(request)
+    if request.command == "php-host-refresh":
+        return run_php_host_refresh(request)
     if request.command == "start":
         return run_start()
     if request.command == "test":
@@ -313,6 +357,85 @@ def run_rebuild_index(*, repo_root_text: str | None = None) -> int:
     return 0
 
 
+def clear_directory_contents(path: Path) -> tuple[int, int]:
+    if not path.exists():
+        return 0, 0
+    removed_files = 0
+    removed_dirs = 0
+    for entry in sorted(path.iterdir(), key=lambda candidate: candidate.as_posix(), reverse=True):
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+            removed_dirs += 1
+        else:
+            entry.unlink()
+            removed_files += 1
+    return removed_files, removed_dirs
+
+
+def run_php_host_refresh(request: TaskRequest) -> int:
+    config_path = (
+        Path(request.php_host_refresh_config_path).expanduser()
+        if request.php_host_refresh_config_path
+        else php_host_config_path(REPO_ROOT)
+    )
+    runtime_config = None
+    if (
+        request.php_host_refresh_repo_root is None
+        or request.php_host_refresh_cache_dir is None
+        or request.php_host_refresh_static_html_dir is None
+    ):
+        try:
+            runtime_config = load_php_host_runtime_config(config_path)
+        except ValueError as exc:
+            if request.php_host_refresh_cache_dir is None and request.php_host_refresh_static_html_dir is None:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print(f"Warning: {exc}", file=sys.stderr)
+
+    repo_root = (
+        Path(request.php_host_refresh_repo_root).expanduser()
+        if request.php_host_refresh_repo_root
+        else runtime_config.repo_root if runtime_config and runtime_config.repo_root else REPO_ROOT
+    ).resolve()
+    cache_dir = (
+        Path(request.php_host_refresh_cache_dir).expanduser()
+        if request.php_host_refresh_cache_dir
+        else runtime_config.cache_dir if runtime_config else None
+    )
+    static_html_dir = (
+        Path(request.php_host_refresh_static_html_dir).expanduser()
+        if request.php_host_refresh_static_html_dir
+        else runtime_config.static_html_dir if runtime_config else None
+    )
+
+    if cache_dir is None and static_html_dir is None:
+        print(
+            "No PHP-host cache paths were resolved. Configure `cache_dir` or `static_html_dir`, or pass overrides.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"PHP host refresh target repo: {repo_root}")
+    if not request.php_host_refresh_skip_rebuild_index:
+        rebuild_post_index(repo_root)
+        print(f"Rebuilt post index for {repo_root}")
+
+    if cache_dir is not None:
+        removed_files, removed_dirs = clear_directory_contents(cache_dir)
+        print(f"Cleared PHP microcache at {cache_dir} ({removed_files} files, {removed_dirs} directories removed).")
+    else:
+        print("Skipped PHP microcache clearing because no cache_dir was configured.")
+
+    if static_html_dir is not None:
+        removed_files, removed_dirs = clear_directory_contents(static_html_dir)
+        print(
+            f"Cleared static HTML artifacts at {static_html_dir} ({removed_files} files, {removed_dirs} directories removed)."
+        )
+    else:
+        print("Skipped static HTML clearing because no static_html_dir was configured.")
+    return 0
+
+
 def run_php_host_setup(request: TaskRequest) -> int:
     setup_request = PhpHostSetupRequest(
         public_web_root=request.public_web_root,
@@ -326,7 +449,11 @@ def run_php_host_setup(request: TaskRequest) -> int:
             request.public_web_root,
             non_interactive=request.non_interactive,
         )
-        config = resolve_php_host_setup_config(setup_request, repo_root=REPO_ROOT)
+        config = resolve_php_host_setup_config(
+            setup_request,
+            repo_root=REPO_ROOT,
+            public_web_root=public_web_root,
+        )
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -343,6 +470,7 @@ def run_php_host_setup(request: TaskRequest) -> int:
     print(f"App root: {config.app_root}")
     print(f"Forum repo root: {config.repo_root}")
     print(f"Cache dir: {config.cache_dir}")
+    print(f"Static HTML dir: {config.static_html_dir}")
     if linked:
         for target, source in linked:
             print(f"Linked {target} -> {source}")

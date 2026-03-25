@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -25,6 +26,15 @@ class PhpHostSetupConfig:
     app_root: Path
     repo_root: Path
     cache_dir: Path
+    static_html_dir: Path
+
+
+@dataclass(frozen=True)
+class PhpHostRuntimeConfig:
+    app_root: Path | None
+    repo_root: Path | None
+    cache_dir: Path | None
+    static_html_dir: Path | None
 
 
 def setup_prompt_value(
@@ -73,6 +83,7 @@ def confirm_php_host_setup(
     print(f"- Application checkout: {config.app_root}")
     print(f"- Forum data repository: {config.repo_root}")
     print(f"- PHP cache directory: {config.cache_dir}")
+    print(f"- Static HTML directory: {config.static_html_dir}")
     response = setup_prompt_value("Continue", default_value="Y/n", input_func=input_func).lower()
     return response in ("", "y", "yes")
 
@@ -101,6 +112,10 @@ def default_php_host_cache_dir(repo_root: Path) -> Path:
     if configured:
         return Path(configured).expanduser()
     return default_php_host_repo_root(repo_root) / "state" / "php_host_cache"
+
+
+def default_php_host_static_html_dir(public_web_root: Path) -> Path:
+    return public_web_root / "_static_html"
 
 
 def _normalize_path(raw_value: str) -> Path:
@@ -137,6 +152,7 @@ def resolve_php_host_setup_config(
     request: PhpHostSetupRequest,
     *,
     repo_root: Path,
+    public_web_root: Path,
     input_func: Callable[[str], str] | None = None,
 ) -> PhpHostSetupConfig:
     if input_func is None:
@@ -162,10 +178,12 @@ def resolve_php_host_setup_config(
         non_interactive=request.non_interactive,
         input_func=input_func,
     )
+    static_html_dir = default_php_host_static_html_dir(public_web_root)
     return PhpHostSetupConfig(
         app_root=app_root,
         repo_root=forum_repo_root,
         cache_dir=cache_dir,
+        static_html_dir=static_html_dir,
     )
 
 
@@ -181,6 +199,7 @@ def render_php_host_config(config: PhpHostSetupConfig) -> str:
             f"    'app_root' => {config.app_root.as_posix()!r},",
             f"    'repo_root' => {config.repo_root.as_posix()!r},",
             f"    'cache_dir' => {config.cache_dir.as_posix()!r},",
+            f"    'static_html_dir' => {config.static_html_dir.as_posix()!r},",
             "    'microcache_ttl' => 5,",
             "];",
             "",
@@ -192,8 +211,30 @@ def write_php_host_config(repo_root: Path, config: PhpHostSetupConfig) -> Path:
     config_path = php_host_config_path(repo_root)
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config.cache_dir.mkdir(parents=True, exist_ok=True)
+    config.static_html_dir.mkdir(parents=True, exist_ok=True)
     config_path.write_text(render_php_host_config(config), encoding="utf-8")
     return config_path
+
+
+def load_php_host_runtime_config(config_path: Path) -> PhpHostRuntimeConfig:
+    if not config_path.exists():
+        raise ValueError(f"Missing PHP host config: {config_path}")
+
+    text = config_path.read_text(encoding="utf-8")
+    values = dict(re.findall(r"'([^']+)'\s*=>\s*'([^']*)'", text))
+
+    def maybe_path(key: str) -> Path | None:
+        value = values.get(key, "").strip()
+        if value == "":
+            return None
+        return Path(value).expanduser()
+
+    return PhpHostRuntimeConfig(
+        app_root=maybe_path("app_root"),
+        repo_root=maybe_path("repo_root"),
+        cache_dir=maybe_path("cache_dir"),
+        static_html_dir=maybe_path("static_html_dir"),
+    )
 
 
 def ensure_public_web_root(path: Path) -> Path:

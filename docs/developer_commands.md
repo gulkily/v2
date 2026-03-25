@@ -14,6 +14,7 @@ Use `./forum` as the short repo-root command for common local tasks.
 - `./forum content-purge records/posts --apply --archive-output /tmp/forum-posts.zip`: archive the selected content outside the repo and rewrite reachable history to remove it.
 - `./forum rebuild-index`: force a full rebuild of the derived post index for the current checkout.
 - `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
+- `./forum php-host-refresh`: rebuild the derived post index and clear the configured PHP microcache plus generated static HTML artifacts.
 - `./forum start`: run the local read-only forum server.
 - `./forum test`: run the full unittest suite.
 - `./forum test test_profile_update_page.py`: run one unittest discovery pattern.
@@ -40,7 +41,7 @@ The command contract is intentionally small: future backends such as Perl should
 
 ## PHP-host refresh after purge or rewrite
 - For the Python read path, run `./forum rebuild-index` after a destructive history rewrite so the derived SQLite post index matches the new checkout.
-- For the PHP-primary path, also clear the configured PHP microcache directory (`cache_dir`) and generated static HTML tree (`static_html_dir`) from `forum_host_config.php`.
+- For the PHP-primary path, `./forum php-host-refresh` rebuilds the index and clears the configured PHP microcache directory (`cache_dir`) plus generated static HTML tree (`static_html_dir`) from `forum_host_config.php`.
 - The PHP shim launches the Python CGI bridge per request, so stale frontend output after a purge is usually cached data, not a long-lived Python worker.
 
 ## Direct entrypoints still supported
@@ -72,6 +73,7 @@ The command contract is intentionally small: future backends such as Perl should
 - The supported PHP-primary deployment profile is documented in [php_primary_host_installation.md](/home/wsl/v2/docs/php_primary_host_installation.md).
 - The documented source checkout for that profile is `https://github.com/gulkily/v2`.
 - Run `./forum php-host-setup /absolute/path/to/public-web-root` from the deployed checkout to generate `php_host/public/forum_host_config.php` and symlink `index.php`, `.htaccess`, and `forum_host_config.php` into the public web root when the host allows symlinks.
+- The generated config now includes `static_html_dir` alongside `cache_dir`, so `./forum php-host-refresh` can clear both cache layers without manual path lookup.
 - Keep `php_host/public/forum_host_config.example.php` tracked as the example shape and let `php_host/public/forum_host_config.php` remain ignored as host-local state.
 - If the host rejects symlinks, follow the command output for the manual fallback instead of editing `index.php` directly.
 - The PHP adapter keeps the existing `/api/create_thread` and `/api/create_reply` routes intact rather than introducing PHP-specific write endpoints.

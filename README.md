@@ -72,6 +72,7 @@ If you prefer a repo-local virtual environment instead of a user-profile install
 - `./forum git-recover`
 - `./forum content-purge records/posts`
 - `./forum rebuild-index`
+- `./forum php-host-refresh`
 - `./forum start`
 - `./forum test`
 
@@ -91,9 +92,8 @@ For future clean-start resets, operators can archive and purge canonical content
 
 If the PHP-primary frontend still shows stale threads after a history rewrite or large cleanup:
 
-- Rebuild the derived index with `./forum rebuild-index`.
-- Clear the PHP microcache directory configured as `cache_dir` in `forum_host_config.php`.
-- Clear the generated static HTML tree configured as `static_html_dir` in `forum_host_config.php`.
+- Run `./forum php-host-refresh`.
+- If you only need the Python read path, `./forum rebuild-index` still rebuilds the derived index by itself.
 
 ## Deployment
 
