@@ -200,6 +200,17 @@ class ComposeThreadPageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('data-signing-debug-enabled="true"', body)
 
+    def test_compose_thread_page_can_disable_username_claim_cta_via_feature_flag(self) -> None:
+        status, _, body = self.get_with_env(
+            "/compose/thread",
+            extra_env={"FORUM_ENABLE_USERNAME_CLAIM_CTA": "0"},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn('data-username-claim-cta', body)
+        self.assertNotIn('/assets/username_claim_cta.js', body)
+        self.assertNotIn("Choose your username", body)
+
     def test_compose_thread_page_source_uses_multiline_shared_shell_blocks(self) -> None:
         status, _, body = self.get("/compose/thread")
 

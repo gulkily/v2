@@ -37,6 +37,14 @@ def merge_feature_enabled(env: dict[str, str] | None = None) -> bool:
     return raw_value in {"1", "true", "yes", "on"}
 
 
+def username_claim_cta_enabled(env: dict[str, str] | None = None) -> bool:
+    source_env = os.environ if env is None else env
+    raw_value = source_env.get("FORUM_ENABLE_USERNAME_CLAIM_CTA")
+    if raw_value is None:
+        return True
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def site_title(env: dict[str, str] | None = None) -> str:
     source_env = os.environ if env is None else env
     configured = source_env.get("FORUM_SITE_TITLE", "").strip()
@@ -256,15 +264,20 @@ def render_page(
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()
-    if page_banner_html is None:
+    cta_enabled = username_claim_cta_enabled()
+    if page_banner_html is None and cta_enabled:
         page_banner_html = render_username_claim_cta_html()
+    elif page_banner_html is None:
+        page_banner_html = ""
+    cta_head_html = render_username_claim_cta_head_bootstrap() if cta_enabled else ""
+    cta_script_html = render_username_claim_cta_script_tag() if cta_enabled else ""
     head_extras_html = _join_html_blocks(
-        render_username_claim_cta_head_bootstrap(),
+        cta_head_html,
         head_extras_html,
     )
     page_script_html = _join_html_blocks(
         render_profile_nav_script_tag(),
-        render_username_claim_cta_script_tag(),
+        cta_script_html,
         render_copy_field_script_tag(),
         page_script_html,
     )

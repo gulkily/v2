@@ -176,6 +176,35 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('class="site-header-band"', enabled_body)
         self.assertIn("Kindness first.", enabled_body)
 
+    def test_board_index_can_disable_username_claim_cta_via_feature_flag(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "FORUM_REPO_ROOT": str(self.repo_root),
+                "FORUM_ENABLE_USERNAME_CLAIM_CTA": "0",
+            },
+            clear=False,
+        ):
+            environ = {
+                "PATH_INFO": "/",
+                "QUERY_STRING": "",
+                "REQUEST_METHOD": "GET",
+                "CONTENT_LENGTH": "0",
+                "wsgi.input": BytesIO(b""),
+            }
+            response: dict[str, object] = {}
+
+            def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+                response["status"] = status
+                response["headers"] = headers
+
+            body = b"".join(application(environ, start_response)).decode("utf-8")
+
+        self.assertEqual(response["status"], "200 OK")
+        self.assertNotIn('data-username-claim-cta', body)
+        self.assertNotIn('/assets/username_claim_cta.js', body)
+        self.assertNotIn("Choose your username", body)
+
     def test_board_index_uses_configured_site_title_when_present(self) -> None:
         with mock.patch.dict(
             os.environ,
