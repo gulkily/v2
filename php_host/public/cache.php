@@ -123,7 +123,7 @@ function forum_request_cookie_names(): array
 function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
 {
     $candidate = $path ?? forum_request_path();
-    return $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt';
+    return $candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt';
 }
 
 function forum_request_has_cache_busting_credentials(?string $path = null): bool

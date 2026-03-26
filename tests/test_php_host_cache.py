@@ -351,6 +351,14 @@ process.stdout.write(signature);
             ),
             "yes",
         )
+        self.assertEqual(
+            self.php_cache_helper(
+                "echo forum_static_html_request() ? 'yes' : 'no';",
+                path="/",
+                cookie="forum_identity_hint=test",
+            ),
+            "yes",
+        )
 
     def test_static_html_public_path_maps_allowlisted_routes_to_index_files(self) -> None:
         expected_root = (Path(self.static_tempdir.name) / "_static_html").as_posix()
@@ -540,14 +548,24 @@ process.stdout.write(signature);
         self.assertIn("X-Forum-Static-Html: HIT", second["headers"])
         self.assertIn("Project FAQ", second["body"])
 
-    def test_board_index_still_bypasses_cache_when_identity_hint_cookie_is_present(self) -> None:
-        first = self.php_request("/", cookie="forum_identity_hint=test")
-        second = self.php_request("/", cookie="forum_identity_hint=test")
+    def test_board_index_uses_cache_with_identity_hint_cookie_when_cta_is_disabled(self) -> None:
+        previous_value = os.environ.get("FORUM_ENABLE_USERNAME_CLAIM_CTA")
+        os.environ["FORUM_ENABLE_USERNAME_CLAIM_CTA"] = "0"
+        try:
+            first = self.php_request("/", cookie="forum_identity_hint=test")
+            second = self.php_request("/", cookie="forum_identity_hint=test")
+        finally:
+            if previous_value is None:
+                os.environ.pop("FORUM_ENABLE_USERNAME_CLAIM_CTA", None)
+            else:
+                os.environ["FORUM_ENABLE_USERNAME_CLAIM_CTA"] = previous_value
 
         self.assertEqual(first["status"], 200)
         self.assertEqual(second["status"], 200)
-        self.assertNotIn("X-Forum-Static-Html: HIT", first["headers"])
-        self.assertNotIn("X-Forum-Static-Html: HIT", second["headers"])
+        self.assertIn("X-Forum-Php-Cache: MISS", first["headers"])
+        self.assertIn("X-Forum-Static-Html: HIT", second["headers"])
+        self.assertNotIn("data-username-claim-cta", first["body"])
+        self.assertNotIn("data-username-claim-cta", second["body"])
 
 
 if __name__ == "__main__":
