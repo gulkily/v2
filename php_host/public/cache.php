@@ -74,7 +74,7 @@ function forum_asset_request_path(?string $path = null): ?string
 function forum_static_html_request_path(?string $path = null): ?string
 {
     $candidate = $path ?? forum_request_path();
-    if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/') {
+    if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/activity/') {
         return $candidate;
     }
     if ($candidate === '/compose/thread' || $candidate === '/compose/thread/') {
@@ -126,7 +126,7 @@ function forum_request_cookie_names(): array
 function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
 {
     $candidate = $path ?? forum_request_path();
-    if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt') {
+    if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt' || $candidate === '/activity/') {
         return true;
     }
     if ($candidate === '/compose/thread' || $candidate === '/compose/thread/') {
@@ -298,7 +298,7 @@ function forum_cacheable_read_request(): bool
     if (forum_asset_request_path($path) !== null) {
         return false;
     }
-    if ($path === '/' || $path === '/instance/' || $path === '/llms.txt' || $path === '/moderation/') {
+    if ($path === '/' || $path === '/instance/' || $path === '/llms.txt' || $path === '/moderation/' || $path === '/activity/') {
         return true;
     }
     if ($path === '/compose/thread' || $path === '/compose/thread/') {

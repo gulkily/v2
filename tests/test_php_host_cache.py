@@ -375,6 +375,23 @@ process.stdout.write(signature);
             ),
             "no",
         )
+        self.assertEqual(
+            self.php_cache_helper(
+                "putenv('FORUM_ENABLE_USERNAME_CLAIM_CTA=0'); echo forum_static_html_request() ? 'yes' : 'no';",
+                path="/activity/",
+                cookie="forum_identity_hint=test",
+            ),
+            "yes",
+        )
+        self.assertEqual(
+            self.php_cache_helper(
+                "putenv('FORUM_ENABLE_USERNAME_CLAIM_CTA=0'); echo forum_static_html_request() ? 'yes' : 'no';",
+                path="/activity/",
+                query_string="view=code",
+                cookie="forum_identity_hint=test",
+            ),
+            "no",
+        )
 
     def test_static_html_public_path_maps_allowlisted_routes_to_index_files(self) -> None:
         expected_root = (Path(self.static_tempdir.name) / "_static_html").as_posix()
@@ -603,6 +620,27 @@ process.stdout.write(signature);
         self.assertNotIn("data-username-claim-cta", second["body"])
         self.assertIn("Compose a signed thread", first["body"])
         self.assertIn("Compose a signed thread", second["body"])
+
+    def test_activity_page_uses_cache_with_identity_hint_cookie_when_cta_is_disabled(self) -> None:
+        previous_value = os.environ.get("FORUM_ENABLE_USERNAME_CLAIM_CTA")
+        os.environ["FORUM_ENABLE_USERNAME_CLAIM_CTA"] = "0"
+        try:
+            first = self.php_request("/activity/", cookie="forum_identity_hint=test")
+            second = self.php_request("/activity/", cookie="forum_identity_hint=test")
+        finally:
+            if previous_value is None:
+                os.environ.pop("FORUM_ENABLE_USERNAME_CLAIM_CTA", None)
+            else:
+                os.environ["FORUM_ENABLE_USERNAME_CLAIM_CTA"] = previous_value
+
+        self.assertEqual(first["status"], 200)
+        self.assertEqual(second["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", first["headers"])
+        self.assertIn("X-Forum-Static-Html: HIT", second["headers"])
+        self.assertNotIn("data-username-claim-cta", first["body"])
+        self.assertNotIn("data-username-claim-cta", second["body"])
+        self.assertIn("Repository activity", first["body"])
+        self.assertIn("Repository activity", second["body"])
 
 
 if __name__ == "__main__":
