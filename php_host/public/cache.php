@@ -5,6 +5,7 @@ declare(strict_types=1);
 const FORUM_PHP_MICROCACHE_TTL_SECONDS = 5;
 const FORUM_PHP_ASSET_CACHE_MAX_AGE_SECONDS = 3600;
 const FORUM_PHP_POST_INDEX_REBUILD_QUERY_PARAM = '__forum_rebuild';
+const FORUM_IDENTITY_HINT_COOKIE_NAME = 'forum_identity_hint';
 
 function forum_request_path(): string
 {
@@ -97,6 +98,57 @@ function forum_static_html_request_path(?string $path = null): ?string
     return null;
 }
 
+function forum_request_cookie_names(): array
+{
+    $rawCookie = $_SERVER['HTTP_COOKIE'] ?? '';
+    if (!is_string($rawCookie) || trim($rawCookie) === '') {
+        return [];
+    }
+    $names = [];
+    foreach (explode(';', $rawCookie) as $part) {
+        $trimmed = trim($part);
+        if ($trimmed === '') {
+            continue;
+        }
+        $segments = explode('=', $trimmed, 2);
+        $name = trim($segments[0]);
+        if ($name === '') {
+            continue;
+        }
+        $names[] = $name;
+    }
+    return $names;
+}
+
+function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
+{
+    $candidate = $path ?? forum_request_path();
+    return $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt';
+}
+
+function forum_request_has_cache_busting_credentials(?string $path = null): bool
+{
+    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER'])) {
+        return true;
+    }
+    if (!isset($_SERVER['HTTP_COOKIE'])) {
+        return false;
+    }
+    $cookieNames = forum_request_cookie_names();
+    if ($cookieNames === []) {
+        return false;
+    }
+    if (!forum_identity_hint_cookie_cache_safe_path($path)) {
+        return true;
+    }
+    foreach ($cookieNames as $cookieName) {
+        if ($cookieName !== FORUM_IDENTITY_HINT_COOKIE_NAME) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function forum_static_html_request(): bool
 {
     if (forum_request_method() !== 'GET') {
@@ -105,14 +157,14 @@ function forum_static_html_request(): bool
     if (forum_post_index_rebuild_request()) {
         return false;
     }
-    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
+    $path = forum_request_path();
+    if (forum_request_has_cache_busting_credentials($path)) {
         return false;
     }
     if (forum_request_query_string() !== '') {
         return false;
     }
 
-    $path = forum_request_path();
     if (forum_asset_request_path($path) !== null) {
         return false;
     }
@@ -225,11 +277,11 @@ function forum_cacheable_read_request(): bool
     if (forum_post_index_rebuild_request()) {
         return false;
     }
-    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
-        return false;
-    }
 
     $path = forum_request_path();
+    if (forum_request_has_cache_busting_credentials($path)) {
+        return false;
+    }
     if (forum_asset_request_path($path) !== null) {
         return false;
     }

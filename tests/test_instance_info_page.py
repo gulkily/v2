@@ -11,6 +11,7 @@ from textwrap import dedent
 from unittest import mock
 
 from forum_core.operation_events import OperationEvent, OperationStep, operation_events_path, start_operation, complete_operation
+from forum_core.post_index import ensure_post_index_current
 from forum_web.web import application
 
 
@@ -45,6 +46,7 @@ class InstanceInfoPageTests(unittest.TestCase):
         subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=self.repo_root, check=True)
         subprocess.run(["git", "add", "."], cwd=self.repo_root, check=True)
         subprocess.run(["git", "commit", "-m", "initial"], cwd=self.repo_root, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ensure_post_index_current(self.repo_root).connection.close()
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -104,6 +106,7 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("generic social feed", body)
         self.assertNotIn('class="breadcrumb"', body)
         self.assertNotIn('class="site-header-page-intro"', body)
+        self.assertNotIn('data-username-claim-cta', body)
         self.assertNotIn("One public page for the project assumptions", body)
 
     def test_instance_info_page_marks_missing_values(self) -> None:

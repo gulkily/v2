@@ -1943,6 +1943,7 @@ def render_instance_info_page() -> str:
             hero_text="",
             include_page_intro=False,
         ),
+        page_banner_html="",
     )
 
 

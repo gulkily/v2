@@ -136,6 +136,7 @@ process.stdout.write(signature);
         query_string: str = "",
         body: bytes = b"",
         content_type: str = "",
+        cookie: str = "",
     ) -> dict[str, object]:
         env = os.environ.copy()
         env.update(
@@ -156,6 +157,8 @@ process.stdout.write(signature);
                 "CONTENT_LENGTH": str(len(body)),
             }
         )
+        if cookie:
+            env["HTTP_COOKIE"] = cookie
         result = self.run_command(
             ["php-cgi", "-q", str(self.index_path)],
             input_bytes=body,
@@ -340,6 +343,14 @@ process.stdout.write(signature);
             ),
             "no",
         )
+        self.assertEqual(
+            self.php_cache_helper(
+                "echo forum_static_html_request() ? 'yes' : 'no';",
+                path="/instance/",
+                cookie="forum_identity_hint=test",
+            ),
+            "yes",
+        )
 
     def test_static_html_public_path_maps_allowlisted_routes_to_index_files(self) -> None:
         expected_root = (Path(self.static_tempdir.name) / "_static_html").as_posix()
@@ -511,6 +522,32 @@ process.stdout.write(signature);
         self.assertEqual(response["status"], 500)
         self.assertNotIn("X-Forum-Php-Native: HIT", response["headers"])
         self.assertIn("Forum CGI bridge failed.", response["body"])
+
+    def test_instance_page_uses_static_html_with_identity_hint_cookie(self) -> None:
+        first = self.php_request("/instance/", cookie="forum_identity_hint=test")
+
+        self.assertEqual(first["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", first["headers"])
+        self.assertIn("Project FAQ", first["body"])
+        self.assertEqual(
+            self.static_html_files(),
+            [Path(self.static_tempdir.name) / "_static_html" / "instance" / "index.html"],
+        )
+
+        second = self.php_request("/instance/", cookie="forum_identity_hint=test")
+
+        self.assertEqual(second["status"], 200)
+        self.assertIn("X-Forum-Static-Html: HIT", second["headers"])
+        self.assertIn("Project FAQ", second["body"])
+
+    def test_board_index_still_bypasses_cache_when_identity_hint_cookie_is_present(self) -> None:
+        first = self.php_request("/", cookie="forum_identity_hint=test")
+        second = self.php_request("/", cookie="forum_identity_hint=test")
+
+        self.assertEqual(first["status"], 200)
+        self.assertEqual(second["status"], 200)
+        self.assertNotIn("X-Forum-Static-Html: HIT", first["headers"])
+        self.assertNotIn("X-Forum-Static-Html: HIT", second["headers"])
 
 
 if __name__ == "__main__":
