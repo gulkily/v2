@@ -11,6 +11,7 @@ from typing import Callable
 from forum_core.identity import build_bootstrap_record_id
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
 from forum_core.operation_events import emit_operation_timing
+from forum_core.php_native_reads import refresh_php_native_read_artifacts
 from forum_core.post_index import refresh_post_index_after_commit
 from forum_core.public_keys import store_or_reuse_public_key, store_or_reuse_public_key_for_fingerprint
 from forum_web.repository import Post, index_posts, load_posts, parse_post_text
@@ -308,4 +309,5 @@ def commit_post(
         timing_callback=timing_callback,
     )
     record_timing("post_index_refresh", started_at)
+    refresh_php_native_read_artifacts(repo_root)
     return commit_id
