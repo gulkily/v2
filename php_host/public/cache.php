@@ -77,6 +77,9 @@ function forum_static_html_request_path(?string $path = null): ?string
     if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/') {
         return $candidate;
     }
+    if ($candidate === '/compose/thread' || $candidate === '/compose/thread/') {
+        return '/compose/thread/';
+    }
     if ($candidate === '/planning/task-priorities' || $candidate === '/planning/task-priorities/') {
         return $candidate;
     }
@@ -123,7 +126,17 @@ function forum_request_cookie_names(): array
 function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
 {
     $candidate = $path ?? forum_request_path();
-    return $candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt';
+    if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt') {
+        return true;
+    }
+    if ($candidate === '/compose/thread' || $candidate === '/compose/thread/') {
+        $ctaValue = getenv('FORUM_ENABLE_USERNAME_CLAIM_CTA');
+        if (!is_string($ctaValue) || $ctaValue === '') {
+            return false;
+        }
+        return !in_array(strtolower(trim($ctaValue)), ['1', 'true', 'yes', 'on'], true);
+    }
+    return false;
 }
 
 function forum_request_has_cache_busting_credentials(?string $path = null): bool
@@ -286,6 +299,9 @@ function forum_cacheable_read_request(): bool
         return false;
     }
     if ($path === '/' || $path === '/instance/' || $path === '/llms.txt' || $path === '/moderation/') {
+        return true;
+    }
+    if ($path === '/compose/thread' || $path === '/compose/thread/') {
         return true;
     }
     if (
