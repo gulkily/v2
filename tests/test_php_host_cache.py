@@ -240,6 +240,18 @@ process.stdout.write(signature);
         self.run_command(["git", "add", relative_path.as_posix()], cwd=self.data_repo_root)
         self.run_command(["git", "commit", "-m", f"Add {post_id}"], cwd=self.data_repo_root)
 
+    def write_php_native_board_index_snapshot(self, payload: dict[str, object]) -> Path:
+        snapshot_path = (
+            self.data_repo_root
+            / "state"
+            / "cache"
+            / "php_native_reads"
+            / "board_index_root.json"
+        )
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        return snapshot_path
+
     def test_php_host_caches_allowlisted_reads_and_marks_hit_headers(self) -> None:
         first = self.php_request("/api/list_index")
         second = self.php_request("/api/list_index")
@@ -372,8 +384,9 @@ process.stdout.write(signature);
         self.assertEqual(self.static_html_files(), [])
 
         refreshed = self.php_request("/")
-        self.assertIn("X-Forum-Php-Cache: MISS", refreshed["headers"])
+        self.assertIn("X-Forum-Php-Native: HIT", refreshed["headers"])
         self.assertIn("thread-php-cache-001", refreshed["body"])
+        self.assertEqual(self.cache_files(), [])
 
     def test_php_host_shows_status_page_before_blocking_rebuild_request(self) -> None:
         self.write_committed_post(
@@ -405,6 +418,99 @@ process.stdout.write(signature);
         self.assertIn("Hello", final_response["body"])
         self.assertNotIn("Refreshing the forum...", final_response["body"])
         self.assertEqual(len(self.cache_files()), 1)
+
+    def test_root_can_render_from_php_native_snapshot_without_python_bridge(self) -> None:
+        self.write_php_native_board_index_snapshot(
+            {
+                "route": "/",
+                "thread_rows": [
+                    {
+                        "post_id": "root-native-001",
+                        "thread_href": "/threads/root-native-001",
+                        "subject": "Native root thread",
+                        "preview": "Native preview line.",
+                        "tags": ["meta"],
+                        "reply_count": 2,
+                        "thread_type": "task",
+                    }
+                ],
+                "stats": {
+                    "post_count": 3,
+                    "thread_count": 1,
+                    "board_tag_count": 1,
+                },
+            }
+        )
+        self.config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    "    'app_root' => '/definitely/missing-app-root',",
+                    f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        response = self.php_request("/")
+
+        self.assertEqual(response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", response["headers"])
+        self.assertIn("/threads/root-native-001", response["body"])
+        self.assertIn("Native root thread", response["body"])
+        self.assertIn("Native preview line.", response["body"])
+        self.assertIn("[meta]", response["body"])
+        self.assertIn("2 replies", response["body"])
+        self.assertIn("task", response["body"])
+        self.assertIn("posts loaded", response["body"])
+        self.assertIn('href="/?format=rss"', response["body"])
+
+    def test_query_bearing_root_request_does_not_use_php_native_snapshot(self) -> None:
+        self.write_php_native_board_index_snapshot(
+            {
+                "route": "/",
+                "thread_rows": [],
+                "stats": {
+                    "post_count": 0,
+                    "thread_count": 0,
+                    "board_tag_count": 0,
+                },
+            }
+        )
+        self.config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    "    'app_root' => '/definitely/missing-app-root',",
+                    f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        response = self.php_request("/", query_string="board_tag=meta")
+
+        self.assertEqual(response["status"], 500)
+        self.assertNotIn("X-Forum-Php-Native: HIT", response["headers"])
+        self.assertIn("Forum CGI bridge failed.", response["body"])
 
 
 if __name__ == "__main__":
