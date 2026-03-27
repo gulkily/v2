@@ -40,3 +40,14 @@
   - Confirmed the eligible self-profile render shows the dedicated bar and the ineligible/public renders still hide it.
 - Notes:
   - This was a presentation refinement requested after the initial action-row implementation; behavior and eligibility rules stayed unchanged.
+
+## Stage 5 - Reuse the canonical account setup bar markup
+- Changes:
+  - Added a shared `render_username_claim_bar_html(...)` helper in [templates.py](/home/wsl/v2/forum_web/templates.py) so both account setup modules render from the same canonical markup.
+  - Updated the mid-page self-profile module to use that shared helper, removing the extra custom wrapper treatment and matching the top module's copy and CTA text exactly.
+  - Adjusted the profile-page tests to assert the canonical `Choose your username` button and shared body copy.
+- Verification:
+  - Ran `python -m unittest tests.test_profile_update_page tests.test_my_profile_empty_state`.
+  - Confirmed the eligible self-profile bar matches the canonical account setup pattern and the visibility behavior is unchanged.
+- Notes:
+  - This change removes future drift risk between the header-level account setup surface and the profile-page version by centralizing the markup.

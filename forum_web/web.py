@@ -108,6 +108,7 @@ from forum_web.templates import (
     load_template,
     merge_feature_enabled,
     render_page,
+    render_username_claim_bar_html,
     render_profile_nav_script_tag,
     reset_current_username_claim_cta_state,
     set_current_username_claim_cta_state,
@@ -1255,16 +1256,9 @@ def render_profile_page(
     )
     username_settings_bar_html = ""
     if self_request and profile_can_update_username(summary=summary, identity_context=identity_context):
-        username_settings_bar_html = (
-            '<section class="site-username-claim panel page-section" data-profile-username-settings-bar>'
-            '<div class="site-username-claim-copy">'
-            "<p class=\"site-username-claim-kicker\">Account setup</p>"
-            "<p class=\"site-username-claim-text\">You can still choose a username for this profile.</p>"
-            "</div>"
-            f'<a class="thread-chip site-username-claim-link" href="/profiles/{html.escape(profile_slug)}/update">'
-            "Username settings"
-            "</a>"
-            "</section>"
+        username_settings_bar_html = render_username_claim_bar_html(
+            href=f"/profiles/{profile_slug}/update",
+            data_attribute_html="data-profile-username-settings-bar",
         )
     profile_action_links: list[str] = []
     if merge_enabled:

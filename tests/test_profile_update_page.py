@@ -72,7 +72,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertNotIn(">username settings<", body)
+        self.assertNotIn(">Choose your username<", body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
     def test_self_profile_page_shows_username_settings_link_when_eligible(self) -> None:
@@ -81,8 +81,9 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('data-profile-username-settings-bar', body)
         self.assertIn("Account setup", body)
+        self.assertIn("Now that you're participating, you can choose a username.", body)
         self.assertIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
-        self.assertIn(">Username settings<", body)
+        self.assertIn(">Choose your username<", body)
 
     def test_self_profile_page_hides_username_settings_link_after_visible_claim(self) -> None:
         self.write_record(
@@ -102,7 +103,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertNotIn('data-profile-username-settings-bar', body)
         self.assertNotIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
-        self.assertNotIn(">Username settings<", body)
+        self.assertNotIn(">Choose your username<", body)
 
     def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
         self.write_record(

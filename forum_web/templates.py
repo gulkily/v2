@@ -70,6 +70,25 @@ def _indent_html_block(block: str, spaces: int) -> str:
     return indent(block.strip(), " " * spaces)
 
 
+def render_username_claim_bar_html(
+    *,
+    href: str,
+    data_attribute_html: str = "",
+) -> str:
+    data_attribute = f" {data_attribute_html.strip()}" if data_attribute_html.strip() else ""
+    return _html_block(
+        f"""
+        <section class="site-username-claim panel"{data_attribute}>
+          <div class="site-username-claim-copy">
+            <p class="site-username-claim-kicker">Account setup</p>
+            <p class="site-username-claim-text">Now that you're participating, you can choose a username.</p>
+          </div>
+          <a class="thread-chip site-username-claim-link" href="{html.escape(href, quote=True)}">Choose your username</a>
+        </section>
+        """
+    )
+
+
 def render_primary_nav(*, aria_label: str = "Primary") -> str:
     links = [
         ("/", "Home"),
@@ -174,17 +193,7 @@ def render_username_claim_cta_html(state: UsernameClaimBannerState | None = None
     current_state = state if state is not None else _CURRENT_USERNAME_CLAIM_BANNER_STATE.get()
     href = current_state.update_href if current_state is not None and current_state.update_href else ""
     return _join_html_blocks(
-        _html_block(
-            f"""
-            <section class="site-username-claim panel" data-username-claim-cta>
-              <div class="site-username-claim-copy">
-                <p class="site-username-claim-kicker">Account setup</p>
-                <p class="site-username-claim-text">Now that you're participating, you can choose a username.</p>
-              </div>
-              <a class="thread-chip site-username-claim-link" data-username-claim-link href="{html.escape(href, quote=True)}">Choose your username</a>
-            </section>
-            """
-        ),
+        render_username_claim_bar_html(href=href, data_attribute_html='data-username-claim-cta'),
         _html_block(
             """
             <script>
