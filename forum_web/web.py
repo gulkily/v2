@@ -1153,6 +1153,7 @@ def render_profile_page(
     posts: list[Post],
     identity_context,
     route_path: str,
+    self_request: bool,
 ) -> str:
     posts_index = index_posts(posts)
     merge_enabled = merge_feature_enabled()
@@ -2047,6 +2048,7 @@ def render_profile_for_request(identity_id: str, *, self_request: bool) -> str:
         posts=posts,
         identity_context=identity_context,
         route_path=f"/profiles/{identity_slug(summary.identity_id)}",
+        self_request=self_request,
     )
 
 
@@ -2065,6 +2067,7 @@ def render_profile_by_username(username: str) -> str:
         posts=posts,
         identity_context=identity_context,
         route_path=f"/user/{username_route_token(username)}",
+        self_request=False,
     )
 
 
