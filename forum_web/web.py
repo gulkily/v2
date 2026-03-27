@@ -1157,6 +1157,7 @@ def render_profile_page(
 ) -> str:
     posts_index = index_posts(posts)
     merge_enabled = merge_feature_enabled()
+    profile_slug = identity_slug(summary.identity_id)
     post_links_html = "".join(
         render_post_link_chip(post_id, posts_index)
         for post_id in summary.post_ids
@@ -1252,16 +1253,23 @@ def render_profile_page(
         if preferred_href.startswith("/user/")
         else "<span>no unambiguous current username route</span>"
     )
+    profile_action_links: list[str] = []
+    if self_request and profile_can_update_username(summary=summary, identity_context=identity_context):
+        profile_action_links.append(
+            f'<a class="thread-chip" href="/profiles/{html.escape(profile_slug)}/update">'
+            "username settings"
+            "</a>"
+        )
+    if merge_enabled:
+        profile_action_links.append(
+            f'<a class="thread-chip" href="/profiles/{html.escape(profile_slug)}/merge">'
+            "manage merges"
+            "</a>"
+        )
     content = load_template("profile.html").substitute(
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
-        profile_action_html=(
-            f'<a class="thread-chip" href="/profiles/{html.escape(identity_slug(summary.identity_id))}/merge">'
-            "manage merges"
-            "</a>"
-            if merge_enabled
-            else ""
-        ),
+        profile_action_html="".join(profile_action_links),
         stat_html=(
             '<div class="stat-grid">'
             + (
