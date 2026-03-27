@@ -45,10 +45,10 @@ class ProfileUpdatePageTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
 
-    def get(self, path: str) -> tuple[str, dict[str, str], str]:
+    def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": "GET",
             "CONTENT_LENGTH": "0",
             "wsgi.input": BytesIO(b""),
@@ -74,7 +74,34 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn('data-username-claim-cta', body)
         self.assertIn('/assets/username_claim_cta.js', body)
+        self.assertNotIn(">username settings<", body)
         self.assertNotIn("You can still claim one username for this profile.", body)
+
+    def test_self_profile_page_shows_username_settings_link_when_eligible(self) -> None:
+        status, _, body = self.get(f"/profiles/{PROFILE_SLUG}", "self=1")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
+        self.assertIn(">username settings<", body)
+
+    def test_self_profile_page_hides_username_settings_link_after_visible_claim(self) -> None:
+        self.write_record(
+            "records/profile-updates/profile-update-alpha.txt",
+            f"""
+            Record-ID: profile-update-alpha
+            Action: set_display_name
+            Source-Identity-ID: {IDENTITY_ID}
+            Timestamp: 2026-03-18T00:00:00Z
+
+            claimed-name
+            """,
+        )
+
+        status, _, body = self.get(f"/profiles/{PROFILE_SLUG}", "self=1")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
+        self.assertNotIn(">username settings<", body)
 
     def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
         self.write_record(

@@ -19,3 +19,13 @@
   - Confirmed the existing profile page tests still pass after the action-row change.
 - Notes:
   - The user-facing link text is `username settings` to match the request for a settings-oriented entry point from `My profile`.
+
+## Stage 3 - Add self-profile visibility regression coverage
+- Changes:
+  - Extended `tests/test_profile_update_page.py` so profile page requests can pass a query string.
+  - Added focused assertions proving eligible `?self=1` profile renders show `username settings`, ineligible `?self=1` renders hide it, and normal public profile renders continue to omit it.
+- Verification:
+  - Ran `python -m unittest tests.test_profile_update_page tests.test_my_profile_empty_state`.
+  - Confirmed all targeted tests passed with the new self-profile coverage in place.
+- Notes:
+  - The regression coverage stays local to existing profile page tests and does not duplicate the separate shared CTA asset tests.
