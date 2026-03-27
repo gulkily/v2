@@ -1267,10 +1267,15 @@ def render_profile_page(
             "manage merges"
             "</a>"
         )
+    profile_action_row_html = (
+        '<div class="action-row link-cluster">' + "".join(profile_action_links) + "</div>"
+        if profile_action_links
+        else ""
+    )
     content = load_template("profile.html").substitute(
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
-        profile_action_html="".join(profile_action_links),
+        profile_action_row_html=profile_action_row_html,
         username_settings_bar_html=username_settings_bar_html,
         stat_html=(
             '<div class="stat-grid">'

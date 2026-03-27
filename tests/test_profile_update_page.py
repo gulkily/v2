@@ -72,6 +72,7 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
+        self.assertNotIn('<div class="action-row link-cluster">', body)
         self.assertNotIn(">Choose your username<", body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 

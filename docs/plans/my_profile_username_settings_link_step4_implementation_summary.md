@@ -51,3 +51,14 @@
   - Confirmed the eligible self-profile bar matches the canonical account setup pattern and the visibility behavior is unchanged.
 - Notes:
   - This change removes future drift risk between the header-level account setup surface and the profile-page version by centralizing the markup.
+
+## Stage 6 - Remove the empty profile action-row gap
+- Changes:
+  - Restored conditional rendering for the profile header action row so the wrapper only appears when there is an actual action such as `manage merges`.
+  - Updated the profile template to consume a prebuilt `profile_action_row_html` block instead of always rendering an empty action container.
+  - Added a regression assertion proving the plain public profile render no longer includes an empty action-row wrapper.
+- Verification:
+  - Ran `python -m unittest tests.test_profile_update_page tests.test_my_profile_empty_state`.
+  - Confirmed the dedicated account setup bar still renders correctly and the old blank space in the profile header is gone.
+- Notes:
+  - This addresses the layout gap left behind after moving the self-profile username action out of the header action row.
