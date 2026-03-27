@@ -29,3 +29,14 @@
   - Confirmed all targeted tests passed with the new self-profile coverage in place.
 - Notes:
   - The regression coverage stays local to existing profile page tests and does not duplicate the separate shared CTA asset tests.
+
+## Stage 4 - Present the self-profile link as a dedicated bar
+- Changes:
+  - Moved the self-profile username entry point out of the action row and into a dedicated full-width bar on the profile page.
+  - Reused the existing `site-username-claim` presentation language so the self-profile bar matches the established `Account setup` treatment.
+  - Updated profile page tests to assert the dedicated bar instead of an action-chip presentation.
+- Verification:
+  - Ran `python -m unittest tests.test_profile_update_page tests.test_my_profile_empty_state`.
+  - Confirmed the eligible self-profile render shows the dedicated bar and the ineligible/public renders still hide it.
+- Notes:
+  - This was a presentation refinement requested after the initial action-row implementation; behavior and eligibility rules stayed unchanged.

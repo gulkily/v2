@@ -1253,13 +1253,20 @@ def render_profile_page(
         if preferred_href.startswith("/user/")
         else "<span>no unambiguous current username route</span>"
     )
-    profile_action_links: list[str] = []
+    username_settings_bar_html = ""
     if self_request and profile_can_update_username(summary=summary, identity_context=identity_context):
-        profile_action_links.append(
-            f'<a class="thread-chip" href="/profiles/{html.escape(profile_slug)}/update">'
-            "username settings"
+        username_settings_bar_html = (
+            '<section class="site-username-claim panel page-section" data-profile-username-settings-bar>'
+            '<div class="site-username-claim-copy">'
+            "<p class=\"site-username-claim-kicker\">Account setup</p>"
+            "<p class=\"site-username-claim-text\">You can still choose a username for this profile.</p>"
+            "</div>"
+            f'<a class="thread-chip site-username-claim-link" href="/profiles/{html.escape(profile_slug)}/update">'
+            "Username settings"
             "</a>"
+            "</section>"
         )
+    profile_action_links: list[str] = []
     if merge_enabled:
         profile_action_links.append(
             f'<a class="thread-chip" href="/profiles/{html.escape(profile_slug)}/merge">'
@@ -1270,6 +1277,7 @@ def render_profile_page(
         profile_heading=html.escape(summary.display_name),
         profile_subhead=html.escape(summary.identity_id),
         profile_action_html="".join(profile_action_links),
+        username_settings_bar_html=username_settings_bar_html,
         stat_html=(
             '<div class="stat-grid">'
             + (

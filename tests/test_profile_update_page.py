@@ -72,8 +72,6 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn('data-username-claim-cta', body)
-        self.assertIn('/assets/username_claim_cta.js', body)
         self.assertNotIn(">username settings<", body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
@@ -81,8 +79,10 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}", "self=1")
 
         self.assertEqual(status, "200 OK")
+        self.assertIn('data-profile-username-settings-bar', body)
+        self.assertIn("Account setup", body)
         self.assertIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
-        self.assertIn(">username settings<", body)
+        self.assertIn(">Username settings<", body)
 
     def test_self_profile_page_hides_username_settings_link_after_visible_claim(self) -> None:
         self.write_record(
@@ -100,8 +100,9 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}", "self=1")
 
         self.assertEqual(status, "200 OK")
+        self.assertNotIn('data-profile-username-settings-bar', body)
         self.assertNotIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
-        self.assertNotIn(">username settings<", body)
+        self.assertNotIn(">Username settings<", body)
 
     def test_profile_page_hides_username_update_link_after_visible_claim(self) -> None:
         self.write_record(
@@ -183,8 +184,6 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn('data-username-claim-cta', body)
-        self.assertIn('/assets/username_claim_cta.js', body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
     def test_profile_page_keeps_shared_cta_mount_when_only_linked_peer_has_claim(self) -> None:
@@ -247,7 +246,6 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn('data-username-claim-cta', body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
     def test_profile_update_page_renders_identity_context(self) -> None:
