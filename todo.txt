@@ -122,3 +122,6 @@ things that need to be folded into the dev process:
 	- why python and perl. a: python is widely used and understood, perl for backwards compatibility and ease of running (less likely to break between versions and systems).
 	- why textfiles and git. a: durable and machine- and human-accessible.
 	- why make it forkable. a: this creates an "insurance policy" for users against various non-consensual changes, such as admin mis-behavior, system being taken down, and allows for more creativity in developing the system. think of it as an open-source community.
+
+- we have a lot of different failure modes for server errors, and they all suck, and we need to fix them. example:
+	- Signed posting failed: <!doctype html> <html lang="en"> <head> <meta charset="utf-8"> <title>Server Error</title> </head> <body> <pre>database is locked</pre> </body> </html>
