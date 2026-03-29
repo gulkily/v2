@@ -353,6 +353,24 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("Working tree is not clean", stderr.getvalue())
 
+    def test_run_git_upgrade_allows_ignored_static_html_artifacts(self) -> None:
+        _, _, clone = self.setup_origin_clone()
+        self.module.REPO_ROOT = clone
+        exclude_path = clone / ".git" / "info" / "exclude"
+        exclude_path.write_text("php_host/public/_static_html/\n", encoding="utf-8")
+        static_path = clone / "php_host" / "public" / "_static_html" / "index.html"
+        static_path.parent.mkdir(parents=True, exist_ok=True)
+        static_path.write_text("<html></html>\n", encoding="utf-8")
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_git_upgrade()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertIn("Git upgrade complete", stdout.getvalue())
+
     def test_run_task_dispatches_content_purge_preview(self) -> None:
         request = self.module.TaskRequest(
             command="content-purge",

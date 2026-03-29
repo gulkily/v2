@@ -5,3 +5,4 @@ __pycache__/
 state/cache/
 state/php_host_cache/
 php_host/public/forum_host_config.php
+php_host/public/_static_html/
