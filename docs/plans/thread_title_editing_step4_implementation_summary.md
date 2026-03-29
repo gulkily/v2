@@ -36,3 +36,13 @@
   - `python -m unittest tests.test_thread_title_update_page tests.test_thread_title_update_submission`
 - Notes:
   - This stage reuses the existing browser signing flow instead of introducing a second client-side signing path.
+
+## Stage 5 - Regression coverage and policy hardening
+- Changes:
+  - Added moderator authorization coverage for thread title updates.
+  - Added an explicit regression that a successful title update leaves the stored root post `Subject:` unchanged while API read surfaces report the resolved current title.
+  - Re-ran the focused end-to-end thread-title test set across parser, API, page, visibility, and discovery surfaces.
+- Verification:
+  - `python -m unittest tests.test_thread_title_updates tests.test_thread_title_update_submission tests.test_thread_title_update_visibility tests.test_thread_title_update_page tests.test_llm_api tests.test_llms_txt`
+- Notes:
+  - This stage closes the remaining policy and readback gaps without expanding the feature surface.

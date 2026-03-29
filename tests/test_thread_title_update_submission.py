@@ -56,6 +56,7 @@ class ThreadTitleUpdateSubmissionTests(unittest.TestCase):
         other = self.generate_signing_keypair(name="Other")
         self.other_private_key_text = other["privateKey"]
         self.other_public_key_text = other["PublicKey"] if "PublicKey" in other else other["publicKey"]
+        self.other_fingerprint = fingerprint_from_public_key_text(self.other_public_key_text)
 
     def tearDown(self) -> None:
         self.repo_tempdir.cleanup()
@@ -127,11 +128,12 @@ process.stdout.write(signature);
         *,
         method: str = "GET",
         body: bytes = b"",
+        query_string: str = "",
         extra_env: dict[str, str] | None = None,
     ) -> tuple[str, dict[str, str], str]:
         environ = {
             "PATH_INFO": path,
-            "QUERY_STRING": "",
+            "QUERY_STRING": query_string,
             "REQUEST_METHOD": method,
             "CONTENT_LENGTH": str(len(body)),
             "wsgi.input": BytesIO(body),
@@ -180,6 +182,8 @@ process.stdout.write(signature);
         self.assertTrue((self.repo_root / "records/thread-title-updates/thread-title-update-001.txt").exists())
         self.assertEqual(len(captured_logs.output), 1)
         self.assertIn("update_thread_title timings for thread-title-update-001:", captured_logs.output[0])
+        root_text = (self.repo_root / "records/posts/thread-001.txt").read_text(encoding="ascii")
+        self.assertIn("Subject: Original title", root_text)
 
     def test_api_update_thread_title_rejects_non_owner_when_flag_is_off(self) -> None:
         payload_text = dedent(
@@ -236,6 +240,67 @@ process.stdout.write(signature);
         self.assertEqual(status, "200 OK")
         self.assertIn("Record-ID: thread-title-update-003", body)
         self.assertIn("Title: Community retitle", body)
+
+    def test_api_update_thread_title_allows_configured_moderator(self) -> None:
+        payload_text = dedent(
+            """
+            Record-ID: thread-title-update-004
+            Thread-ID: thread-001
+            Timestamp: 2026-03-28T12:03:00Z
+
+            Moderator retitle
+            """
+        ).lstrip()
+        signature_text = self.sign_payload(payload_text, private_key_text=self.other_private_key_text)
+        request_body = json.dumps(
+            {
+                "payload": payload_text,
+                "signature": signature_text,
+                "public_key": self.other_public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        status, _, body = self.request(
+            "/api/update_thread_title",
+            method="POST",
+            body=request_body,
+            extra_env={"FORUM_MODERATOR_FINGERPRINTS": self.other_fingerprint},
+        )
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Title: Moderator retitle", body)
+
+    def test_owner_update_keeps_root_subject_unchanged_while_api_reports_current_title(self) -> None:
+        payload_text = dedent(
+            """
+            Record-ID: thread-title-update-005
+            Thread-ID: thread-001
+            Timestamp: 2026-03-28T12:04:00Z
+
+            API-visible rename
+            """
+        ).lstrip()
+        signature_text = self.sign_payload(payload_text, private_key_text=self.owner_private_key_text)
+        request_body = json.dumps(
+            {
+                "payload": payload_text,
+                "signature": signature_text,
+                "public_key": self.owner_public_key_text,
+                "dry_run": False,
+            }
+        ).encode("utf-8")
+
+        status, _, _ = self.request("/api/update_thread_title", method="POST", body=request_body)
+        self.assertEqual(status, "200 OK")
+
+        root_text = (self.repo_root / "records/posts/thread-001.txt").read_text(encoding="ascii")
+        self.assertIn("Subject: Original title", root_text)
+
+        thread_status, _, thread_body = self.request("/api/get_thread", query_string="thread_id=thread-001")
+        self.assertEqual(thread_status, "200 OK")
+        self.assertIn("Current-Title: API-visible rename", thread_body)
+        self.assertIn("Subject: Original title", thread_body)
 
 
 if __name__ == "__main__":
