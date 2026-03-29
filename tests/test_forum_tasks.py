@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import subprocess
 import shutil
 import sys
 import tempfile
@@ -36,6 +37,44 @@ class ForumTasksTests(unittest.TestCase):
 
     def write_example(self, text: str) -> None:
         (self.repo_root / ".env.example").write_text(text, encoding="utf-8")
+
+    def git(self, repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            check=check,
+            text=True,
+            capture_output=True,
+        )
+
+    def init_repo(self, repo: Path) -> None:
+        repo.mkdir(parents=True, exist_ok=True)
+        self.git(repo, "init", "-b", "main")
+        self.git(repo, "config", "user.email", "test@example.com")
+        self.git(repo, "config", "user.name", "Test User")
+
+    def commit_file(self, repo: Path, relative_path: str, content: str, message: str) -> None:
+        path = repo / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        self.git(repo, "add", relative_path)
+        self.git(repo, "commit", "-m", message)
+
+    def setup_origin_clone(self) -> tuple[Path, Path, Path]:
+        seed = self.repo_root / "seed"
+        self.init_repo(seed)
+        self.commit_file(seed, "base.txt", "base\n", "init")
+
+        origin = self.repo_root / "origin.git"
+        self.git(seed, "init", "--bare", str(origin))
+        self.git(seed, "remote", "add", "origin", str(origin))
+        self.git(seed, "push", "-u", "origin", "main")
+
+        clone = self.repo_root / "clone"
+        self.git(self.repo_root, "clone", str(origin), str(clone))
+        self.git(clone, "config", "user.email", "test@example.com")
+        self.git(clone, "config", "user.name", "Test User")
+        return origin, seed, clone
 
     def write_php_host_sources(self) -> None:
         public_dir = self.repo_root / "php_host" / "public"
@@ -77,6 +116,22 @@ class ForumTasksTests(unittest.TestCase):
         self.assertIsNotNone(request)
         self.assertEqual(request.command, "git-recover")
         self.assertTrue(request.git_recover_apply)
+
+    def test_parse_task_args_accepts_git_upgrade(self) -> None:
+        _, request = self.module.parse_task_args(["git-upgrade"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "git-upgrade")
+        self.assertEqual(request.git_upgrade_remote, "origin")
+        self.assertEqual(request.git_upgrade_branch, "main")
+
+    def test_parse_task_args_accepts_git_upgrade_overrides(self) -> None:
+        _, request = self.module.parse_task_args(["git-upgrade", "--remote", "upstream", "--branch", "release"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "git-upgrade")
+        self.assertEqual(request.git_upgrade_remote, "upstream")
+        self.assertEqual(request.git_upgrade_branch, "release")
 
     def test_parse_task_args_accepts_content_purge_preview(self) -> None:
         _, request = self.module.parse_task_args(["content-purge", "records/posts", "records/identity"])
@@ -254,6 +309,49 @@ class ForumTasksTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         mocked.assert_called_once_with(self.repo_root, apply=True)
+
+    def test_run_task_dispatches_git_upgrade(self) -> None:
+        request = self.module.TaskRequest(command="git-upgrade", git_upgrade_remote="origin", git_upgrade_branch="main")
+
+        with mock.patch.object(self.module, "run_git_upgrade", return_value=0) as mocked:
+            exit_code = self.module.run_task(request)
+
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(remote_name="origin", branch_name="main")
+
+    def test_run_git_upgrade_fetches_and_merges_origin_main(self) -> None:
+        origin, seed, clone = self.setup_origin_clone()
+        self.module.REPO_ROOT = clone
+        self.commit_file(clone, "records/posts/local.txt", "local\n", "local content")
+        self.commit_file(seed, "app.txt", "remote\n", "remote code")
+        self.git(seed, "push", "origin", "main")
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_git_upgrade()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        log_subjects = self.git(clone, "log", "--pretty=%s", "-3").stdout.strip().splitlines()
+        self.assertIn("Merge remote-tracking branch 'origin/main'", log_subjects[0])
+        self.assertTrue((clone / "records" / "posts" / "local.txt").exists())
+        self.assertTrue((clone / "app.txt").exists())
+        self.assertTrue(origin.exists())
+
+    def test_run_git_upgrade_rejects_dirty_checkout(self) -> None:
+        _, _, clone = self.setup_origin_clone()
+        self.module.REPO_ROOT = clone
+        (clone / "base.txt").write_text("changed\n", encoding="utf-8")
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_git_upgrade()
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("Working tree is not clean", stderr.getvalue())
 
     def test_run_task_dispatches_content_purge_preview(self) -> None:
         request = self.module.TaskRequest(

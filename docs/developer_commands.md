@@ -10,6 +10,7 @@ Use `./forum` as the short repo-root command for common local tasks.
 - `./forum env-sync`: append missing `.env` settings from `.env.example` without overwriting existing values.
 - `./forum git-recover`: diagnose the current checkout for common deploy-sync git failures.
 - `./forum git-recover --apply`: reset the checkout back to local `main` tracking `origin/main`, discarding local commits and working-tree changes when needed.
+- `./forum git-upgrade`: fetch `origin` and merge `origin/main` into the current local branch without discarding local commits.
 - `./forum content-purge records/posts`: preview archival-plus-history purge for one or more canonical `records/` paths.
 - `./forum content-purge records/posts --apply --archive-output /tmp/forum-posts.zip`: archive the selected content outside the repo and rewrite reachable history to remove it.
 - `./forum rebuild-index`: force a full rebuild of the derived post index for the current checkout.
@@ -25,6 +26,13 @@ The command contract is intentionally small: future backends such as Perl should
 - `./forum git-recover` is the canonical operator diagnosis path when a checkout is failing normal `git pull`.
 - `--apply` resets the checkout to the expected deployment state and may discard local commits, staged changes, tracked edits, and untracked files to get back to `origin/main`.
 - Mid-operation states such as rebase-in-progress and merge-in-progress are diagnosed, but still require explicit operator resolution before rerunning `--apply`.
+
+## Git upgrade
+- `./forum git-upgrade` is the normal production-safe update path when the deployed checkout may contain local content commits that should be retained.
+- The command runs `git fetch <remote>` and then `git merge --no-edit <remote>/<branch>` into the current local branch.
+- Defaults are `--remote origin` and `--branch main`.
+- The command refuses to run when the checkout is dirty, detached, or already in the middle of a merge or rebase.
+- Use `./forum git-recover --apply` only for break-glass checkout repair, not routine upgrades.
 
 ## Content purge
 - `./forum content-purge [<records-path> ...]` previews an operator-only archive-plus-history-rewrite workflow for canonical content under `records/`.

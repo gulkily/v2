@@ -52,6 +52,8 @@ class TaskRequest:
     install_target: str | None = None
     test_pattern: str | None = None
     git_recover_apply: bool = False
+    git_upgrade_remote: str | None = None
+    git_upgrade_branch: str | None = None
     content_purge_paths: tuple[str, ...] = ()
     content_purge_archive_output: str | None = None
     content_purge_apply: bool = False
@@ -101,6 +103,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="Apply a repair by resetting the checkout to the expected deployment state.",
+    )
+    git_upgrade_parser = subparsers.add_parser(
+        "git-upgrade",
+        help="Fetch and merge the latest upstream branch into the current local branch.",
+    )
+    git_upgrade_parser.add_argument(
+        "--remote",
+        default="origin",
+        help="Remote to fetch from. Defaults to origin.",
+    )
+    git_upgrade_parser.add_argument(
+        "--branch",
+        default="main",
+        help="Remote branch to merge. Defaults to main.",
     )
     content_purge_parser = subparsers.add_parser(
         "content-purge",
@@ -203,6 +219,12 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         return parser, TaskRequest(command="env-sync")
     if args.command == "git-recover":
         return parser, TaskRequest(command="git-recover", git_recover_apply=bool(args.apply))
+    if args.command == "git-upgrade":
+        return parser, TaskRequest(
+            command="git-upgrade",
+            git_upgrade_remote=args.remote,
+            git_upgrade_branch=args.branch,
+        )
     if args.command == "content-purge":
         return parser, TaskRequest(
             command="content-purge",
@@ -245,6 +267,11 @@ def run_task(request: TaskRequest) -> int:
         return run_env_sync()
     if request.command == "git-recover":
         return run_git_recover(REPO_ROOT, apply=request.git_recover_apply)
+    if request.command == "git-upgrade":
+        return run_git_upgrade(
+            remote_name=request.git_upgrade_remote or "origin",
+            branch_name=request.git_upgrade_branch or "main",
+        )
     if request.command == "content-purge":
         return run_content_purge(
             REPO_ROOT,
@@ -350,6 +377,80 @@ def run_start() -> int:
         return 1
     command = [sys.executable, str(REPO_ROOT / "scripts/run_read_only.py")]
     return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
+
+
+def run_git_command(*args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=REPO_ROOT,
+        check=check,
+        text=True,
+        capture_output=True,
+    )
+
+
+def current_git_branch() -> str:
+    result = run_git_command("branch", "--show-current")
+    return result.stdout.strip()
+
+
+def git_checkout_is_clean() -> tuple[bool, str]:
+    status = run_git_command("status", "--short")
+    if status.returncode != 0:
+        return False, "Unable to read git status."
+    if status.stdout.strip():
+        return False, "Working tree is not clean; commit, stash, or remove local changes before upgrading."
+    return True, ""
+
+
+def git_operation_in_progress() -> str | None:
+    git_dir_result = run_git_command("rev-parse", "--git-dir")
+    if git_dir_result.returncode != 0:
+        return "Unable to resolve git metadata directory."
+    git_dir = Path(git_dir_result.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = (REPO_ROOT / git_dir).resolve()
+    if (git_dir / "MERGE_HEAD").exists():
+        return "Merge in progress; resolve or abort it before upgrading."
+    if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
+        return "Rebase in progress; resolve or abort it before upgrading."
+    return None
+
+
+def run_git_upgrade(*, remote_name: str = "origin", branch_name: str = "main") -> int:
+    branch = current_git_branch()
+    if not branch:
+        print("Detached HEAD; check out the local deployment branch before upgrading.", file=sys.stderr)
+        return 1
+
+    in_progress_message = git_operation_in_progress()
+    if in_progress_message is not None:
+        print(in_progress_message, file=sys.stderr)
+        return 1
+
+    is_clean, clean_message = git_checkout_is_clean()
+    if not is_clean:
+        print(clean_message, file=sys.stderr)
+        return 1
+
+    upstream_ref = f"{remote_name}/{branch_name}"
+    print(f"Fetching {remote_name}...")
+    fetch_result = run_git_command("fetch", remote_name)
+    if fetch_result.returncode != 0:
+        print(fetch_result.stderr.strip() or f"`git fetch {remote_name}` failed.", file=sys.stderr)
+        return fetch_result.returncode
+
+    print(f"Merging {upstream_ref} into local `{branch}`...")
+    merge_result = run_git_command("merge", "--no-edit", upstream_ref)
+    if merge_result.returncode != 0:
+        print(merge_result.stderr.strip() or merge_result.stdout.strip() or f"`git merge {upstream_ref}` failed.", file=sys.stderr)
+        return merge_result.returncode
+
+    output = merge_result.stdout.strip()
+    if output:
+        print(output)
+    print(f"Git upgrade complete: local `{branch}` now includes `{upstream_ref}`.")
+    return 0
 
 
 def run_rebuild_index(*, repo_root_text: str | None = None) -> int:
