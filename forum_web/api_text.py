@@ -98,10 +98,12 @@ def render_index_text(
     visible_reply_counts: dict[str, int] | None = None,
     pinned_thread_ids: frozenset[str] | None = None,
     locked_thread_ids: frozenset[str] | None = None,
+    current_titles: dict[str, str] | None = None,
 ) -> str:
     reply_counts = visible_reply_counts or {}
     pinned_ids = pinned_thread_ids or frozenset()
     locked_ids = locked_thread_ids or frozenset()
+    title_map = current_titles or {}
     lines = [
         "Command: list_index",
         f"Board-Tag: {board_tag or 'all'}",
@@ -113,7 +115,7 @@ def render_index_text(
             "\t".join(
                 [
                     thread.root.post_id,
-                    thread.root.subject or "",
+                    title_map.get(thread.root.post_id, thread.root.subject or ""),
                     " ".join(thread.root.board_tags),
                     str(reply_counts.get(thread.root.post_id, len(thread.replies))),
                     "pinned" if thread.root.post_id in pinned_ids else "",
@@ -129,10 +131,12 @@ def render_thread_text(
     *,
     hidden_post_ids: frozenset[str] | None = None,
     locked: bool = False,
+    current_title: str | None = None,
 ) -> str:
     hidden_ids = hidden_post_ids or frozenset()
     lines = [
         f"Thread-ID: {thread.root.post_id}",
+        f"Current-Title: {current_title or thread.root.subject or thread.root.post_id}",
         f"Thread-State: {'locked' if locked else 'open'}",
         f"Record-Count: {1 + len(thread.replies)}",
         "",

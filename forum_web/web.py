@@ -43,6 +43,11 @@ from forum_core.moderation import (
     post_is_hidden,
     thread_is_hidden,
 )
+from forum_core.thread_title_updates import (
+    load_thread_title_update_records,
+    resolve_current_thread_title,
+    thread_title_updates_dir,
+)
 from forum_cgi.identity_links import submit_identity_link
 from forum_cgi.merge_requests import submit_merge_request
 from forum_cgi.moderation import submit_moderation
@@ -537,6 +542,22 @@ def load_repository_state():
     return posts, threads, board_tags, moderation_records, moderation_state, identity_context
 
 
+def load_thread_title_updates(repo_root: Path):
+    return load_thread_title_update_records(thread_title_updates_dir(repo_root))
+
+
+def resolved_thread_title(thread, title_updates) -> str:
+    return resolve_current_thread_title(
+        thread_id=thread.root.post_id,
+        root_subject=thread.root.subject or "Untitled thread",
+        updates=title_updates,
+    )
+
+
+def resolved_thread_heading(thread, title_updates) -> str:
+    return resolved_thread_title(thread, title_updates) or thread.root.post_id
+
+
 @dataclass(frozen=True)
 class CommitFileSummary:
     total_files: int
@@ -995,12 +1016,13 @@ def load_board_feed_items(repo_root: Path, *, board_tag: str | None) -> list[Fee
     threads = group_threads(posts)
     moderation_records = load_moderation_records(moderation_records_dir(repo_root))
     moderation_state = derive_moderation_state(moderation_records)
+    title_updates = load_thread_title_updates(repo_root)
     public_threads = visible_threads(threads, moderation_state, board_tag=board_tag, repo_root=repo_root)
     items: list[FeedItem] = []
     for thread in public_threads:
         items.append(
             FeedItem(
-                title=thread.root.subject or thread.root.post_id,
+                title=resolved_thread_heading(thread, title_updates),
                 link=f"/threads/{thread.root.post_id}",
                 description=first_line(thread.root.body) or "Thread update.",
                 guid=f"thread:{thread.root.post_id}",
@@ -1354,6 +1376,7 @@ def render_account_key_page() -> str:
 def render_board_index(*, board_tag: str | None = None) -> str:
     repo_root = get_repo_root()
     posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
     if board_tag and board_tag not in board_tags:
         raise LookupError(f"unknown board tag: {board_tag}")
     feed_href = "/?format=rss"
@@ -1363,6 +1386,7 @@ def render_board_index(*, board_tag: str | None = None) -> str:
         posts,
         threads,
         moderation_state,
+        title_updates=title_updates,
         repo_root=repo_root,
         board_tag=board_tag,
     )
@@ -1383,12 +1407,12 @@ def render_board_index(*, board_tag: str | None = None) -> str:
     )
 
 
-def build_board_index_page_context(posts, threads, moderation_state, *, repo_root: Path, board_tag: str | None = None) -> dict[str, str]:
+def build_board_index_page_context(posts, threads, moderation_state, *, title_updates, repo_root: Path, board_tag: str | None = None) -> dict[str, str]:
     public_threads = visible_threads(threads, moderation_state, board_tag=board_tag, repo_root=repo_root)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
     return {
         "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
-        "thread_rows_html": render_board_index_thread_rows(public_threads, moderation_state),
+        "thread_rows_html": render_board_index_thread_rows(public_threads, moderation_state, title_updates=title_updates),
     }
 
 
@@ -1404,15 +1428,15 @@ def render_board_index_stats(post_count: int, thread_count: int, board_tag_count
     )
 
 
-def render_board_index_thread_rows(threads, moderation_state) -> str:
+def render_board_index_thread_rows(threads, moderation_state, *, title_updates) -> str:
     return "\n".join(
-        render_board_index_thread_row(index, thread, moderation_state)
+        render_board_index_thread_row(index, thread, moderation_state, title_updates=title_updates)
         for index, thread in enumerate(threads, start=1)
     )
 
 
-def render_board_index_thread_row(rank: int, thread, moderation_state) -> str:
-    subject = thread.root.subject or "Untitled thread"
+def render_board_index_thread_row(rank: int, thread, moderation_state, *, title_updates) -> str:
+    subject = resolved_thread_heading(thread, title_updates)
     preview = first_line(thread.root.body) or "No preview available."
     visible_tags = [tag for tag in thread.root.board_tags if tag]
     if visible_tags == ["general"]:
@@ -1718,11 +1742,13 @@ def render_activity_rss(*, view_mode: str, page: int) -> bytes:
 
 
 def render_board_section(tag: str, threads, moderation_state) -> str:
+    repo_root = get_repo_root()
+    title_updates = load_thread_title_updates(repo_root)
     thread_cards = "".join(
         "<article class=\"thread-card\">"
         f"{render_thread_status_badges(thread.root.post_id, moderation_state, thread_type=root_thread_type(thread.root))}"
         f"<p class=\"thread-id\">{html.escape(thread.root.post_id)}</p>"
-        f"<h3><a href=\"/threads/{html.escape(thread.root.post_id)}\">{html.escape(thread.root.subject or 'Untitled thread')}</a></h3>"
+        f"<h3><a href=\"/threads/{html.escape(thread.root.post_id)}\">{html.escape(resolved_thread_heading(thread, title_updates))}</a></h3>"
         f"<p>{html.escape(first_line(thread.root.body))}</p>"
         f"<p class=\"thread-meta\">{visible_reply_count(thread, moderation_state)} repl{'y' if visible_reply_count(thread, moderation_state) == 1 else 'ies'}</p>"
         "</article>"
@@ -1738,7 +1764,9 @@ def render_board_section(tag: str, threads, moderation_state) -> str:
 
 
 def render_thread(thread_id: str) -> str:
+    repo_root = get_repo_root()
     posts, grouped_threads, _, _, moderation_state, identity_context = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
     threads = index_threads(grouped_threads)
     thread = threads.get(thread_id)
     if thread is None or thread_is_hidden(moderation_state, thread_id):
@@ -1796,9 +1824,10 @@ def render_thread(thread_id: str) -> str:
             ),
         )
     feed_href = f"/threads/{thread_id}?format=rss"
+    current_title = resolved_thread_heading(thread, title_updates)
 
     content = load_template("thread.html").substitute(
-        thread_heading=html.escape(thread.root.subject or thread.root.post_id),
+        thread_heading=html.escape(current_title),
         thread_meta_html=thread_meta_html,
         reply_link_html=reply_link_html,
         root_context_html=render_thread_root_context(thread),
@@ -1812,7 +1841,7 @@ def render_thread(thread_id: str) -> str:
         replies_section_html=replies_section_html,
     )
     return render_page(
-        title=thread.root.subject or thread.root.post_id,
+        title=current_title,
         hero_kicker="",
         hero_title="",
         hero_text="",
@@ -2683,7 +2712,9 @@ def render_task_filter_nav(*, current_mode: str) -> str:
 
 
 def render_task_priorities_page(*, view_mode: str) -> str:
+    repo_root = get_repo_root()
     _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
     task_threads = load_task_threads(grouped_threads, moderation_state)
     filtered_threads = filter_task_threads(task_threads, mode=view_mode)
     total_comments = sum(visible_reply_count(thread, moderation_state) for thread in task_threads)
@@ -2696,7 +2727,7 @@ def render_task_priorities_page(*, view_mode: str) -> str:
         "</div>"
     )
     rows_html = "".join(
-        render_task_priorities_row(thread, moderation_state=moderation_state)
+        render_task_priorities_row(thread, moderation_state=moderation_state, title_updates=title_updates)
         for thread in filtered_threads
     )
     if not rows_html:
@@ -2747,15 +2778,16 @@ def render_task_priorities_page(*, view_mode: str) -> str:
     )
 
 
-def render_task_priorities_row(thread, *, moderation_state) -> str:
+def render_task_priorities_row(thread, *, moderation_state, title_updates) -> str:
     task = thread.root.task_metadata
     assert task is not None
+    current_title = resolved_thread_heading(thread, title_updates)
     discussion_html, discussion_sort_value = render_task_thread_summary(thread, moderation_state=moderation_state)
     dependency_html = render_task_dependency_links(task.dependencies)
     return (
         f'<tr id="task-{html.escape(thread.root.post_id)}"'
         f' data-id="{html.escape(thread.root.post_id)}"'
-        f' data-task="{html.escape(thread.root.subject or thread.root.post_id)}"'
+        f' data-task="{html.escape(current_title)}"'
         f' data-impact="{task.presentability_impact:.2f}"'
         f' data-difficulty="{task.implementation_difficulty:.2f}"'
         f' data-dependencies="{html.escape(" ".join(task.dependencies))}"'
@@ -2763,7 +2795,7 @@ def render_task_priorities_row(thread, *, moderation_state) -> str:
         f' data-comments="{html.escape(discussion_sort_value)}">'
         f'<td><a class="task-id" href="/planning/tasks/{html.escape(thread.root.post_id)}">{html.escape(thread.root.post_id)}</a></td>'
         "<td>"
-        f'<h3 class="task-title"><a class="task-link" href="/planning/tasks/{html.escape(thread.root.post_id)}">{html.escape(thread.root.subject or thread.root.post_id)}</a></h3>'
+        f'<h3 class="task-title"><a class="task-link" href="/planning/tasks/{html.escape(thread.root.post_id)}">{html.escape(current_title)}</a></h3>'
         f'<p class="task-note">{html.escape(thread.root.body)}</p>'
         f'<p class="task-status">status {html.escape(task.status)}</p>'
         "</td>"
@@ -2842,7 +2874,9 @@ def render_task_detail_page(
     completion_result: TaskStatusUpdateResult | None = None,
     completion_error: str | None = None,
 ) -> str:
+    repo_root = get_repo_root()
     _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
     task_threads = load_task_threads(grouped_threads, moderation_state)
     thread = index_task_threads(task_threads).get(task_id)
     if thread is None:
@@ -2850,6 +2884,7 @@ def render_task_detail_page(
 
     task = thread.root.task_metadata
     assert task is not None
+    current_title = resolved_thread_heading(thread, title_updates)
     discussion_html = render_task_detail_discussion(thread, moderation_state=moderation_state)
     content = load_template("task_detail.html").substitute(
         breadcrumb_html=render_breadcrumb(
@@ -2859,7 +2894,7 @@ def render_task_detail_page(
                 (f"/planning/tasks/{thread.root.post_id}", thread.root.post_id),
             ]
         ),
-        task_heading=html.escape(thread.root.subject or thread.root.post_id),
+        task_heading=html.escape(current_title),
         task_id=html.escape(thread.root.post_id),
         task_status=html.escape(task.status),
         task_summary=html.escape(thread.root.body),
@@ -2875,9 +2910,9 @@ def render_task_detail_page(
         discussion_html=discussion_html,
     )
     return render_page(
-        title=thread.root.subject or thread.root.post_id,
+        title=current_title,
         hero_kicker="Task Detail",
-        hero_title=thread.root.subject or thread.root.post_id,
+        hero_title=current_title,
         hero_text="This task view is derived from one task-typed root thread. The root carries structured task metadata, and the same thread remains the discussion surface.",
         content_html=content,
     )
@@ -2923,6 +2958,7 @@ def render_api_home() -> str:
 def render_api_list_index(board_tag: str | None) -> str:
     repo_root = get_repo_root()
     _, threads, board_tags, _, moderation_state, _ = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
     if board_tag and board_tag not in board_tags:
         return render_bad_request_text(f"unknown board_tag: {board_tag}")
 
@@ -2937,6 +2973,7 @@ def render_api_list_index(board_tag: str | None) -> str:
         visible_reply_counts=reply_counts,
         pinned_thread_ids=moderation_state.pinned_thread_ids,
         locked_thread_ids=moderation_state.locked_thread_ids,
+        current_titles={thread.root.post_id: resolved_thread_heading(thread, title_updates) for thread in public_threads},
     )
 
 
@@ -2944,7 +2981,9 @@ def render_api_get_thread(thread_id: str | None) -> tuple[str, str]:
     if not thread_id:
         return "400 Bad Request", render_bad_request_text("missing required query parameter: thread_id")
 
+    repo_root = get_repo_root()
     _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
     thread = index_threads(grouped_threads).get(thread_id)
     if thread is None or thread_is_hidden(moderation_state, thread_id):
         return "404 Not Found", render_not_found_text("thread", thread_id)
@@ -2958,6 +2997,7 @@ def render_api_get_thread(thread_id: str | None) -> tuple[str, str]:
         thread,
         hidden_post_ids=hidden_post_ids,
         locked=moderation_state.locks_thread(thread_id),
+        current_title=resolved_thread_heading(thread, title_updates),
     )
 
 

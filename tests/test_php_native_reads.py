@@ -156,6 +156,33 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
             ],
         )
 
+    def test_build_board_index_snapshot_uses_resolved_thread_title(self) -> None:
+        self.write_record(
+            "records/posts/root-201.txt",
+            """
+            Post-ID: root-201
+            Board-Tags: general
+            Subject: Original title
+
+            Snapshot preview.
+            """,
+        )
+        self.write_record(
+            "records/thread-title-updates/thread-title-update-201.txt",
+            """
+            Record-ID: thread-title-update-201
+            Thread-ID: root-201
+            Timestamp: 2026-03-28T12:00:00Z
+
+            Snapshot renamed
+            """,
+        )
+        self.commit_paths("records/posts", "records/thread-title-updates", message="Seed renamed snapshot fixture")
+
+        snapshot = build_board_index_snapshot(self.repo_root)
+
+        self.assertEqual(snapshot["thread_rows"][0]["subject"], "Snapshot renamed")
+
 
 if __name__ == "__main__":
     unittest.main()

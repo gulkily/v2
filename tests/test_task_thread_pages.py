@@ -137,6 +137,26 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn('href="/threads/T01?format=rss"', body)
         self.assertNotIn('thread-chip--rss', body)
 
+    def test_task_views_use_resolved_thread_title_when_update_record_exists(self) -> None:
+        self.write_record(
+            "records/thread-title-updates/thread-title-update-task.txt",
+            """
+            Record-ID: thread-title-update-task
+            Thread-ID: T01
+            Timestamp: 2026-03-28T12:00:00Z
+
+            Renamed task thread
+            """,
+        )
+
+        _, _, thread_body = self.get("/threads/T01")
+        _, _, priorities_body = self.get("/planning/task-priorities/")
+        _, _, detail_body = self.get("/planning/tasks/T01")
+
+        self.assertIn("Renamed task thread", thread_body)
+        self.assertIn("Renamed task thread", priorities_body)
+        self.assertIn("Renamed task thread", detail_body)
+
     def test_thread_page_hides_empty_reply_metadata_and_section(self) -> None:
         self.write_record(
             "records/posts/thread-empty.txt",

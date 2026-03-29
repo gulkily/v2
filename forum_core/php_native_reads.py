@@ -6,6 +6,7 @@ from pathlib import Path
 
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
 from forum_core.post_index import IndexedPostRow, load_indexed_root_posts
+from forum_core.thread_title_updates import load_thread_title_update_records, resolve_current_thread_title, thread_title_updates_dir
 from forum_web.repository import group_threads, load_posts, root_thread_type
 
 
@@ -64,6 +65,7 @@ def build_board_index_snapshot(repo_root: Path) -> dict[str, object]:
     threads = group_threads(posts)
     moderation_state = derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root)))
     indexed_roots = load_indexed_root_posts(repo_root)
+    title_updates = load_thread_title_update_records(thread_title_updates_dir(repo_root))
     public_threads = sorted(
         [
             thread
@@ -79,7 +81,11 @@ def build_board_index_snapshot(repo_root: Path) -> dict[str, object]:
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
     thread_rows: list[dict[str, object]] = []
     for thread in public_threads:
-        subject = thread.root.subject or "Untitled thread"
+        subject = resolve_current_thread_title(
+            thread_id=thread.root.post_id,
+            root_subject=thread.root.subject or "Untitled thread",
+            updates=title_updates,
+        )
         preview = _first_line(thread.root.body) or "No preview available."
         visible_tags = tuple(tag for tag in thread.root.board_tags if tag and tag != "general")
         thread_rows.append(

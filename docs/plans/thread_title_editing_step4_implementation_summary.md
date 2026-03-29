@@ -16,3 +16,13 @@
   - `python -m unittest /home/wsl/v2/tests/test_thread_title_update_submission.py /home/wsl/v2/tests/test_llm_api.py /home/wsl/v2/tests/test_llms_txt.py`
 - Notes:
   - This stage adds the canonical write path and API discovery updates without changing read surfaces yet.
+
+## Stage 3 - Resolved title read surfaces
+- Changes:
+  - Added resolved current-title overlay support to board index, thread page, task/planning pages, text API thread/index reads, and PHP/native board snapshots.
+  - Kept raw root-post subject data intact while exposing the resolved title at thread-level read surfaces.
+  - Added focused visibility tests for HTML, API, task, and PHP/native read paths.
+- Verification:
+  - `python -m unittest tests.test_thread_title_update_visibility tests.test_task_thread_pages tests.test_php_native_reads tests.test_board_index_page.BoardIndexPageTests.test_board_index_uses_resolved_thread_title_when_update_record_exists`
+- Notes:
+  - This stage overlays current thread titles onto existing read surfaces without mutating root post content.

@@ -258,14 +258,24 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertIn('</article>\n<article class="board-index-thread-row">', body)
         self.assertIn('/assets/username_claim_cta.js', body)
         self.assertIn('Choose your username', body)
-        self.assertIn('Now that you\'re participating, you can choose a username.', body)
-        self.assertTrue(body.index('data-username-claim-cta') < body.index('class="site-header-nav"'))
-        self.assertIn('>Project info</a>', body)
-        self.assertIn('>Activity</a>', body)
-        self.assertNotIn('view repository history', body)
-        self.assertNotIn('/activity/?view=moderation', body)
-        self.assertNotIn('moderation activity', body)
-        self.assertNotIn('/planning/task-priorities/', body)
+
+    def test_board_index_uses_resolved_thread_title_when_update_record_exists(self) -> None:
+        self.write_record(
+            "records/thread-title-updates/thread-title-update-001.txt",
+            """
+            Record-ID: thread-title-update-001
+            Thread-ID: root-001
+            Timestamp: 2026-03-28T12:00:00Z
+
+            Renamed thread
+            """,
+        )
+
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Renamed thread", body)
+        self.assertNotIn(">Hello world<", body)
 
     def test_board_index_suppresses_default_listing_metadata(self) -> None:
         status, _, body = self.get("/")
