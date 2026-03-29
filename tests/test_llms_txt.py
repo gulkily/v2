@@ -45,6 +45,7 @@ class LlmsTxtTests(unittest.TestCase):
         self.assertIn("# v2 llms.txt", body)
         self.assertIn("GET /api/", body)
         self.assertIn("POST /api/create_thread", body)
+        self.assertIn("POST /api/update_thread_title", body)
         self.assertIn("GET /compose/thread", body)
         self.assertIn("Use /instance/ to inspect current public operator and deployment facts.", body)
 

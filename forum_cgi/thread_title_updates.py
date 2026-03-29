@@ -1,0 +1,235 @@
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+from forum_cgi.posting import (
+    PostingError,
+    build_commit_message,
+    commit_post,
+    ensure_ascii_text,
+    records_dir,
+    write_ascii_file,
+)
+from forum_cgi.signing import verify_detached_signature
+from forum_core.identity import build_identity_id
+from forum_core.public_keys import resolve_canonical_public_key_path, store_or_reuse_public_key
+from forum_core.thread_title_updates import (
+    ThreadTitleUpdateRecord,
+    parse_thread_title_update_text,
+    signer_can_update_thread_title,
+    thread_title_updates_dir,
+)
+from forum_web.repository import index_posts, load_posts
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ThreadTitleUpdateSubmissionResult:
+    command_name: str
+    record_id: str
+    thread_id: str
+    timestamp: str
+    title: str
+    stored_path: str
+    commit_id: str | None
+    dry_run: bool
+    signature_path: str | None = None
+    public_key_path: str | None = None
+    signer_fingerprint: str | None = None
+    identity_id: str | None = None
+
+
+def resolve_thread_title_update_path(repo_root: Path, record_id: str) -> Path:
+    return thread_title_updates_dir(repo_root) / f"{record_id}.txt"
+
+
+def resolve_thread_title_update_signature_path(repo_root: Path, record_id: str) -> Path:
+    return thread_title_updates_dir(repo_root) / f"{record_id}.txt.asc"
+
+
+def parse_thread_title_update_payload(payload_text: str) -> ThreadTitleUpdateRecord:
+    try:
+        return parse_thread_title_update_text(payload_text)
+    except ValueError as exc:
+        raise PostingError("bad_request", str(exc)) from exc
+
+
+def ensure_thread_title_update_record_id_available(record: ThreadTitleUpdateRecord, repo_root: Path) -> None:
+    if resolve_thread_title_update_path(repo_root, record.record_id).exists():
+        raise PostingError(
+            "conflict",
+            f"thread-title-update record already exists: {record.record_id}",
+            status="409 Conflict",
+        )
+
+
+def validate_thread_title_update_record(
+    record: ThreadTitleUpdateRecord,
+    repo_root: Path,
+    *,
+    signer_identity_id: str,
+    signer_fingerprint: str,
+) -> None:
+    posts = load_posts(records_dir(repo_root))
+    posts_by_id = index_posts(posts)
+    thread_root = posts_by_id.get(record.thread_id)
+    if thread_root is None or not thread_root.is_root:
+        raise PostingError("not_found", f"unknown thread: {record.thread_id}", status="404 Not Found")
+    if not signer_can_update_thread_title(
+        thread_owner_identity_id=thread_root.identity_id,
+        signer_identity_id=signer_identity_id,
+        signer_fingerprint=signer_fingerprint,
+    ):
+        raise PostingError("forbidden", "signer is not allowed to update this thread title", status="403 Forbidden")
+
+
+def build_thread_title_update_preview(
+    record: ThreadTitleUpdateRecord,
+    repo_root: Path,
+) -> ThreadTitleUpdateSubmissionResult:
+    return ThreadTitleUpdateSubmissionResult(
+        command_name="update_thread_title",
+        record_id=record.record_id,
+        thread_id=record.thread_id,
+        timestamp=record.timestamp,
+        title=record.title,
+        stored_path=str(resolve_thread_title_update_path(repo_root, record.record_id).relative_to(repo_root)),
+        commit_id=None,
+        dry_run=True,
+    )
+
+
+def store_thread_title_update_record(
+    record: ThreadTitleUpdateRecord,
+    repo_root: Path,
+    payload_text: str,
+    *,
+    signature_text: str,
+    public_key_text: str,
+    timing_callback=None,
+) -> tuple[str, str, str, str]:
+    updates_dir = thread_title_updates_dir(repo_root)
+    updates_dir.mkdir(parents=True, exist_ok=True)
+    record_path = write_ascii_file(
+        resolve_thread_title_update_path(repo_root, record.record_id),
+        ensure_ascii_text(payload_text, field_name="payload"),
+    )
+    signature_path = write_ascii_file(
+        resolve_thread_title_update_signature_path(repo_root, record.record_id),
+        ensure_ascii_text(signature_text, field_name="signature"),
+    )
+    stored_public_key = store_or_reuse_public_key(
+        repo_root=repo_root,
+        public_key_text=ensure_ascii_text(public_key_text, field_name="public_key"),
+    )
+    public_key_path = stored_public_key.path
+    commit_id = commit_post(
+        repo_root,
+        [record_path, signature_path, *([public_key_path] if stored_public_key.created else [])],
+        message=build_commit_message("update_thread_title", record.record_id),
+        timing_callback=timing_callback,
+    )
+    return (
+        commit_id,
+        str(record_path.relative_to(repo_root)),
+        str(signature_path.relative_to(repo_root)),
+        str(public_key_path.relative_to(repo_root)),
+    )
+
+
+def submit_thread_title_update(
+    payload_text: str,
+    repo_root: Path,
+    *,
+    dry_run: bool,
+    signature_text: str | None = None,
+    public_key_text: str | None = None,
+    require_signature: bool = True,
+) -> ThreadTitleUpdateSubmissionResult:
+    timing_measurements: list[tuple[str, float]] = []
+
+    def record_timing(phase_name: str, duration_ms: float) -> None:
+        timing_measurements.append((phase_name, duration_ms))
+
+    started_at = time.perf_counter()
+    payload_text = ensure_ascii_text(payload_text, field_name="payload")
+    record = parse_thread_title_update_payload(payload_text)
+    record_timing("parse_thread_title_update", (time.perf_counter() - started_at) * 1000.0)
+
+    if require_signature and (signature_text is None or public_key_text is None):
+        raise PostingError("bad_request", "signature and public_key are required")
+    if not signature_text or not public_key_text:
+        raise PostingError("bad_request", "signature and public_key must be provided together")
+
+    started_at = time.perf_counter()
+    signer_fingerprint = verify_detached_signature(
+        payload_text=payload_text,
+        signature_text=signature_text,
+        public_key_text=public_key_text,
+    )
+    record_timing("verify_detached_signature", (time.perf_counter() - started_at) * 1000.0)
+    signer_identity_id = build_identity_id(signer_fingerprint)
+
+    started_at = time.perf_counter()
+    validate_thread_title_update_record(
+        record,
+        repo_root,
+        signer_identity_id=signer_identity_id,
+        signer_fingerprint=signer_fingerprint,
+    )
+    record_timing("validate_thread_title_update", (time.perf_counter() - started_at) * 1000.0)
+    ensure_thread_title_update_record_id_available(record, repo_root)
+
+    signature_path = str(
+        resolve_thread_title_update_signature_path(repo_root, record.record_id).relative_to(repo_root)
+    )
+    public_key_path = str(resolve_canonical_public_key_path(repo_root, signer_fingerprint).relative_to(repo_root))
+
+    if dry_run:
+        preview = build_thread_title_update_preview(record, repo_root)
+        return ThreadTitleUpdateSubmissionResult(
+            command_name=preview.command_name,
+            record_id=preview.record_id,
+            thread_id=preview.thread_id,
+            timestamp=preview.timestamp,
+            title=preview.title,
+            stored_path=preview.stored_path,
+            commit_id=None,
+            dry_run=True,
+            signature_path=signature_path,
+            public_key_path=public_key_path,
+            signer_fingerprint=signer_fingerprint,
+            identity_id=signer_identity_id,
+        )
+
+    commit_id, stored_path, stored_signature_path, stored_public_key_path = store_thread_title_update_record(
+        record,
+        repo_root,
+        payload_text,
+        signature_text=signature_text,
+        public_key_text=public_key_text,
+        timing_callback=record_timing,
+    )
+    logger.info(
+        "update_thread_title timings for %s: %s",
+        record.record_id,
+        ", ".join(f"{phase_name}={duration_ms:.2f}ms" for phase_name, duration_ms in timing_measurements),
+    )
+    return ThreadTitleUpdateSubmissionResult(
+        command_name="update_thread_title",
+        record_id=record.record_id,
+        thread_id=record.thread_id,
+        timestamp=record.timestamp,
+        title=record.title,
+        stored_path=stored_path,
+        commit_id=commit_id,
+        dry_run=False,
+        signature_path=stored_signature_path,
+        public_key_path=stored_public_key_path,
+        signer_fingerprint=signer_fingerprint,
+        identity_id=signer_identity_id,
+    )

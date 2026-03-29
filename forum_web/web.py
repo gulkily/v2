@@ -50,6 +50,7 @@ from forum_cgi.posting import PostingError
 from forum_cgi.profile_updates import submit_profile_update
 from forum_cgi.service import submit_create_reply, submit_create_thread
 from forum_cgi.task_status import TaskStatusUpdateResult, submit_mark_task_done
+from forum_cgi.thread_title_updates import submit_thread_title_update
 from forum_cgi.text import (
     render_error_body,
     render_identity_link_result,
@@ -57,6 +58,7 @@ from forum_cgi.text import (
     render_moderation_result,
     render_profile_update_result,
     render_submission_result,
+    render_thread_title_update_result,
 )
 from forum_web.api_text import (
     render_api_home_text,
@@ -3315,6 +3317,20 @@ def render_api_update_profile(environ, *, default_dry_run: bool) -> tuple[str, s
     return "200 OK", render_profile_update_result(result)
 
 
+def render_api_update_thread_title(environ, *, default_dry_run: bool) -> tuple[str, str]:
+    payload = read_json_request(environ)
+    repo_root = get_repo_root()
+    result = submit_thread_title_update(
+        read_optional_text(payload, "payload") or "",
+        repo_root,
+        dry_run=parse_dry_run_flag(payload.get("dry_run"), default=default_dry_run),
+        signature_text=read_optional_text(payload, "signature"),
+        public_key_text=read_optional_text(payload, "public_key"),
+        require_signature=True,
+    )
+    return "200 OK", render_thread_title_update_result(result)
+
+
 def render_api_set_identity_hint(environ) -> tuple[str, str]:
     payload = read_json_request(environ)
     fingerprint = read_optional_text(payload, "fingerprint")
@@ -3468,6 +3484,18 @@ def _dispatch_application(environ, start_response):
                 start_response("405 Method Not Allowed", headers)
                 return [body]
             status, body_text = render_api_update_profile(environ, default_dry_run=False)
+            body = body_text.encode("utf-8")
+            headers = [("Content-Type", "text/plain; charset=utf-8")]
+            start_response(status, headers)
+            return [body]
+
+        if path == "/api/update_thread_title":
+            if method != "POST":
+                body = render_error_body("bad_request", "POST is required").encode("utf-8")
+                headers = [("Content-Type", "text/plain; charset=utf-8")]
+                start_response("405 Method Not Allowed", headers)
+                return [body]
+            status, body_text = render_api_update_thread_title(environ, default_dry_run=False)
             body = body_text.encode("utf-8")
             headers = [("Content-Type", "text/plain; charset=utf-8")]
             start_response(status, headers)
