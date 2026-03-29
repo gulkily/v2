@@ -1778,6 +1778,7 @@ def render_thread(thread_id: str) -> str:
         if not locked
         else '<p class="status-note">This thread is locked by moderation. New replies are disabled.</p>'
     )
+    change_title_link_html = f'<p><a class="thread-chip" href="/threads/{html.escape(thread.root.post_id)}/title">change title</a></p>'
     thread_labels = thread_status_labels(thread_id, moderation_state)
     visible_replies = visible_reply_count(thread, moderation_state)
     thread_meta = ""
@@ -1830,6 +1831,7 @@ def render_thread(thread_id: str) -> str:
         thread_heading=html.escape(current_title),
         thread_meta_html=thread_meta_html,
         reply_link_html=reply_link_html,
+        change_title_link_html=change_title_link_html,
         root_context_html=render_thread_root_context(thread),
         root_post_html=render_post_card(
             thread.root,
@@ -1853,6 +1855,43 @@ def render_thread(thread_id: str) -> str:
         ),
         content_html=content,
         head_extras_html=render_feed_head_link(feed_href),
+    )
+
+
+def render_thread_title_update_page(thread_id: str) -> str:
+    repo_root = get_repo_root()
+    _, grouped_threads, _, _, moderation_state, _ = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
+    thread = index_threads(grouped_threads).get(thread_id)
+    if thread is None or thread_is_hidden(moderation_state, thread_id):
+        raise LookupError(f"unknown thread: {thread_id}")
+
+    current_title = resolved_thread_heading(thread, title_updates)
+    content = load_template("thread_title_update.html").substitute(
+        dry_run_value="false",
+        thread_id=html.escape(thread.root.post_id),
+        current_title=html.escape(current_title),
+        title_value="",
+        submit_label="Submit title change",
+        signing_debug_enabled_value="true" if signing_debug_logging_enabled() else "false",
+        eligibility_text=html.escape(
+            "Server accepts the change only when the signing key belongs to the thread owner, a configured moderator, or any signed user if the permissive flag is enabled."
+        ),
+    )
+    return render_page(
+        title=f"Change title · {current_title}",
+        hero_kicker="",
+        hero_title="",
+        hero_text="",
+        content_html=content,
+        page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
+        page_header_html=render_site_header(
+            hero_kicker="",
+            hero_title="",
+            hero_text="",
+            include_page_intro=False,
+        ),
+        page_banner_html="",
     )
 
 
@@ -3930,6 +3969,19 @@ def _dispatch_application(environ, start_response):
             headers = [("Content-Type", "text/javascript; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
+
+        if path.startswith("/threads/") and path.endswith("/title"):
+            thread_id = path.removeprefix("/threads/").removesuffix("/title").rstrip("/")
+            try:
+                body = render_thread_title_update_page(thread_id).encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [body]
+            except LookupError:
+                body = render_missing_resource("thread").encode("utf-8")
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("404 Not Found", headers)
+                return [body]
 
         if path.startswith("/threads/"):
             thread_id = path.removeprefix("/threads/")

@@ -295,6 +295,12 @@ function redirectTarget(commandName, recordId, defaults) {
     }
     return `/profiles/${encodeURIComponent(defaults.profileSlug)}`;
   }
+  if (commandName === "update_thread_title") {
+    if (!defaults.threadId) {
+      return "";
+    }
+    return `/threads/${encodeURIComponent(defaults.threadId)}`;
+  }
   if (!recordId) {
     return "";
   }
@@ -310,6 +316,11 @@ function formState(commandName) {
       displayName: $("display-name-input"),
     };
   }
+  if (commandName === "update_thread_title") {
+    return {
+      title: $("thread-title-input"),
+    };
+  }
   return {
     body: $("body-input"),
     taskStatus: $("task-status-input"),
@@ -321,7 +332,7 @@ function formState(commandName) {
 }
 
 function composeDraftContext(commandName, defaults) {
-  if (commandName === "update_profile") {
+  if (commandName === "update_profile" || commandName === "update_thread_title") {
     return null;
   }
   const scopeParts = [
@@ -434,6 +445,18 @@ function normalizeDisplayName(displayName) {
   return value;
 }
 
+function normalizeThreadTitle(title) {
+  const value = requiredTrimmed(title, "Title");
+  if (value.includes("\n") || value.includes("\r")) {
+    throw new Error("Title must be a single line");
+  }
+  ensureAscii(value, "Title");
+  if (value.length > 72) {
+    throw new Error("Title must be at most 72 characters");
+  }
+  return value;
+}
+
 function buildCanonicalPostPayload(form, commandName, defaults, { proofOfWork = "", postId = "" } = {}) {
   const body = normalizeComposeAscii(requiredTrimmed(form.body.value, "Body")).text.replace(/\n*$/, "\n");
   const resolvedPostId = postId || generatePostId(commandName, body);
@@ -520,9 +543,40 @@ function buildCanonicalProfileUpdatePayload(form, defaults) {
   };
 }
 
+function generateThreadTitleUpdateId(title) {
+  return `thread-title-update-${timestampToken()}-${slugFromText(title)}-${randomToken()}`;
+}
+
+function buildCanonicalThreadTitleUpdatePayload(form, defaults) {
+  const title = normalizeThreadTitle(form.title.value);
+  const recordId = generateThreadTitleUpdateId(title);
+  const timestamp = isoTimestamp();
+  const threadId = requiredTrimmed(defaults.threadId, "Thread-ID");
+
+  ensureAscii(recordId, "Record-ID");
+  ensureAscii(timestamp, "Timestamp");
+  ensureAscii(threadId, "Thread-ID");
+
+  return {
+    payload: [
+      `Record-ID: ${recordId}`,
+      `Thread-ID: ${threadId}`,
+      `Timestamp: ${timestamp}`,
+      "",
+      title,
+      "",
+    ].join("\n"),
+    recordId,
+    title,
+  };
+}
+
 function buildCanonicalPayload(form, commandName, defaults) {
   if (commandName === "update_profile") {
     return buildCanonicalProfileUpdatePayload(form, defaults);
+  }
+  if (commandName === "update_thread_title") {
+    return buildCanonicalThreadTitleUpdatePayload(form, defaults);
   }
   return buildCanonicalPostPayload(form, commandName, defaults);
 }
@@ -530,6 +584,9 @@ function buildCanonicalPayload(form, commandName, defaults) {
 function hasPreviewInput(form, commandName) {
   if (commandName === "update_profile") {
     return Boolean(form.displayName.value.trim());
+  }
+  if (commandName === "update_thread_title") {
+    return Boolean(form.title.value.trim());
   }
   return Boolean(form.body.value.trim());
 }
@@ -551,6 +608,8 @@ function pendingSubmissionStorageKey(commandName, defaults, { dryRun = false } =
   if (commandName === "update_profile") {
     scopeParts.push(defaults.sourceIdentityId || "");
     scopeParts.push(defaults.profileSlug || "");
+  } else if (commandName === "update_thread_title") {
+    scopeParts.push(defaults.threadId || "");
   } else {
     scopeParts.push(defaults.threadType || "plain");
     scopeParts.push(defaults.boardTags || "general");
@@ -773,11 +832,12 @@ function responseMessageText(responseText) {
 
 async function main() {
   logSigningDebug("main_enter");
-  const root = $("compose-app") || $("profile-update-app");
+  const root = $("compose-app") || $("profile-update-app") || $("thread-title-update-app");
   if (!root) {
     logSigningDebug("main_no_root", {
       hasComposeApp: Boolean($("compose-app")),
       hasProfileUpdateApp: Boolean($("profile-update-app")),
+      hasThreadTitleUpdateApp: Boolean($("thread-title-update-app")),
     });
     return;
   }
@@ -787,7 +847,11 @@ async function main() {
   const dryRun = root.dataset.dryRun === "true";
   const defaults = defaultContext(root);
   const state = formState(commandName);
-  const form = commandName === "update_profile" ? $("profile-update-form") : $("signed-post-form");
+  const form = commandName === "update_profile"
+    ? $("profile-update-form")
+    : commandName === "update_thread_title"
+      ? $("thread-title-update-form")
+      : $("signed-post-form");
   const privateKeyInput = $("private-key-input");
   const publicKeyOutput = $("public-key-output");
   const payloadOutput = $("payload-output");
@@ -800,7 +864,9 @@ async function main() {
   const draftContext = composeDraftContext(commandName, defaults);
   const canStoreDraft = Boolean(draftContext) && draftStorageAvailable();
   const pendingSubmissionKey = pendingSubmissionStorageKey(commandName, defaults, { dryRun });
-  const canStorePendingSubmission = commandName !== "update_profile" && draftStorageAvailable() && !dryRun;
+  const canStorePendingSubmission = !new Set(["update_profile", "update_thread_title"]).has(commandName)
+    && draftStorageAvailable()
+    && !dryRun;
   const allowUnsignedFallback = root.dataset.unsignedFallbackEnabled === "true";
   let currentKeys = null;
   let pendingDraftTimer = 0;
@@ -846,7 +912,13 @@ async function main() {
     if (dryRun) {
       return "Submit preview";
     }
-    return commandName === "update_profile" ? "Submit update" : "Submit post";
+    if (commandName === "update_profile") {
+      return "Submit update";
+    }
+    if (commandName === "update_thread_title") {
+      return "Submit title change";
+    }
+    return "Submit post";
   }
 
   function signedSubmitLabel() {
@@ -857,7 +929,13 @@ async function main() {
     if (dryRun) {
       return "Submit preview";
     }
-    return commandName === "update_profile" ? "Submit update" : "Submit without signing";
+    if (commandName === "update_profile") {
+      return "Submit update";
+    }
+    if (commandName === "update_thread_title") {
+      return "Submit title change";
+    }
+    return "Submit without signing";
   }
 
   function applySubmitLabel(mode = "default") {
@@ -924,6 +1002,11 @@ async function main() {
       state.displayName.select();
     });
   }
+  if (commandName === "update_thread_title" && state.title) {
+    state.title.addEventListener("focus", () => {
+      state.title.select();
+    });
+  }
 
   function scheduleDraftSave() {
     if (!draftContext || !canStoreDraft) {
@@ -984,13 +1067,15 @@ async function main() {
     logSigningDebug("prepare_initial_keys_start", {
       commandName,
     });
-    if (commandName === "update_profile") {
+    if (commandName === "update_profile" || commandName === "update_thread_title") {
       const stored = await deriveStoredKeys();
       if (!stored) {
         logSigningDebug("prepare_initial_keys_no_stored_profile_key");
         setStatus(
           "key-status",
-          "Import the private key for this profile, or generate a new one only if it matches this identity.",
+          commandName === "update_profile"
+            ? "Import the private key for this profile, or generate a new one only if it matches this identity."
+            : "Import the key that should rename this thread, or generate a new one if the server policy allows it.",
         );
         return null;
       }
@@ -1015,7 +1100,7 @@ async function main() {
       logSigningDebug("resolve_submit_keys_using_cached_keys");
       return currentKeys;
     }
-    if (commandName === "update_profile") {
+    if (commandName === "update_profile" || commandName === "update_thread_title") {
       const stored = await deriveStoredKeys();
       if (stored) {
         applyKeys(stored);
@@ -1023,7 +1108,11 @@ async function main() {
         return stored;
       }
       logSigningDebug("resolve_submit_keys_missing_profile_key");
-      throw new Error("Load or import the private key for this profile before signing.");
+      throw new Error(
+        commandName === "update_profile"
+          ? "Load or import the private key for this profile before signing."
+          : "Load or import a private key before signing this thread title change.",
+      );
     }
     const keys = await ensureLocalKeys();
     applyKeys(keys);
@@ -1040,11 +1129,20 @@ async function main() {
     if (commandName === "update_profile") {
       return "Submitting signed profile update...";
     }
+    if (commandName === "update_thread_title") {
+      return "Submitting signed thread title update...";
+    }
     return "Submitting signed post...";
   }
 
   function failurePrefix() {
-    return commandName === "update_profile" ? "Username update failed" : "Signed posting failed";
+    if (commandName === "update_profile") {
+      return "Username update failed";
+    }
+    if (commandName === "update_thread_title") {
+      return "Thread title update failed";
+    }
+    return "Signed posting failed";
   }
 
   function successMessage() {
@@ -1053,6 +1151,9 @@ async function main() {
     }
     if (commandName === "update_profile") {
       return "Signed profile update accepted. Redirecting...";
+    }
+    if (commandName === "update_thread_title") {
+      return "Signed thread title update accepted. Redirecting...";
     }
     return "Signed post accepted. Redirecting...";
   }
@@ -1114,6 +1215,8 @@ async function main() {
 
   const previewInputs = commandName === "update_profile"
     ? [state.displayName]
+    : commandName === "update_thread_title"
+      ? [state.title]
     : [
         state.body,
         state.taskStatus,

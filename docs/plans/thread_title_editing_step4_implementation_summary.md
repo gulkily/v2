@@ -26,3 +26,13 @@
   - `python -m unittest tests.test_thread_title_update_visibility tests.test_task_thread_pages tests.test_php_native_reads tests.test_board_index_page.BoardIndexPageTests.test_board_index_uses_resolved_thread_title_when_update_record_exists`
 - Notes:
   - This stage overlays current thread titles onto existing read surfaces without mutating root post content.
+
+## Stage 4 - Browser title-change flow
+- Changes:
+  - Added a dedicated `/threads/<thread-id>/title` page that reuses the browser signing flow for thread-title updates.
+  - Added a `change title` action on thread pages and a dedicated signed payload builder for `update_thread_title` in the shared browser asset.
+  - Added page-level coverage for the new thread title update route and thread-page action link.
+- Verification:
+  - `python -m unittest tests.test_thread_title_update_page tests.test_thread_title_update_submission`
+- Notes:
+  - This stage reuses the existing browser signing flow instead of introducing a second client-side signing path.

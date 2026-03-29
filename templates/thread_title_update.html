@@ -1,0 +1,79 @@
+<section
+  id="thread-title-update-app"
+  class="panel compose-panel page-section"
+  data-command="update_thread_title"
+  data-endpoint="/api/update_thread_title"
+  data-dry-run="${dry_run_value}"
+  data-thread-id="${thread_id}"
+  data-signing-debug-enabled="${signing_debug_enabled_value}"
+>
+  <form id="thread-title-update-form" class="field-stack">
+    <label class="field-stack" for="thread-title-input">
+      <span>New thread title:</span>
+      <input id="thread-title-input" name="title" type="text" maxlength="72" value="${title_value}" required>
+    </label>
+    <div class="compose-submit-area">
+      <div class="action-row">
+        <button id="sign-submit-button" type="submit">${submit_label}</button>
+        <a class="thread-chip" href="/threads/${thread_id}">back to thread</a>
+        <a class="thread-chip" href="/account/key/">view browser key</a>
+      </div>
+      <p
+        id="submit-status"
+        class="status-note compose-submit-status"
+        data-status-tone="idle"
+        aria-live="polite"
+      >Waiting for submission.</p>
+    </div>
+  </form>
+  <p id="key-status" class="status-note">Checking browser signing support...</p>
+</section>
+
+<details class="panel compose-details page-section">
+  <summary>Technical details</summary>
+  <div class="detail-grid">
+    <div class="detail-row"><strong class="detail-label">Current title:</strong><code class="detail-value">${current_title}</code></div>
+    <div class="detail-row"><strong class="detail-label">Thread-ID:</strong><code class="detail-value">${thread_id}</code></div>
+    <div class="detail-row"><strong class="detail-label">Policy:</strong><span class="detail-value">${eligibility_text}</span></div>
+  </div>
+  <div class="compose-grid">
+    <section class="compose-card">
+      <div class="section-head page-lede">
+        <h2>Key material</h2>
+      </div>
+      <div class="action-row">
+        <button id="generate-key-button" type="button">Generate New Key</button>
+        <button id="import-key-button" type="button">Import Key</button>
+      </div>
+      <label class="field-stack" for="private-key-input">
+        <span>ASCII-armored private key</span>
+        <textarea id="private-key-input" class="technical-textarea" rows="10" spellcheck="false" wrap="off"></textarea>
+      </label>
+      <label class="field-stack" for="public-key-output">
+        <span>ASCII-armored public key</span>
+        <div class="copy-textarea-wrap copy-textarea-wrap--full">
+          <button class="copy-textarea-button" type="button" data-copy-source="#public-key-output">copy</button>
+          <textarea id="public-key-output" class="technical-textarea key-display profile-public-key-textarea" rows="8" spellcheck="false" wrap="off" readonly></textarea>
+        </div>
+      </label>
+    </section>
+
+    <section class="compose-card">
+      <div class="section-head page-lede">
+        <h2>Derived payload</h2>
+      </div>
+      <label class="field-stack" for="payload-output">
+        <span>Canonical payload preview</span>
+        <textarea id="payload-output" class="technical-textarea" rows="10" spellcheck="false" wrap="off" readonly></textarea>
+      </label>
+      <label class="field-stack" for="signature-output">
+        <span>Detached signature</span>
+        <textarea id="signature-output" class="technical-textarea" rows="8" spellcheck="false" wrap="off" readonly></textarea>
+      </label>
+      <label class="field-stack" for="response-output">
+        <span>Server response</span>
+        <textarea id="response-output" class="technical-textarea" rows="10" spellcheck="false" wrap="off" readonly></textarea>
+      </label>
+    </section>
+  </div>
+</details>
