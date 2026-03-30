@@ -543,6 +543,13 @@ function forum_html_escape(string $text): string
 
 function forum_site_title(): string
 {
+    $configured = forum_host_config()['site_title'] ?? '';
+    if (is_string($configured)) {
+        $configured = trim($configured);
+        if ($configured !== '') {
+            return $configured;
+        }
+    }
     $configured = getenv('FORUM_SITE_TITLE');
     if (is_string($configured)) {
         $configured = trim($configured);

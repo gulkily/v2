@@ -64,6 +64,7 @@ The generated `forum_host_config.php` is the primary adapter settings surface fo
 - `repo_root`: the writable forum data repository root
 - `cache_dir`: the writable PHP microcache directory
 - `static_html_dir`: the public artifact directory for generated `_static_html` page files
+- `site_title`: the shared site title used by PHP-rendered public pages
 - `microcache_ttl`: the short allowlisted read-cache lifetime in seconds
 
 `forum_host_config.example.php` is tracked as the shape reference, while the real `forum_host_config.php` stays ignored by git because it contains host-local paths.
@@ -87,7 +88,7 @@ Any host-specific glue should stay inside the adapter and deployment docs, not s
 1. Deploy the application checkout from `https://github.com/gulkily/v2` onto the host so the Python code, `cgi-bin/`, and `records/` tree remain available on disk.
 2. If the host supports `git`, clone or update the checkout directly, for example `git clone https://github.com/gulkily/v2.git`.
 3. Run `./forum php-host-setup /absolute/path/to/public-web-root` from the deployed checkout.
-4. Accept the derived defaults or provide host-specific paths for the application checkout, forum data repository, and writable PHP cache directory when prompted.
+4. Accept the derived defaults or provide host-specific paths for the application checkout, forum data repository, and writable PHP cache directory when prompted. The generated config also persists the current `FORUM_SITE_TITLE` value so anonymous PHP-rendered pages keep the same title as the Python app.
 5. Confirm the command generated `php_host/public/forum_host_config.php` and attempted to symlink `index.php`, `.htaccess`, and `forum_host_config.php` into the public web root.
 6. If the host rejects symlinks, leave the generated config file in place and follow the command's manual copy or manual linking guidance for the three public files.
 7. Ensure the host can execute `python3` and the deployed CGI scripts, and that git commands are permitted for write operations.

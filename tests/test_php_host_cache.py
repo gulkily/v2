@@ -53,6 +53,7 @@ class PhpHostCacheTests(unittest.TestCase):
                     f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
                     f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
                     f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'Forum Reader',",
                     "    'microcache_ttl' => 5,",
                     "];",
                     "",
@@ -505,6 +506,7 @@ process.stdout.write(signature);
                     f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
                     f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
                     f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
                     "    'microcache_ttl' => 5,",
                     "];",
                     "",
@@ -523,6 +525,8 @@ process.stdout.write(signature);
         self.assertIn("[meta]", response["body"])
         self.assertIn("2 replies", response["body"])
         self.assertIn("task", response["body"])
+        self.assertIn("<title>zenmemes</title>", response["body"])
+        self.assertIn('class="site-header-title"><a href="/">zenmemes</a>', response["body"])
         self.assertIn("posts loaded", response["body"])
         self.assertIn('href="/?format=rss"', response["body"])
 
@@ -550,6 +554,7 @@ process.stdout.write(signature);
                     f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
                     f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
                     f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
                     "    'microcache_ttl' => 5,",
                     "];",
                     "",

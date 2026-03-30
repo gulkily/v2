@@ -27,6 +27,7 @@ class PhpHostSetupConfig:
     repo_root: Path
     cache_dir: Path
     static_html_dir: Path
+    site_title: str
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class PhpHostRuntimeConfig:
     repo_root: Path | None
     cache_dir: Path | None
     static_html_dir: Path | None
+    site_title: str | None
 
 
 def setup_prompt_value(
@@ -84,6 +86,7 @@ def confirm_php_host_setup(
     print(f"- Forum data repository: {config.repo_root}")
     print(f"- PHP cache directory: {config.cache_dir}")
     print(f"- Static HTML directory: {config.static_html_dir}")
+    print(f"- Site title: {config.site_title}")
     response = setup_prompt_value("Continue", default_value="Y/n", input_func=input_func).lower()
     return response in ("", "y", "yes")
 
@@ -116,6 +119,13 @@ def default_php_host_cache_dir(repo_root: Path) -> Path:
 
 def default_php_host_static_html_dir(public_web_root: Path) -> Path:
     return public_web_root / "_static_html"
+
+
+def default_php_host_site_title() -> str:
+    configured = os.environ.get("FORUM_SITE_TITLE", "").strip()
+    if configured:
+        return configured
+    return "Forum Reader"
 
 
 def _normalize_path(raw_value: str) -> Path:
@@ -184,6 +194,7 @@ def resolve_php_host_setup_config(
         repo_root=forum_repo_root,
         cache_dir=cache_dir,
         static_html_dir=static_html_dir,
+        site_title=default_php_host_site_title(),
     )
 
 
@@ -200,6 +211,7 @@ def render_php_host_config(config: PhpHostSetupConfig) -> str:
             f"    'repo_root' => {config.repo_root.as_posix()!r},",
             f"    'cache_dir' => {config.cache_dir.as_posix()!r},",
             f"    'static_html_dir' => {config.static_html_dir.as_posix()!r},",
+            f"    'site_title' => {config.site_title!r},",
             "    'microcache_ttl' => 5,",
             "];",
             "",
@@ -234,6 +246,7 @@ def load_php_host_runtime_config(config_path: Path) -> PhpHostRuntimeConfig:
         repo_root=maybe_path("repo_root"),
         cache_dir=maybe_path("cache_dir"),
         static_html_dir=maybe_path("static_html_dir"),
+        site_title=values.get("site_title", "").strip() or None,
     )
 
 
