@@ -667,6 +667,41 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("'site_title' => 'zenmemes'", config_text)
 
+    def test_run_php_host_setup_env_site_title_overrides_existing_config_value(self) -> None:
+        self.write_php_host_sources()
+        public_root = self.repo_root / "public_html"
+        config_path = self.repo_root / "php_host" / "public" / "forum_host_config.php"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    f"    'public_web_root' => {public_root.as_posix()!r},",
+                    f"    'app_root' => {self.repo_root.as_posix()!r},",
+                    f"    'repo_root' => {self.repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(self.repo_root / 'state' / 'php_host_cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(public_root / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'Forum Reader',",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        request = self.module.TaskRequest(command="php-host-setup", non_interactive=True)
+
+        with mock.patch.dict("os.environ", {"FORUM_SITE_TITLE": "zenmemes"}, clear=False):
+            exit_code = self.module.run_php_host_setup(request)
+
+        config_text = config_path.read_text(encoding="utf-8")
+        self.assertEqual(exit_code, 0)
+        self.assertIn("'site_title' => 'zenmemes'", config_text)
+
     def test_run_php_host_setup_can_cancel_after_summary(self) -> None:
         self.write_php_host_sources()
         public_root = self.repo_root / "interactive_public"

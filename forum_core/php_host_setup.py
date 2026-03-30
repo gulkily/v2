@@ -209,7 +209,13 @@ def resolve_php_host_setup_config(
         if existing_config and existing_config.static_html_dir
         else default_php_host_static_html_dir(public_web_root)
     )
-    site_title = existing_config.site_title if existing_config and existing_config.site_title else default_php_host_site_title()
+    configured_site_title = os.environ.get("FORUM_SITE_TITLE", "").strip()
+    if configured_site_title:
+        site_title = configured_site_title
+    elif existing_config and existing_config.site_title:
+        site_title = existing_config.site_title
+    else:
+        site_title = default_php_host_site_title()
     return PhpHostSetupConfig(
         public_web_root=public_web_root,
         app_root=app_root,
