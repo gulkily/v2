@@ -554,6 +554,9 @@ def run_php_host_refresh(request: TaskRequest) -> int:
 
 
 def run_php_host_setup(request: TaskRequest) -> int:
+    if not ensure_runtime_dependencies():
+        return 1
+    load_repo_env(repo_root=REPO_ROOT)
     setup_request = PhpHostSetupRequest(
         public_web_root=request.public_web_root,
         app_root=request.app_root,
