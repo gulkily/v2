@@ -163,38 +163,51 @@ def resolve_php_host_setup_config(
     *,
     repo_root: Path,
     public_web_root: Path,
+    existing_config: PhpHostRuntimeConfig | None = None,
     input_func: Callable[[str], str] | None = None,
 ) -> PhpHostSetupConfig:
     if input_func is None:
         input_func = input
+    app_root_default = existing_config.app_root if existing_config and existing_config.app_root else repo_root
     app_root = _resolve_config_path(
         "Application checkout path",
         request.app_root,
-        default_path=repo_root,
+        default_path=app_root_default,
         non_interactive=request.non_interactive,
         input_func=input_func,
+    )
+    forum_repo_default = (
+        existing_config.repo_root if existing_config and existing_config.repo_root else default_php_host_repo_root(repo_root)
     )
     forum_repo_root = _resolve_config_path(
         "Forum data repository path",
         request.repo_root,
-        default_path=default_php_host_repo_root(repo_root),
+        default_path=forum_repo_default,
         non_interactive=request.non_interactive,
         input_func=input_func,
+    )
+    cache_dir_default = (
+        existing_config.cache_dir if existing_config and existing_config.cache_dir else default_php_host_cache_dir(repo_root)
     )
     cache_dir = _resolve_config_path(
         "PHP cache directory",
         request.cache_dir,
-        default_path=default_php_host_cache_dir(repo_root),
+        default_path=cache_dir_default,
         non_interactive=request.non_interactive,
         input_func=input_func,
     )
-    static_html_dir = default_php_host_static_html_dir(public_web_root)
+    static_html_dir = (
+        existing_config.static_html_dir
+        if existing_config and existing_config.static_html_dir
+        else default_php_host_static_html_dir(public_web_root)
+    )
+    site_title = existing_config.site_title if existing_config and existing_config.site_title else default_php_host_site_title()
     return PhpHostSetupConfig(
         app_root=app_root,
         repo_root=forum_repo_root,
         cache_dir=cache_dir,
         static_html_dir=static_html_dir,
-        site_title=default_php_host_site_title(),
+        site_title=site_title,
     )
 
 

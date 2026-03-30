@@ -492,6 +492,51 @@ class ForumTasksTests(unittest.TestCase):
         self.assertTrue((public_root / "forum_host_config.php").is_symlink())
         self.assertIn("kept existing symlink", second_stdout.getvalue())
 
+    def test_run_php_host_setup_reuses_existing_config_values_on_rerun(self) -> None:
+        self.write_php_host_sources()
+        public_root = self.repo_root / "public_html"
+        existing_app_root = self.repo_root / "existing_app"
+        existing_repo_root = self.repo_root / "existing_repo"
+        existing_cache_dir = self.repo_root / "existing_cache"
+        existing_static_html_dir = self.repo_root / "existing_static_html"
+        config_path = self.repo_root / "php_host" / "public" / "forum_host_config.php"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    f"    'app_root' => {existing_app_root.as_posix()!r},",
+                    f"    'repo_root' => {existing_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {existing_cache_dir.as_posix()!r},",
+                    f"    'static_html_dir' => {existing_static_html_dir.as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        request = self.module.TaskRequest(
+            command="php-host-setup",
+            public_web_root=str(public_root),
+            non_interactive=True,
+        )
+
+        exit_code = self.module.run_php_host_setup(request)
+
+        config_text = config_path.read_text(encoding="utf-8")
+        self.assertEqual(exit_code, 0)
+        self.assertIn(f"'app_root' => '{existing_app_root.as_posix()}'", config_text)
+        self.assertIn(f"'repo_root' => '{existing_repo_root.as_posix()}'", config_text)
+        self.assertIn(f"'cache_dir' => '{existing_cache_dir.as_posix()}'", config_text)
+        self.assertIn(f"'static_html_dir' => '{existing_static_html_dir.as_posix()}'", config_text)
+        self.assertIn("'site_title' => 'zenmemes'", config_text)
+
     def test_run_php_host_setup_prompts_interactively_when_path_missing(self) -> None:
         self.write_php_host_sources()
         public_root = self.repo_root / "interactive_public"
@@ -510,6 +555,57 @@ class ForumTasksTests(unittest.TestCase):
         self.assertTrue((public_root / "index.php").is_symlink())
         self.assertIn("PHP host setup will use:", stdout.getvalue())
         self.assertIn("Site title: Forum Reader", stdout.getvalue())
+
+    def test_run_php_host_setup_interactive_defaults_show_existing_config_values(self) -> None:
+        self.write_php_host_sources()
+        public_root = self.repo_root / "interactive_public"
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        existing_app_root = self.repo_root / "existing_app"
+        existing_repo_root = self.repo_root / "existing_repo"
+        existing_cache_dir = self.repo_root / "existing_cache"
+        existing_static_html_dir = self.repo_root / "existing_static_html"
+        config_path = self.repo_root / "php_host" / "public" / "forum_host_config.php"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    f"    'app_root' => {existing_app_root.as_posix()!r},",
+                    f"    'repo_root' => {existing_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {existing_cache_dir.as_posix()!r},",
+                    f"    'static_html_dir' => {existing_static_html_dir.as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        prompts: list[str] = []
+        answers = iter([str(public_root), "", "", "", ""])
+        request = self.module.TaskRequest(command="php-host-setup")
+
+        def fake_input(prompt: str) -> str:
+            prompts.append(prompt)
+            return next(answers)
+
+        with mock.patch("builtins.input", side_effect=fake_input):
+            with mock.patch("sys.stdin.isatty", return_value=True):
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    exit_code = self.module.run_php_host_setup(request)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertIn(f"Application checkout path [{existing_app_root}]: ", prompts)
+        self.assertIn(f"Forum data repository path [{existing_repo_root}]: ", prompts)
+        self.assertIn(f"PHP cache directory [{existing_cache_dir}]: ", prompts)
+        self.assertIn("Site title: zenmemes", stdout.getvalue())
 
     def test_run_php_host_setup_uses_forum_site_title_env_in_generated_config(self) -> None:
         self.write_php_host_sources()

@@ -566,10 +566,15 @@ def run_php_host_setup(request: TaskRequest) -> int:
             request.public_web_root,
             non_interactive=request.non_interactive,
         )
+        existing_config = None
+        config_path = php_host_config_path(REPO_ROOT)
+        if config_path.exists():
+            existing_config = load_php_host_runtime_config(config_path)
         config = resolve_php_host_setup_config(
             setup_request,
             repo_root=REPO_ROOT,
             public_web_root=public_web_root,
+            existing_config=existing_config,
         )
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
