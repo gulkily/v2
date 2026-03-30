@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    // Absolute path to the published public web root that receives index.php, .htaccess, and forum_host_config.php.
+    'public_web_root' => '/absolute/path/to/public-web-root',
+
     // Absolute path to the deployed application checkout that contains cgi-bin/ and forum code.
     'app_root' => '/absolute/path/to/v2',
 

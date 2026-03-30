@@ -456,6 +456,7 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "")
         self.assertTrue(config_path.exists())
         config_text = config_path.read_text(encoding="utf-8")
+        self.assertIn(f"'public_web_root' => '{public_root.as_posix()}'", config_text)
         self.assertIn("'app_root' =>", config_text)
         self.assertIn("'repo_root' =>", config_text)
         self.assertIn("'static_html_dir' =>", config_text)
@@ -492,6 +493,45 @@ class ForumTasksTests(unittest.TestCase):
         self.assertTrue((public_root / "forum_host_config.php").is_symlink())
         self.assertIn("kept existing symlink", second_stdout.getvalue())
 
+    def test_run_php_host_setup_non_interactive_uses_existing_public_web_root(self) -> None:
+        self.write_php_host_sources()
+        public_root = self.repo_root / "existing_public"
+        config_path = self.repo_root / "php_host" / "public" / "forum_host_config.php"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    f"    'public_web_root' => {public_root.as_posix()!r},",
+                    f"    'app_root' => {self.repo_root.as_posix()!r},",
+                    f"    'repo_root' => {self.repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(self.repo_root / 'state' / 'php_host_cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(public_root / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        request = self.module.TaskRequest(command="php-host-setup", non_interactive=True)
+
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = self.module.run_php_host_setup(request)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertTrue((public_root / "index.php").is_symlink())
+        self.assertTrue((public_root / ".htaccess").is_symlink())
+        self.assertTrue((public_root / "forum_host_config.php").is_symlink())
+
     def test_run_php_host_setup_reuses_existing_config_values_on_rerun(self) -> None:
         self.write_php_host_sources()
         public_root = self.repo_root / "public_html"
@@ -509,6 +549,7 @@ class ForumTasksTests(unittest.TestCase):
                     "declare(strict_types=1);",
                     "",
                     "return [",
+                    f"    'public_web_root' => {public_root.as_posix()!r},",
                     f"    'app_root' => {existing_app_root.as_posix()!r},",
                     f"    'repo_root' => {existing_repo_root.as_posix()!r},",
                     f"    'cache_dir' => {existing_cache_dir.as_posix()!r},",
@@ -575,6 +616,7 @@ class ForumTasksTests(unittest.TestCase):
                     "declare(strict_types=1);",
                     "",
                     "return [",
+                    f"    'public_web_root' => {public_root.as_posix()!r},",
                     f"    'app_root' => {existing_app_root.as_posix()!r},",
                     f"    'repo_root' => {existing_repo_root.as_posix()!r},",
                     f"    'cache_dir' => {existing_cache_dir.as_posix()!r},",
@@ -602,6 +644,7 @@ class ForumTasksTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stderr.getvalue(), "")
+        self.assertIn(f"Public web root path [{public_root}]: ", prompts)
         self.assertIn(f"Application checkout path [{existing_app_root}]: ", prompts)
         self.assertIn(f"Forum data repository path [{existing_repo_root}]: ", prompts)
         self.assertIn(f"PHP cache directory [{existing_cache_dir}]: ", prompts)
