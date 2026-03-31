@@ -291,8 +291,14 @@ process.stdout.write(signature);
 
         self.assertEqual(first["status"], 200)
         self.assertIn("X-Forum-Php-Cache: MISS", first["headers"])
+        self.assertIn("X-Forum-Response-Source: cgi", first["headers"])
+        self.assertTrue(any(header.startswith("X-Forum-Request-Duration-Ms: ") for header in first["headers"]))
+        self.assertTrue(any(header.startswith("X-Forum-Cgi-Duration-Ms: ") for header in first["headers"]))
+        self.assertTrue(any(header.startswith("X-Forum-Operation-Id: ") for header in first["headers"]))
         self.assertEqual(second["status"], 200)
         self.assertIn("X-Forum-Php-Cache: HIT", second["headers"])
+        self.assertIn("X-Forum-Response-Source: php-microcache", second["headers"])
+        self.assertTrue(any(header.startswith("X-Forum-Request-Duration-Ms: ") for header in second["headers"]))
         self.assertEqual(first["body"], second["body"])
         self.assertEqual(len(self.cache_files()), 1)
 
@@ -328,6 +334,8 @@ process.stdout.write(signature);
 
         self.assertEqual(second["status"], 200)
         self.assertIn("X-Forum-Static-Html: HIT", second["headers"])
+        self.assertIn("X-Forum-Response-Source: static-html", second["headers"])
+        self.assertTrue(any(header.startswith("X-Forum-Request-Duration-Ms: ") for header in second["headers"]))
         self.assertIn("Hello static HTML", second["body"])
 
     def test_php_host_sets_asset_cache_headers_without_microcaching_assets(self) -> None:

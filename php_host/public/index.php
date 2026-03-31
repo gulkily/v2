@@ -232,6 +232,26 @@ function forum_host_config(): array
 
 require_once forum_source_dir() . '/cache.php';
 
+function forum_elapsed_ms(float $startedAt): string
+{
+    return number_format((microtime(true) - $startedAt) * 1000.0, 2, '.', '');
+}
+
+function forum_timing_headers(
+    float $requestStartedAt,
+    string $responseSource,
+    ?float $cgiStartedAt = null
+): array {
+    $headers = [
+        'X-Forum-Response-Source: ' . $responseSource,
+        'X-Forum-Request-Duration-Ms: ' . forum_elapsed_ms($requestStartedAt),
+    ];
+    if ($cgiStartedAt !== null) {
+        $headers[] = 'X-Forum-Cgi-Duration-Ms: ' . forum_elapsed_ms($cgiStartedAt);
+    }
+    return $headers;
+}
+
 function forum_app_root(): string
 {
     $configured = forum_host_config()['app_root'] ?? '';
@@ -1073,33 +1093,50 @@ function forum_input_stream()
     return fopen('php://stdin', 'rb');
 }
 
+$forumRequestStartedAt = microtime(true);
+
 $nativeResponse = forum_read_php_native_board_index_response();
 if (is_array($nativeResponse)) {
-    forum_apply_native_response($nativeResponse, ['X-Forum-Php-Native: HIT']);
+    forum_apply_native_response($nativeResponse, array_merge(
+        ['X-Forum-Php-Native: HIT'],
+        forum_timing_headers($forumRequestStartedAt, 'php-native-board-index')
+    ));
     exit;
 }
 
 $staticHtml = forum_read_static_html();
 if (is_string($staticHtml)) {
-    forum_apply_static_html_response($staticHtml, ['X-Forum-Static-Html: HIT']);
+    forum_apply_static_html_response($staticHtml, array_merge(
+        ['X-Forum-Static-Html: HIT'],
+        forum_timing_headers($forumRequestStartedAt, 'static-html')
+    ));
     exit;
 }
 
 $threadNativeAttempt = forum_read_php_native_thread_response();
 if (is_array($threadNativeAttempt['response'] ?? null)) {
-    forum_apply_native_response($threadNativeAttempt['response'], ['X-Forum-Php-Native: HIT']);
+    forum_apply_native_response($threadNativeAttempt['response'], array_merge(
+        ['X-Forum-Php-Native: HIT'],
+        forum_timing_headers($forumRequestStartedAt, 'php-native-thread')
+    ));
     exit;
 }
 $threadFallbackHeaders = is_array($threadNativeAttempt['headers'] ?? null) ? $threadNativeAttempt['headers'] : [];
 
 $cachedResponse = forum_read_cached_response();
 if (is_string($cachedResponse)) {
-    forum_apply_cgi_response($cachedResponse, array_merge(['X-Forum-Php-Cache: HIT'], $threadFallbackHeaders, forum_asset_cache_headers()));
+    forum_apply_cgi_response($cachedResponse, array_merge(
+        ['X-Forum-Php-Cache: HIT'],
+        $threadFallbackHeaders,
+        forum_asset_cache_headers(),
+        forum_timing_headers($forumRequestStartedAt, 'php-microcache')
+    ));
     exit;
 }
 
 $appRoot = forum_app_root();
 $command = forum_python_command($appRoot);
+$cgiStartedAt = microtime(true);
 $descriptorSpec = [
     0 => ['pipe', 'r'],
     1 => ['pipe', 'w'],
@@ -1142,12 +1179,21 @@ if ($exitCode !== 0) {
 $response = $stdout === false ? '' : $stdout;
 $parsed = forum_parse_cgi_response($response);
 if (forum_is_post_index_rebuild_status_response($parsed)) {
-    forum_apply_post_index_rebuild_status_response($parsed, array_merge(['X-Forum-Php-Cache: MISS'], $threadFallbackHeaders));
+    forum_apply_post_index_rebuild_status_response($parsed, array_merge(
+        ['X-Forum-Php-Cache: MISS'],
+        $threadFallbackHeaders,
+        forum_timing_headers($forumRequestStartedAt, 'cgi', $cgiStartedAt)
+    ));
     exit;
 }
 forum_store_static_html($parsed);
 forum_store_cached_response($parsed, $response);
-forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], $threadFallbackHeaders, forum_asset_cache_headers()));
+forum_apply_cgi_response($response, array_merge(
+    ['X-Forum-Php-Cache: MISS'],
+    $threadFallbackHeaders,
+    forum_asset_cache_headers(),
+    forum_timing_headers($forumRequestStartedAt, 'cgi', $cgiStartedAt)
+));
 if (forum_mutating_request() && (int) $parsed['status_code'] >= 200 && (int) $parsed['status_code'] < 400) {
     forum_clear_cache();
     forum_clear_static_html();

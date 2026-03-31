@@ -4158,6 +4158,7 @@ def application(environ, start_response):
             operation_name=f"{method} {path}",
             metadata=metadata,
         )
+        extra_headers.append(("X-Forum-Operation-Id", handle.operation_id))
         with bind_operation(handle):
             try:
                 response = _dispatch_application(environ, start_response_with_extra)
