@@ -2067,7 +2067,7 @@ def render_recent_operation_card(operation) -> str:
         f"{operation.total_duration_ms:.2f} ms" if operation.total_duration_ms is not None else "running"
     )
     metadata_html = "".join(
-        f'<span class="thread-chip">{html.escape(key)}: {html.escape(value)}</span>'
+        f'<span class="thread-chip">{html.escape(str(key))}: {html.escape(str(value))}</span>'
         for key, value in sorted(operation.metadata.items())
     )
     steps_html = "".join(

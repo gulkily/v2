@@ -168,6 +168,28 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("path: /activity/", body)
         self.assertIn("view: code", body)
 
+    def test_slow_operations_page_renders_integer_metadata_values(self) -> None:
+        expected_operations = (
+            OperationEvent(
+                operation_id="slow-int-metadata",
+                operation_kind="request",
+                operation_name="GET /activity/",
+                state="completed",
+                started_at="2026-03-20T02:00:00Z",
+                updated_at="2026-03-20T02:00:01Z",
+                ended_at="2026-03-20T02:00:02Z",
+                total_duration_ms=6500.0,
+                error_text=None,
+                metadata={"method": "GET", "page": 2},
+                steps=(OperationStep(name="render_activity", duration_ms=6400.0),),
+            ),
+        )
+        with mock.patch("forum_web.web.load_recent_slow_operations", return_value=expected_operations):
+            status, _, body = self.get("/operations/slow/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("page: 2", body)
+
     def test_primary_nav_does_not_link_to_slow_operations_page(self) -> None:
         status, _, body = self.get("/")
 

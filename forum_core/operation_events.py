@@ -101,6 +101,12 @@ def _utc_now_text() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _normalize_metadata(metadata: dict[str, object] | None) -> dict[str, str]:
+    if not metadata:
+        return {}
+    return {str(key): str(value) for key, value in metadata.items()}
+
+
 def _cleanup_expired_events(connection: sqlite3.Connection, *, retention_hours: int) -> None:
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).isoformat().replace("+00:00", "Z")
     connection.execute(
@@ -154,7 +160,7 @@ def start_operation(
                 "running",
                 started_at,
                 started_at,
-                json.dumps(metadata or {}, sort_keys=True),
+                json.dumps(_normalize_metadata(metadata), sort_keys=True),
                 "[]",
             ),
         )
@@ -349,7 +355,7 @@ def load_recent_slow_operations(
 
 def _row_to_operation_event(row: sqlite3.Row) -> OperationEvent:
     steps = json.loads(row["steps_json"])
-    metadata = json.loads(row["metadata_json"])
+    metadata = _normalize_metadata(json.loads(row["metadata_json"]))
     return OperationEvent(
         operation_id=row["operation_id"],
         operation_kind=row["operation_kind"],

@@ -146,6 +146,20 @@ class OperationEventsTests(unittest.TestCase):
             ("GET /recent-slow", "GET /older-slow"),
         )
 
+    def test_start_operation_normalizes_metadata_values_to_strings(self) -> None:
+        handle = start_operation(
+            self.repo_root,
+            operation_kind="request",
+            operation_name="GET /activity/",
+            metadata={"method": "GET", "page": 2},
+        )
+        complete_operation(handle)
+
+        operations = load_recent_operations(self.repo_root)
+
+        self.assertEqual(operations[0].metadata["method"], "GET")
+        self.assertEqual(operations[0].metadata["page"], "2")
+
 
 if __name__ == "__main__":
     unittest.main()
