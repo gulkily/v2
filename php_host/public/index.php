@@ -560,7 +560,7 @@ function forum_site_title(): string
     return 'Forum Reader';
 }
 
-function forum_php_native_read_route(): ?string
+function forum_php_native_board_index_route(): ?string
 {
     if (forum_request_method() !== 'GET') {
         return null;
@@ -578,6 +578,34 @@ function forum_php_native_read_route(): ?string
         return null;
     }
     return 'board_index_root';
+}
+
+function forum_php_native_thread_route(): ?string
+{
+    if (forum_request_method() !== 'GET') {
+        return null;
+    }
+    if (forum_post_index_rebuild_request()) {
+        return null;
+    }
+    if (forum_request_query_string() !== '') {
+        return null;
+    }
+    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
+        return null;
+    }
+    $path = forum_request_path();
+    if (!str_starts_with($path, '/threads/')) {
+        return null;
+    }
+    if (str_ends_with($path, '/title')) {
+        return null;
+    }
+    $threadId = trim(substr($path, strlen('/threads/')), '/');
+    if ($threadId === '' || str_contains($threadId, '/')) {
+        return null;
+    }
+    return $threadId;
 }
 
 function forum_repo_root(): string
@@ -599,6 +627,28 @@ function forum_php_native_snapshot_path(string $routeName): ?string
         return null;
     }
     return forum_repo_root() . DIRECTORY_SEPARATOR . 'state' . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'php_native_reads' . DIRECTORY_SEPARATOR . 'board_index_root.json';
+}
+
+function forum_php_native_db_path(): string
+{
+    return forum_repo_root() . DIRECTORY_SEPARATOR . 'state' . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'php_native_reads.sqlite3';
+}
+
+function forum_php_native_open_db(): ?SQLite3
+{
+    if (!class_exists('SQLite3')) {
+        return null;
+    }
+    $path = forum_php_native_db_path();
+    if (!is_file($path)) {
+        return null;
+    }
+    try {
+        $db = new SQLite3($path, SQLITE3_OPEN_READWRITE);
+    } catch (Throwable $_error) {
+        return null;
+    }
+    return $db;
 }
 
 function forum_php_native_load_snapshot(string $routeName): ?array
@@ -627,6 +677,68 @@ function forum_php_native_load_snapshot(string $routeName): ?array
     return $decoded;
 }
 
+function forum_php_native_increment_counter(string $routePath, string $userType, string $outcome): void
+{
+    $db = forum_php_native_open_db();
+    if (!($db instanceof SQLite3)) {
+        return;
+    }
+    $statement = $db->prepare(
+        'INSERT INTO php_native_read_counters(route_path, user_type, outcome, count, updated_at) '
+        . 'VALUES (:route_path, :user_type, :outcome, 1, :updated_at) '
+        . 'ON CONFLICT(route_path, user_type, outcome) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at'
+    );
+    if (!($statement instanceof SQLite3Stmt)) {
+        $db->close();
+        return;
+    }
+    $statement->bindValue(':route_path', $routePath, SQLITE3_TEXT);
+    $statement->bindValue(':user_type', $userType, SQLITE3_TEXT);
+    $statement->bindValue(':outcome', $outcome, SQLITE3_TEXT);
+    $statement->bindValue(':updated_at', gmdate('c'), SQLITE3_TEXT);
+    $statement->execute();
+    $statement->close();
+    $db->close();
+}
+
+function forum_php_native_load_thread_snapshot(string $threadId): ?array
+{
+    $db = forum_php_native_open_db();
+    if (!($db instanceof SQLite3)) {
+        return null;
+    }
+    $statement = $db->prepare('SELECT snapshot_json FROM php_native_snapshots WHERE snapshot_id = :snapshot_id');
+    if (!($statement instanceof SQLite3Stmt)) {
+        $db->close();
+        return null;
+    }
+    $statement->bindValue(':snapshot_id', 'thread/' . $threadId, SQLITE3_TEXT);
+    $result = $statement->execute();
+    if (!($result instanceof SQLite3Result)) {
+        $statement->close();
+        $db->close();
+        return null;
+    }
+    $row = $result->fetchArray(SQLITE3_ASSOC);
+    $result->finalize();
+    $statement->close();
+    $db->close();
+    if (!is_array($row) || !isset($row['snapshot_json']) || !is_string($row['snapshot_json'])) {
+        return null;
+    }
+    $decoded = json_decode($row['snapshot_json'], true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    if (($decoded['route'] ?? null) !== '/threads/' . $threadId) {
+        return null;
+    }
+    if (!isset($decoded['content_html']) || !is_string($decoded['content_html'])) {
+        return null;
+    }
+    return $decoded;
+}
+
 function forum_render_primary_nav(): string
 {
     $mergeEnabled = forum_env_flag_enabled('FORUM_ENABLE_ACCOUNT_MERGE') ? '1' : '0';
@@ -638,6 +750,26 @@ function forum_render_primary_nav(): string
   <a href="/activity/">Activity</a>
   <a href="" data-profile-nav-link data-profile-nav-state="unresolved" data-merge-feature-enabled="{$mergeEnabled}" aria-disabled="true" tabindex="-1">My profile</a>
 </nav>
+HTML;
+}
+
+function forum_render_page_header(): string
+{
+    $headerTitle = forum_html_escape(forum_site_title());
+    $navHtml = forum_render_primary_nav();
+    return <<<HTML
+<header class="site-header site-header--page">
+  <div class="site-header-main">
+    <div class="site-header-lockup">
+      <p class="site-header-mark">(*)</p>
+      <div class="site-header-copy">
+        <p class="site-header-title"><a href="/">{$headerTitle}</a></p>
+        <p class="site-header-tagline">calm threads from canonical text records</p>
+      </div>
+    </div>
+    {$navHtml}
+  </div>
+</header>
 HTML;
 }
 
@@ -662,6 +794,78 @@ function forum_render_username_claim_cta(): string
   link.setAttribute('href', href);
 }());
 </script>
+HTML;
+}
+
+function forum_render_page_footer(): string
+{
+    return <<<HTML
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <p>Best read with a clear mind and a modest browser window.</p>
+    <p>[ slow web ]</p>
+  </div>
+</footer>
+HTML;
+}
+
+function forum_render_feed_head_link_html(string $feedHref): string
+{
+    if ($feedHref === '') {
+        return '';
+    }
+    $href = forum_html_escape($feedHref);
+    return '<link rel="alternate" type="application/rss+xml" title="RSS feed" href="' . $href . '">';
+}
+
+function forum_render_page_scripts_html(bool $includeUsernameClaimScript = true): string
+{
+    $scripts = [
+        '<script type="module" src="/assets/profile_nav.js"></script>',
+        '<script type="module" src="/assets/copy_field.js"></script>',
+    ];
+    if ($includeUsernameClaimScript) {
+        $scripts[] = '<script type="module" src="/assets/username_claim_cta.js"></script>';
+    }
+    return implode("\n", $scripts);
+}
+
+function forum_render_php_native_page(string $title, string $contentHtml, string $headExtrasHtml = ''): string
+{
+    $documentTitle = forum_html_escape($title);
+    $usernameClaimBootstrap = forum_render_username_claim_bootstrap();
+    $rawUsernameClaim = getenv('FORUM_ENABLE_USERNAME_CLAIM_CTA');
+    $usernameClaimEnabled = !is_string($rawUsernameClaim) || $rawUsernameClaim === '' || forum_env_flag_enabled('FORUM_ENABLE_USERNAME_CLAIM_CTA');
+    $usernameClaimHtml = $usernameClaimEnabled ? forum_render_username_claim_cta() : '';
+    $headerHtml = forum_render_page_header();
+    $footerHtml = forum_render_page_footer();
+    $scriptsHtml = forum_render_page_scripts_html($usernameClaimEnabled);
+    return <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{$documentTitle}</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/assets/site.css">
+  {$usernameClaimBootstrap}
+  {$headExtrasHtml}
+</head>
+<body>
+  <div class="page-shell ">
+    {$usernameClaimHtml}
+    {$headerHtml}
+    <main class="content-shell">
+      {$contentHtml}
+    </main>
+    {$footerHtml}
+  </div>
+  {$scriptsHtml}
+</body>
+</html>
 HTML;
 }
 
@@ -765,70 +969,43 @@ function forum_render_board_index_thread_rows_html(array $threadRows): string
 
 function forum_render_php_native_board_index_page(array $snapshot): string
 {
-    $title = forum_html_escape(forum_site_title());
-    $headerTitle = forum_html_escape(forum_site_title());
-    $usernameClaimBootstrap = forum_render_username_claim_bootstrap();
-    $usernameClaimHtml = forum_render_username_claim_cta();
-    $navHtml = forum_render_primary_nav();
     $threadRowsHtml = forum_render_board_index_thread_rows_html($snapshot['thread_rows']);
     $statsHtml = forum_render_board_index_stats_html($snapshot['stats']);
-    return <<<HTML
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{$title}</title>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="shortcut icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/assets/site.css">
-  {$usernameClaimBootstrap}
-  <link rel="alternate" type="application/rss+xml" title="RSS feed" href="/?format=rss">
-</head>
-<body>
-  <div class="page-shell ">
-    {$usernameClaimHtml}
-    <header class="site-header site-header--page">
-      <div class="site-header-main">
-        <div class="site-header-lockup">
-          <p class="site-header-mark">(*)</p>
-          <div class="site-header-copy">
-            <p class="site-header-title"><a href="/">{$headerTitle}</a></p>
-            <p class="site-header-tagline">calm threads from canonical text records</p>
-          </div>
-        </div>
-        {$navHtml}
-      </div>
-    </header>
-    <main class="content-shell">
-      <section class="panel page-section">
-        <section class="board-index-thread-list" aria-label="Visible threads">
-          {$threadRowsHtml}
-        </section>
-      </section>
-      <section class="panel page-section">
-        {$statsHtml}
-      </section>
-    </main>
-    <footer class="site-footer">
-      <div class="site-footer-inner">
-        <p>Best read with a clear mind and a modest browser window.</p>
-        <p>[ slow web ]</p>
-      </div>
-    </footer>
-  </div>
-  <script type="module" src="/assets/profile_nav.js"></script>
-  <script type="module" src="/assets/username_claim_cta.js"></script>
-  <script type="module" src="/assets/copy_field.js"></script>
-</body>
-</html>
+    $contentHtml = <<<HTML
+<section class="panel page-section">
+  <section class="board-index-thread-list" aria-label="Visible threads">
+    {$threadRowsHtml}
+  </section>
+</section>
+<section class="panel page-section">
+  {$statsHtml}
+</section>
 HTML;
+    return forum_render_php_native_page(
+        forum_site_title(),
+        $contentHtml,
+        forum_render_feed_head_link_html('/?format=rss'),
+    );
 }
 
-function forum_read_php_native_response(): ?array
+function forum_render_php_native_thread_page(array $snapshot): string
 {
-    $routeName = forum_php_native_read_route();
+    $title = trim((string) ($snapshot['title'] ?? ''));
+    if ($title === '') {
+        $title = trim((string) ($snapshot['thread_id'] ?? ''));
+    }
+    $contentHtml = (string) ($snapshot['content_html'] ?? '');
+    $feedHref = trim((string) ($snapshot['feed_href'] ?? ''));
+    return forum_render_php_native_page(
+        $title,
+        $contentHtml,
+        forum_render_feed_head_link_html($feedHref),
+    );
+}
+
+function forum_read_php_native_board_index_response(): ?array
+{
+    $routeName = forum_php_native_board_index_route();
     if ($routeName === null) {
         return null;
     }
@@ -842,6 +1019,37 @@ function forum_read_php_native_response(): ?array
             'Content-Type: text/html; charset=utf-8',
         ],
         'body' => forum_render_php_native_board_index_page($snapshot),
+    ];
+}
+
+function forum_read_php_native_thread_response(): array
+{
+    $threadId = forum_php_native_thread_route();
+    if ($threadId === null) {
+        return [
+            'response' => null,
+            'headers' => [],
+        ];
+    }
+    $snapshot = forum_php_native_load_thread_snapshot($threadId);
+    if ($snapshot === null) {
+        $routePath = '/threads/' . $threadId;
+        forum_php_native_increment_counter($routePath, 'anonymous', 'snapshot_missing');
+        return [
+            'response' => null,
+            'headers' => ['X-Forum-Php-Native-Fallback: snapshot-missing'],
+        ];
+    }
+    forum_php_native_increment_counter('/threads/' . $threadId, 'anonymous', 'native_hit');
+    return [
+        'response' => [
+            'status_code' => 200,
+            'headers' => [
+                'Content-Type: text/html; charset=utf-8',
+            ],
+            'body' => forum_render_php_native_thread_page($snapshot),
+        ],
+        'headers' => [],
     ];
 }
 
@@ -865,7 +1073,7 @@ function forum_input_stream()
     return fopen('php://stdin', 'rb');
 }
 
-$nativeResponse = forum_read_php_native_response();
+$nativeResponse = forum_read_php_native_board_index_response();
 if (is_array($nativeResponse)) {
     forum_apply_native_response($nativeResponse, ['X-Forum-Php-Native: HIT']);
     exit;
@@ -877,9 +1085,16 @@ if (is_string($staticHtml)) {
     exit;
 }
 
+$threadNativeAttempt = forum_read_php_native_thread_response();
+if (is_array($threadNativeAttempt['response'] ?? null)) {
+    forum_apply_native_response($threadNativeAttempt['response'], ['X-Forum-Php-Native: HIT']);
+    exit;
+}
+$threadFallbackHeaders = is_array($threadNativeAttempt['headers'] ?? null) ? $threadNativeAttempt['headers'] : [];
+
 $cachedResponse = forum_read_cached_response();
 if (is_string($cachedResponse)) {
-    forum_apply_cgi_response($cachedResponse, array_merge(['X-Forum-Php-Cache: HIT'], forum_asset_cache_headers()));
+    forum_apply_cgi_response($cachedResponse, array_merge(['X-Forum-Php-Cache: HIT'], $threadFallbackHeaders, forum_asset_cache_headers()));
     exit;
 }
 
@@ -895,6 +1110,7 @@ $process = proc_open($command, $descriptorSpec, $pipes, $appRoot, forum_cgi_envi
 if (!is_resource($process)) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
+    forum_apply_response_headers($threadFallbackHeaders);
     echo "Failed to start forum CGI bridge.\n";
     exit;
 }
@@ -915,6 +1131,7 @@ $exitCode = proc_close($process);
 if ($exitCode !== 0) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
+    forum_apply_response_headers($threadFallbackHeaders);
     echo "Forum CGI bridge failed.\n";
     if ($stderr !== '') {
         echo $stderr;
@@ -925,12 +1142,12 @@ if ($exitCode !== 0) {
 $response = $stdout === false ? '' : $stdout;
 $parsed = forum_parse_cgi_response($response);
 if (forum_is_post_index_rebuild_status_response($parsed)) {
-    forum_apply_post_index_rebuild_status_response($parsed, ['X-Forum-Php-Cache: MISS']);
+    forum_apply_post_index_rebuild_status_response($parsed, array_merge(['X-Forum-Php-Cache: MISS'], $threadFallbackHeaders));
     exit;
 }
 forum_store_static_html($parsed);
 forum_store_cached_response($parsed, $response);
-forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], forum_asset_cache_headers()));
+forum_apply_cgi_response($response, array_merge(['X-Forum-Php-Cache: MISS'], $threadFallbackHeaders, forum_asset_cache_headers()));
 if (forum_mutating_request() && (int) $parsed['status_code'] >= 200 && (int) $parsed['status_code'] < 400) {
     forum_clear_cache();
     forum_clear_static_html();

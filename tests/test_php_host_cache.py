@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from textwrap import dedent
+
+from forum_core.php_native_reads import rebuild_php_native_thread_snapshots, thread_snapshot_db_path
 
 
 class PhpHostCacheTests(unittest.TestCase):
@@ -255,6 +258,32 @@ process.stdout.write(signature);
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         return snapshot_path
+
+    def write_static_thread_html(self, thread_id: str, html_text: str) -> Path:
+        static_path = (
+            Path(self.static_tempdir.name)
+            / "_static_html"
+            / "threads"
+            / thread_id
+            / "index.html"
+        )
+        static_path.parent.mkdir(parents=True, exist_ok=True)
+        static_path.write_text(html_text, encoding="utf-8")
+        return static_path
+
+    def php_native_counter_value(self, route_path: str, user_type: str, outcome: str) -> int:
+        db_path = thread_snapshot_db_path(self.data_repo_root)
+        if not db_path.exists():
+            return 0
+        connection = sqlite3.connect(db_path)
+        try:
+            row = connection.execute(
+                "SELECT count FROM php_native_read_counters WHERE route_path = ? AND user_type = ? AND outcome = ?",
+                (route_path, user_type, outcome),
+            ).fetchone()
+        finally:
+            connection.close()
+        return 0 if row is None else int(row[0])
 
     def test_php_host_caches_allowlisted_reads_and_marks_hit_headers(self) -> None:
         first = self.php_request("/api/list_index")
@@ -568,6 +597,93 @@ process.stdout.write(signature);
         self.assertEqual(response["status"], 500)
         self.assertNotIn("X-Forum-Php-Native: HIT", response["headers"])
         self.assertIn("Forum CGI bridge failed.", response["body"])
+
+    def test_thread_route_can_render_from_php_native_sqlite_snapshot(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-native-001",
+            subject="Native thread",
+            body_text="Root body for native thread.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+
+        rebuild_php_native_thread_snapshots(self.data_repo_root)
+
+        thread_response = self.php_request("/threads/thread-native-001")
+
+        self.assertEqual(thread_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", thread_response["headers"])
+        self.assertIn("Native thread", thread_response["body"])
+        self.assertIn("compose a reply", thread_response["body"])
+        self.assertIn("change title", thread_response["body"])
+        self.assertEqual(
+            self.php_native_counter_value("/threads/thread-native-001", "anonymous", "native_hit"),
+            1,
+        )
+
+    def test_thread_static_html_takes_precedence_over_native_snapshot(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-static-first-001",
+            subject="Should be shadowed",
+            body_text="Dynamic body.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+        rebuild_php_native_thread_snapshots(self.data_repo_root)
+        self.write_static_thread_html("thread-static-first-001", "<html><body>Static wins</body></html>")
+
+        thread_response = self.php_request("/threads/thread-static-first-001")
+
+        self.assertEqual(thread_response["status"], 200)
+        self.assertIn("X-Forum-Static-Html: HIT", thread_response["headers"])
+        self.assertNotIn("X-Forum-Php-Native: HIT", thread_response["headers"])
+        self.assertIn("Static wins", thread_response["body"])
+        self.assertEqual(
+            self.php_native_counter_value("/threads/thread-static-first-001", "anonymous", "native_hit"),
+            0,
+        )
+
+    def test_thread_snapshot_miss_falls_through_and_is_counted(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-fallback-001",
+            subject="Fallback thread",
+            body_text="Fallback body.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+        db_path = thread_snapshot_db_path(self.data_repo_root)
+        connection = sqlite3.connect(db_path)
+        try:
+            connection.execute("DELETE FROM php_native_snapshots WHERE snapshot_id = ?", ("thread/thread-fallback-001",))
+            connection.commit()
+        finally:
+            connection.close()
+
+        thread_response = self.php_request("/threads/thread-fallback-001")
+
+        self.assertEqual(thread_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native-Fallback: snapshot-missing", thread_response["headers"])
+        self.assertNotIn("X-Forum-Php-Native: HIT", thread_response["headers"])
+        self.assertIn("Fallback thread", thread_response["body"])
+        self.assertEqual(
+            self.php_native_counter_value("/threads/thread-fallback-001", "anonymous", "snapshot_missing"),
+            1,
+        )
 
     def test_instance_page_uses_static_html_with_identity_hint_cookie(self) -> None:
         first = self.php_request("/instance/", cookie="forum_identity_hint=test")

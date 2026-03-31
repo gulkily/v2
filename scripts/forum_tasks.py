@@ -23,6 +23,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 from forum_git_recover import run_git_recover
 from forum_content_purge import run_content_purge
 
+from forum_core.php_native_reads import rebuild_php_native_thread_snapshots
 from forum_core.post_index import rebuild_post_index
 from forum_core.runtime_env import (
     dotenv_available,
@@ -59,6 +60,8 @@ class TaskRequest:
     content_purge_apply: bool = False
     content_purge_force: bool = False
     rebuild_index_repo_root: str | None = None
+    rebuild_php_native_repo_root: str | None = None
+    rebuild_php_native_thread_ids: tuple[str, ...] = ()
     public_web_root: str | None = None
     app_root: str | None = None
     repo_root: str | None = None
@@ -153,6 +156,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root",
         help="Override the forum data repository path. Defaults to the current checkout root.",
     )
+    rebuild_php_native_parser = subparsers.add_parser(
+        "rebuild-php-native-snapshots",
+        help="Manually rebuild SQLite-backed PHP-native thread snapshots.",
+    )
+    rebuild_php_native_parser.add_argument(
+        "thread_ids",
+        nargs="*",
+        help="Optional thread IDs to rebuild. Omit to rebuild all thread snapshots.",
+    )
+    rebuild_php_native_parser.add_argument(
+        "--repo-root",
+        help="Override the forum data repository path. Defaults to the current checkout root.",
+    )
     php_host_parser = subparsers.add_parser(
         "php-host-setup",
         help="Generate PHP-host config and publish public files into a web root.",
@@ -235,6 +251,12 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         )
     if args.command == "rebuild-index":
         return parser, TaskRequest(command="rebuild-index", rebuild_index_repo_root=args.repo_root)
+    if args.command == "rebuild-php-native-snapshots":
+        return parser, TaskRequest(
+            command="rebuild-php-native-snapshots",
+            rebuild_php_native_repo_root=args.repo_root,
+            rebuild_php_native_thread_ids=tuple(args.thread_ids),
+        )
     if args.command == "php-host-setup":
         return parser, TaskRequest(
             command="php-host-setup",
@@ -286,6 +308,11 @@ def run_task(request: TaskRequest) -> int:
         )
     if request.command == "rebuild-index":
         return run_rebuild_index(repo_root_text=request.rebuild_index_repo_root)
+    if request.command == "rebuild-php-native-snapshots":
+        return run_rebuild_php_native_snapshots(
+            repo_root_text=request.rebuild_php_native_repo_root,
+            thread_ids=request.rebuild_php_native_thread_ids,
+        )
     if request.command == "php-host-setup":
         return run_php_host_setup(request)
     if request.command == "php-host-refresh":
@@ -457,6 +484,18 @@ def run_rebuild_index(*, repo_root_text: str | None = None) -> int:
     repo_root = (Path(repo_root_text).expanduser() if repo_root_text else REPO_ROOT).resolve()
     rebuild_post_index(repo_root)
     print(f"Rebuilt post index for {repo_root}")
+    return 0
+
+
+def run_rebuild_php_native_snapshots(*, repo_root_text: str | None = None, thread_ids: tuple[str, ...] = ()) -> int:
+    repo_root = (Path(repo_root_text).expanduser() if repo_root_text else REPO_ROOT).resolve()
+    rebuilt = rebuild_php_native_thread_snapshots(
+        repo_root,
+        thread_ids=thread_ids if thread_ids else None,
+    )
+    scope_label = "all thread snapshots" if not thread_ids else ", ".join(thread_ids)
+    print(f"Rebuilt PHP-native thread snapshots for {scope_label} in {repo_root}")
+    print(f"Refreshed {len(rebuilt)} thread snapshot(s).")
     return 0
 
 

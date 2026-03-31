@@ -309,5 +309,5 @@ def commit_post(
         timing_callback=timing_callback,
     )
     record_timing("post_index_refresh", started_at)
-    refresh_php_native_read_artifacts(repo_root)
+    refresh_php_native_read_artifacts(repo_root, touched_paths=tuple(relative_paths))
     return commit_id

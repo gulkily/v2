@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -8,7 +9,15 @@ from pathlib import Path
 from textwrap import dedent
 
 from forum_cgi.posting import commit_post
-from forum_core.php_native_reads import board_index_snapshot_path, build_board_index_snapshot
+from forum_core.php_native_reads import (
+    affected_thread_ids_for_touched_paths,
+    board_index_snapshot_path,
+    build_board_index_snapshot,
+    build_thread_snapshot,
+    rebuild_php_native_thread_snapshots,
+    thread_snapshot_db_path,
+)
+from forum_core.php_native_reads_db import load_php_native_snapshot
 
 
 class PhpNativeReadSnapshotTests(unittest.TestCase):
@@ -182,6 +191,129 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
         snapshot = build_board_index_snapshot(self.repo_root)
 
         self.assertEqual(snapshot["thread_rows"][0]["subject"], "Snapshot renamed")
+
+    def test_build_thread_snapshot_includes_expected_thread_page_content(self) -> None:
+        self.write_record(
+            "records/posts/T01.txt",
+            """
+            Post-ID: T01
+            Board-Tags: general planning
+            Subject: Example task thread
+            Thread-Type: task
+            Task-Status: proposed
+            Task-Presentability-Impact: 0.80
+            Task-Implementation-Difficulty: 0.30
+            Task-Depends-On: T00
+            Task-Sources: todo.txt
+
+            Ship a task thread through the normal discussion flow.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: general
+            Thread-ID: T01
+            Parent-ID: T01
+
+            First visible reply.
+            """,
+        )
+        self.commit_paths("records/posts", message="Seed task thread fixture")
+
+        snapshot = build_thread_snapshot("T01", self.repo_root)
+
+        self.assertEqual(snapshot["route"], "/threads/T01")
+        self.assertEqual(snapshot["title"], "Example task thread")
+        self.assertEqual(snapshot["feed_href"], "/threads/T01?format=rss")
+        self.assertIn("Task metadata", snapshot["content_html"])
+        self.assertIn("compose a reply", snapshot["content_html"])
+        self.assertIn("change title", snapshot["content_html"])
+        self.assertIn("Replies", snapshot["content_html"])
+        self.assertIn("First visible reply.", snapshot["content_html"])
+
+    def test_affected_thread_ids_for_post_moderation_and_title_updates(self) -> None:
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Root thread
+
+            Root body.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: general
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Reply body.
+            """,
+        )
+        self.write_record(
+            "records/moderation/hide-reply-001.txt",
+            """
+            Record-ID: hide-reply-001
+            Action: hide
+            Target-Type: post
+            Target-ID: reply-001
+            Timestamp: 2026-03-25T12:00:00Z
+
+            Hidden reply.
+            """,
+        )
+        self.write_record(
+            "records/thread-title-updates/thread-title-update-001.txt",
+            """
+            Record-ID: thread-title-update-001
+            Thread-ID: root-001
+            Timestamp: 2026-03-28T12:00:00Z
+
+            Renamed thread
+            """,
+        )
+        self.commit_paths("records/posts", "records/moderation", "records/thread-title-updates", message="Seed invalidation fixture")
+
+        affected = affected_thread_ids_for_touched_paths(
+            self.repo_root,
+            (
+                "records/posts/reply-001.txt",
+                "records/moderation/hide-reply-001.txt",
+                "records/thread-title-updates/thread-title-update-001.txt",
+            ),
+        )
+
+        self.assertEqual(affected, ["root-001"])
+
+    def test_rebuild_php_native_thread_snapshots_backfills_sqlite_rows(self) -> None:
+        self.write_record(
+            "records/posts/root-101.txt",
+            """
+            Post-ID: root-101
+            Board-Tags: general
+            Subject: Snapshot target
+
+            Snapshot me.
+            """,
+        )
+        self.commit_paths("records/posts", message="Seed backfill fixture")
+
+        rebuilt = rebuild_php_native_thread_snapshots(self.repo_root)
+
+        self.assertEqual(rebuilt, ["root-101"])
+        connection = sqlite3.connect(thread_snapshot_db_path(self.repo_root))
+        try:
+            snapshot = load_php_native_snapshot(connection, "thread/root-101")
+        finally:
+            connection.close()
+        assert snapshot is not None
+        self.assertEqual(snapshot["route"], "/threads/root-101")
+        self.assertIn("Snapshot target", snapshot["content_html"])
 
 
 if __name__ == "__main__":

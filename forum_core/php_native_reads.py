@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
+from typing import Iterable
 
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
+from forum_core.moderation import parse_moderation_record
 from forum_core.post_index import IndexedPostRow, load_indexed_root_posts
+from forum_core.php_native_reads_db import connect_php_native_reads_db, delete_php_native_snapshot, php_native_reads_db_path, save_php_native_snapshot
+from forum_core.thread_title_updates import parse_thread_title_update_record
 from forum_core.thread_title_updates import load_thread_title_update_records, resolve_current_thread_title, thread_title_updates_dir
-from forum_web.repository import group_threads, load_posts, root_thread_type
+from forum_web.repository import group_threads, index_posts, index_threads, load_posts, root_thread_type
 
 
 def php_native_reads_dir(repo_root: Path) -> Path:
@@ -20,6 +25,14 @@ def post_records_dir(repo_root: Path) -> Path:
 
 def board_index_snapshot_path(repo_root: Path) -> Path:
     return php_native_reads_dir(repo_root) / "board_index_root.json"
+
+
+def thread_snapshot_id(thread_id: str) -> str:
+    return f"thread/{thread_id}"
+
+
+def thread_snapshot_db_path(repo_root: Path) -> Path:
+    return php_native_reads_db_path(repo_root)
 
 
 def _first_line(text: str) -> str:
@@ -110,10 +123,226 @@ def build_board_index_snapshot(repo_root: Path) -> dict[str, object]:
     }
 
 
-def refresh_php_native_read_artifacts(repo_root: Path) -> None:
+def _build_thread_content_html(thread_id: str, repo_root: Path) -> tuple[str, str]:
+    from forum_web.templates import _html_block, _join_html_blocks, load_template
+    from forum_web.web import (
+        load_repository_state,
+        load_thread_title_updates,
+        render_post_card,
+        render_thread_root_context,
+        resolved_thread_heading,
+        thread_status_labels,
+        visible_reply_count,
+    )
+
+    _posts, grouped_threads, _board_tags, _moderation_records, moderation_state, identity_context = load_repository_state()
+    title_updates = load_thread_title_updates(repo_root)
+    thread = index_threads(grouped_threads).get(thread_id)
+    if thread is None or thread_is_hidden(moderation_state, thread_id):
+        raise LookupError(f"unknown thread: {thread_id}")
+
+    locked = moderation_state.locks_thread(thread_id)
+    reply_link_html = (
+        f'<p><a class="thread-chip" href="/compose/reply?thread_id={thread.root.post_id}&parent_id={thread.root.post_id}">compose a reply</a></p>'
+        if not locked
+        else '<p class="status-note">This thread is locked by moderation. New replies are disabled.</p>'
+    )
+    change_title_link_html = f'<p><a class="thread-chip" href="/threads/{thread.root.post_id}/title">change title</a></p>'
+    thread_labels = thread_status_labels(thread_id, moderation_state)
+    visible_replies = visible_reply_count(thread, moderation_state)
+    thread_meta = ""
+    if visible_replies > 0:
+        thread_meta = f"{visible_replies} visible repl{'y' if visible_replies == 1 else 'ies'} in this thread."
+    if root_thread_type(thread.root):
+        thread_meta = (
+            f"{root_thread_type(thread.root)} thread. {thread_meta}"
+            if thread_meta
+            else f"{root_thread_type(thread.root)} thread."
+        )
+    if thread_labels:
+        thread_meta = (thread_meta + " " if thread_meta else "") + " ".join(thread_labels) + "."
+    thread_meta_html = f'<p class="thread-meta">{thread_meta}</p>' if thread_meta else ""
+    replies_section_html = ""
+    if visible_replies > 0:
+        replies_section_html = _join_html_blocks(
+            _html_block(
+                """
+                <section class="panel page-section">
+                  <div class="section-head page-lede"><h2>Replies</h2></div>
+                  <div class="post-stack">
+                """
+            ),
+            "\n".join(
+                render_post_card(
+                    reply,
+                    root_thread_id=thread.root.post_id,
+                    identity_context=identity_context,
+                    hidden=post_is_hidden(moderation_state, reply.post_id, thread.root.post_id),
+                    compact_thread_view=True,
+                )
+                for reply in thread.replies
+            ),
+            _html_block(
+                """
+                  </div>
+                </section>
+                """
+            ),
+        )
+    current_title = resolved_thread_heading(thread, title_updates)
+    content_html = load_template("thread.html").substitute(
+        thread_heading=current_title,
+        thread_meta_html=thread_meta_html,
+        reply_link_html=reply_link_html,
+        change_title_link_html=change_title_link_html,
+        root_context_html=render_thread_root_context(thread),
+        root_post_html=render_post_card(
+            thread.root,
+            root_thread_id=thread.root.post_id,
+            identity_context=identity_context,
+            compact_thread_view=True,
+            show_subject=False,
+        ),
+        replies_section_html=replies_section_html,
+    )
+    return current_title, content_html
+
+
+def build_thread_snapshot(thread_id: str, repo_root: Path) -> dict[str, object]:
+    previous_repo_root = os.environ.get("FORUM_REPO_ROOT")
+    os.environ["FORUM_REPO_ROOT"] = str(repo_root.resolve())
+    try:
+        title, content_html = _build_thread_content_html(thread_id, repo_root)
+    finally:
+        if previous_repo_root is None:
+            os.environ.pop("FORUM_REPO_ROOT", None)
+        else:
+            os.environ["FORUM_REPO_ROOT"] = previous_repo_root
+    return {
+        "route": f"/threads/{thread_id}",
+        "thread_id": thread_id,
+        "title": title,
+        "content_html": content_html,
+        "feed_href": f"/threads/{thread_id}?format=rss",
+    }
+
+
+def _all_thread_ids(repo_root: Path) -> list[str]:
+    posts = load_posts(post_records_dir(repo_root))
+    return sorted(post.post_id for post in posts if post.is_root)
+
+
+def _root_thread_id_for_post(repo_root: Path, post_id: str) -> str | None:
+    posts = index_posts(load_posts(post_records_dir(repo_root)))
+    post = posts.get(post_id)
+    return None if post is None else post.root_thread_id
+
+
+def _threads_from_post_paths(repo_root: Path, touched_paths: Iterable[str]) -> set[str]:
+    posts_by_id = index_posts(load_posts(post_records_dir(repo_root)))
+    thread_ids: set[str] = set()
+    for touched_path in touched_paths:
+        path = Path(touched_path)
+        if path.parts[:2] != ("records", "posts") or path.suffix != ".txt":
+            continue
+        post_id = path.stem
+        post = posts_by_id.get(post_id)
+        if post is not None:
+            thread_ids.add(post.root_thread_id)
+    return thread_ids
+
+
+def _threads_from_moderation_paths(repo_root: Path, touched_paths: Iterable[str]) -> set[str]:
+    thread_ids: set[str] = set()
+    for touched_path in touched_paths:
+        path = repo_root / touched_path
+        relative_parts = Path(touched_path).parts
+        if relative_parts[:2] != ("records", "moderation") or path.suffix != ".txt" or not path.exists():
+            continue
+        record = parse_moderation_record(path)
+        if record.target_type == "thread":
+            thread_ids.add(record.target_id)
+            continue
+        thread_id = _root_thread_id_for_post(repo_root, record.target_id)
+        if thread_id is not None:
+            thread_ids.add(thread_id)
+    return thread_ids
+
+
+def _threads_from_title_update_paths(repo_root: Path, touched_paths: Iterable[str]) -> set[str]:
+    thread_ids: set[str] = set()
+    for touched_path in touched_paths:
+        path = repo_root / touched_path
+        relative_parts = Path(touched_path).parts
+        if relative_parts[:2] != ("records", "thread-title-updates") or path.suffix != ".txt" or not path.exists():
+            continue
+        record = parse_thread_title_update_record(path)
+        thread_ids.add(record.thread_id)
+    return thread_ids
+
+
+def _requires_broad_identity_refresh(touched_paths: Iterable[str]) -> bool:
+    watched_prefixes = {
+        ("records", "profile-updates"),
+        ("records", "identity-links"),
+        ("records", "merge-requests"),
+        ("records", "identity"),
+    }
+    for touched_path in touched_paths:
+        path = Path(touched_path)
+        if path.suffix != ".txt":
+            continue
+        if path.parts[:2] in watched_prefixes:
+            return True
+    return False
+
+
+def affected_thread_ids_for_touched_paths(repo_root: Path, touched_paths: Iterable[str]) -> list[str]:
+    normalized_paths = tuple(touched_paths)
+    if _requires_broad_identity_refresh(normalized_paths):
+        return _all_thread_ids(repo_root)
+    affected = set()
+    affected.update(_threads_from_post_paths(repo_root, normalized_paths))
+    affected.update(_threads_from_moderation_paths(repo_root, normalized_paths))
+    affected.update(_threads_from_title_update_paths(repo_root, normalized_paths))
+    return sorted(affected)
+
+
+def refresh_thread_snapshot(repo_root: Path, thread_id: str, *, invalidated_by_post_id: str | None = None) -> None:
+    connection = connect_php_native_reads_db(repo_root)
+    try:
+        try:
+            snapshot = build_thread_snapshot(thread_id, repo_root)
+        except LookupError:
+            delete_php_native_snapshot(connection, thread_snapshot_id(thread_id))
+            return
+        save_php_native_snapshot(
+            connection,
+            snapshot_id=thread_snapshot_id(thread_id),
+            entity_type="thread",
+            entity_id=thread_id,
+            snapshot=snapshot,
+            invalidated_by_post_id=invalidated_by_post_id,
+        )
+    finally:
+        connection.close()
+
+
+def rebuild_php_native_thread_snapshots(repo_root: Path, *, thread_ids: Iterable[str] | None = None) -> list[str]:
+    refreshed: list[str] = []
+    target_thread_ids = sorted(set(thread_ids if thread_ids is not None else _all_thread_ids(repo_root)))
+    for thread_id in target_thread_ids:
+        refresh_thread_snapshot(repo_root, thread_id)
+        refreshed.append(thread_id)
+    return refreshed
+
+
+def refresh_php_native_read_artifacts(repo_root: Path, *, touched_paths: Iterable[str] = ()) -> None:
     snapshot_path = board_index_snapshot_path(repo_root)
     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
     snapshot_path.write_text(
         json.dumps(build_board_index_snapshot(repo_root), indent=2, sort_keys=True),
         encoding="utf-8",
     )
+    for thread_id in affected_thread_ids_for_touched_paths(repo_root, touched_paths):
+        refresh_thread_snapshot(repo_root, thread_id)
