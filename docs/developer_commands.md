@@ -85,6 +85,7 @@ The command contract is intentionally small: future backends such as Perl should
 - Keep `php_host/public/forum_host_config.example.php` tracked as the example shape and let `php_host/public/forum_host_config.php` remain ignored as host-local state.
 - If the host rejects symlinks, follow the command output for the manual fallback instead of editing `index.php` directly.
 - The PHP adapter keeps the existing `/api/create_thread` and `/api/create_reply` routes intact rather than introducing PHP-specific write endpoints.
+- After deploying performance-path changes, use [main_page_performance_fix_operator_checklist.md](/home/wsl/v2/docs/plans/main_page_performance_fix_operator_checklist.md) to warm caches and verify the expected `X-Forum-Response-Source` headers for `/`, `/threads/...`, and `/profiles/...`.
 
 ## Dedalus baseline
 1. Install dependencies with `./forum install`.

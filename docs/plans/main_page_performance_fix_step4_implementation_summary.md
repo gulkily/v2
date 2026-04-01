@@ -42,3 +42,13 @@
   - Result: `41 passed in 15.03s`.
 - Notes:
   - CGI rebuild requests still need the real startup rebuild path, so Stage 2 was narrowed to skip eager startup only for non-rebuild CGI reads.
+
+## Stage 5 - Add deploy verification checklist
+- Changes:
+  - Added an operator checklist for post-deploy warmup, response-source verification, slow-path diagnosis, and freshness checks across `/`, `/threads/...`, and `/profiles/...`.
+  - Linked that checklist from the canonical PHP-host operator section in `docs/developer_commands.md`.
+- Verification:
+  - Reviewed the checklist against the current response headers and route set added through Stages 1-4.
+  - Confirmed the linked doc path resolves from `docs/developer_commands.md`.
+- Notes:
+  - Stage 5 is documentation/operator guidance only; no runtime behavior changed in this stage.
