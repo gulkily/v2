@@ -178,6 +178,10 @@ def ensure_runtime_post_index_startup(repo_root: Path) -> None:
     _INDEX_STARTUP_READY_ROOTS.add(resolved_root)
 
 
+def request_runs_once(environ: dict[str, object]) -> bool:
+    return bool(environ.get("wsgi.run_once"))
+
+
 def _request_supports_reindex_feedback(path: str, *, method: str) -> bool:
     if method != "GET":
         return False
@@ -355,7 +359,7 @@ def render_streamed_post_index_refresh_response(*, target_path: str, status_text
 
 
 def request_supports_streaming(environ: dict[str, object]) -> bool:
-    return not bool(environ.get("wsgi.run_once"))
+    return not request_runs_once(environ)
 
 
 def _query_requests_post_index_rebuild(query_params: dict[str, list[str]]) -> bool:
@@ -3440,6 +3444,7 @@ def _dispatch_application(environ, start_response):
     query_params = parse_qs(environ.get("QUERY_STRING", ""))
     method = environ.get("REQUEST_METHOD", "GET").upper()
     wants_rss = request_wants_rss(query_params)
+    runs_once = request_runs_once(environ)
     environ["_forum_start_response"] = start_response
     repo_root = get_repo_root()
     if not wants_rss and _request_supports_reindex_feedback(path, method=method):
@@ -3463,7 +3468,8 @@ def _dispatch_application(environ, start_response):
             )
             if streamed_response is not None:
                 return streamed_response
-    ensure_runtime_post_index_startup(repo_root)
+    if not runs_once:
+        ensure_runtime_post_index_startup(repo_root)
     if not wants_rss and _request_supports_reindex_feedback(path, method=method):
         buffered_response = maybe_render_buffered_reindex_feedback_response(
             environ=environ,

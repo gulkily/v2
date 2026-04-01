@@ -314,7 +314,16 @@ class PostIndexStartupTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertNotIn("Refreshing the forum...", body)
-        mock_startup.assert_called_once_with(self.repo_root)
+        mock_startup.assert_not_called()
+
+    def test_cgi_style_non_reindex_route_skips_eager_startup_initialization(self) -> None:
+        web._INDEX_STARTUP_READY_ROOTS.clear()
+
+        with mock.patch("forum_web.web.ensure_runtime_post_index_startup") as mock_startup:
+            status, _, _ = self.request("/operations/slow/", extra_environ={"wsgi.run_once": True})
+
+        self.assertEqual(status, "200 OK")
+        mock_startup.assert_not_called()
 
 
 if __name__ == "__main__":
