@@ -10,9 +10,9 @@ from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
-from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text
+from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text, identity_slug
 from forum_core.operation_events import load_recent_operations
-from forum_core.post_index import PostIndexReadiness
+from forum_core.post_index import PostIndexReadiness, ensure_post_index_current
 from forum_web.web import application
 
 
@@ -65,6 +65,7 @@ class RequestOperationEventsTests(unittest.TestCase):
         self.write_record(f"records/identity/{bootstrap_record_id}.txt", bootstrap_payload)
         self.run_command(["git", "add", "."], cwd=self.repo_root)
         self.run_command(["git", "commit", "-m", "add identity bootstrap"], cwd=self.repo_root)
+        ensure_post_index_current(self.repo_root).connection.close()
 
     def tearDown(self) -> None:
         self.repo_tempdir.cleanup()
@@ -164,7 +165,7 @@ process.stdout.write(signature);
         activity_operation = next(event for event in operations if event.operation_name == "GET /activity/")
         self.assertEqual(activity_operation.state, "completed")
         self.assertEqual(activity_operation.metadata["view"], "code")
-        self.assertEqual(activity_operation.metadata["page"], 3)
+        self.assertEqual(activity_operation.metadata["page"], "3")
         step_names = tuple(step.name for step in activity_operation.steps)
         self.assertIn("activity_load_events", step_names)
         self.assertIn("activity_render_event_cards", step_names)
@@ -177,7 +178,7 @@ process.stdout.write(signature);
         operations = load_recent_operations(self.repo_root)
         activity_operation = next(event for event in operations if event.operation_name == "GET /activity/")
         self.assertEqual(activity_operation.metadata["view"], "content")
-        self.assertEqual(activity_operation.metadata["page"], 1)
+        self.assertEqual(activity_operation.metadata["page"], "1")
         step_names = tuple(step.name for step in activity_operation.steps)
         self.assertIn("activity_load_repository_state", step_names)
         self.assertIn("activity_build_posts_index", step_names)
@@ -243,10 +244,45 @@ process.stdout.write(signature);
                 status, _, body = self.request("/")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn("Refreshing forum data", body)
+        self.assertIn("Refreshing the forum", body)
         operations = load_recent_operations(self.repo_root)
         board_operation = next(event for event in operations if event.operation_name == "GET /")
         self.assertEqual(board_operation.state, "completed")
+
+    def test_board_request_records_route_specific_timing_steps(self) -> None:
+        status, _, _ = self.request("/")
+
+        self.assertEqual(status, "200 OK")
+        operations = load_recent_operations(self.repo_root)
+        board_operation = next(event for event in operations if event.operation_name == "GET /")
+        step_names = tuple(step.name for step in board_operation.steps)
+        self.assertIn("board_load_repository_state", step_names)
+        self.assertIn("board_build_page_context", step_names)
+        self.assertIn("board_render_page", step_names)
+
+    def test_thread_request_records_route_specific_timing_steps(self) -> None:
+        status, _, _ = self.request("/threads/root-001")
+
+        self.assertEqual(status, "200 OK")
+        operations = load_recent_operations(self.repo_root)
+        thread_operation = next(event for event in operations if event.operation_name == "GET /threads/root-001")
+        step_names = tuple(step.name for step in thread_operation.steps)
+        self.assertIn("thread_load_repository_state", step_names)
+        self.assertIn("thread_lookup_thread", step_names)
+        self.assertIn("thread_render_page", step_names)
+
+    def test_profile_request_records_route_specific_timing_steps(self) -> None:
+        status, _, _ = self.request(f"/profiles/{identity_slug(self.identity_id)}")
+
+        self.assertEqual(status, "200 OK")
+        operations = load_recent_operations(self.repo_root)
+        profile_operation = next(
+            event for event in operations if event.operation_name == f"GET /profiles/{identity_slug(self.identity_id)}"
+        )
+        step_names = tuple(step.name for step in profile_operation.steps)
+        self.assertIn("profile_load_repository_state", step_names)
+        self.assertIn("profile_lookup_summary", step_names)
+        self.assertIn("profile_render_page", step_names)
 
 
 if __name__ == "__main__":

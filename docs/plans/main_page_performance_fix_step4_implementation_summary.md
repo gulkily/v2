@@ -19,3 +19,14 @@
   - Result: `10 passed in 0.80s`.
 - Notes:
   - This keeps the existing eager-startup behavior for reusable workers while making the real CGI gateway (`wsgi.run_once = True`) rely on route-level, on-demand index access instead.
+
+## Stage 3 - Add route-specific timing steps for public reads
+- Changes:
+  - Added reusable timed request-step recording for request-scoped operation events.
+  - Instrumented board, thread, and profile read handlers with named phases for repository load, lookup/context building, and page rendering.
+  - Extended request-operation tests to assert the new timing steps for `/`, `/threads/...`, and `/profiles/...`, and aligned that test file with the current string-normalized metadata behavior.
+- Verification:
+  - Ran `python3 -m pytest -q tests/test_request_operation_events.py`.
+  - Result: `9 passed in 4.09s`.
+- Notes:
+  - The request-operation test fixture now prebuilds the post index so board/thread/profile requests exercise the actual render path rather than the stale-index refresh page.

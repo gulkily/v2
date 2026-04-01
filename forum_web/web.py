@@ -14,7 +14,7 @@ from email.utils import format_datetime
 from http.cookies import SimpleCookie
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Iterator
+from typing import Callable, Iterable, Iterator, TypeVar
 from urllib.parse import parse_qs, unquote
 from wsgiref.util import setup_testing_defaults
 
@@ -133,6 +133,7 @@ POST_INDEX_REBUILD_TARGET_HEADER = "X-Forum-Post-Index-Target-Path"
 POST_INDEX_REBUILD_REQUEST_HEADER = "X-Forum-Post-Index-Rebuild-Path"
 POST_INDEX_REBUILD_QUERY_PARAM = "__forum_rebuild"
 IDENTITY_HINT_SYNC_PATH = "/api/set_identity_hint"
+T = TypeVar("T")
 
 
 def get_repo_root() -> Path:
@@ -180,6 +181,14 @@ def ensure_runtime_post_index_startup(repo_root: Path) -> None:
 
 def request_runs_once(environ: dict[str, object]) -> bool:
     return bool(environ.get("wsgi.run_once"))
+
+
+def timed_request_step(step_name: str, callback: Callable[[], T]) -> T:
+    started_at = time.perf_counter()
+    try:
+        return callback()
+    finally:
+        record_current_operation_step(step_name, (time.perf_counter() - started_at) * 1000.0)
 
 
 def _request_supports_reindex_feedback(path: str, *, method: str) -> bool:
@@ -1379,36 +1388,48 @@ def render_account_key_page() -> str:
 
 def render_board_index(*, board_tag: str | None = None) -> str:
     repo_root = get_repo_root()
-    posts, threads, board_tags, _, moderation_state, _ = load_repository_state()
-    title_updates = load_thread_title_updates(repo_root)
+    posts, threads, board_tags, _, moderation_state, _ = timed_request_step(
+        "board_load_repository_state",
+        load_repository_state,
+    )
+    title_updates = timed_request_step(
+        "board_load_title_updates",
+        lambda: load_thread_title_updates(repo_root),
+    )
     if board_tag and board_tag not in board_tags:
         raise LookupError(f"unknown board tag: {board_tag}")
     feed_href = "/?format=rss"
     if board_tag:
         feed_href = f"/?board_tag={board_tag}&format=rss"
-    context = build_board_index_page_context(
-        posts,
-        threads,
-        moderation_state,
-        title_updates=title_updates,
-        repo_root=repo_root,
-        board_tag=board_tag,
+    context = timed_request_step(
+        "board_build_page_context",
+        lambda: build_board_index_page_context(
+            posts,
+            threads,
+            moderation_state,
+            title_updates=title_updates,
+            repo_root=repo_root,
+            board_tag=board_tag,
+        ),
     )
-    content = load_template("board_index.html").substitute(context)
-    return render_page(
-        title=site_title(),
-        hero_kicker="",
-        hero_title="",
-        hero_text="",
-        page_header_html=render_site_header(
+    content = timed_request_step(
+        "board_render_page",
+        lambda: render_page(
+            title=site_title(),
             hero_kicker="",
             hero_title="",
             hero_text="",
-            include_page_intro=False,
+            page_header_html=render_site_header(
+                hero_kicker="",
+                hero_title="",
+                hero_text="",
+                include_page_intro=False,
+            ),
+            content_html=load_template("board_index.html").substitute(context),
+            head_extras_html=render_feed_head_link(feed_href),
         ),
-        content_html=content,
-        head_extras_html=render_feed_head_link(feed_href),
     )
+    return content
 
 
 def build_board_index_page_context(posts, threads, moderation_state, *, title_updates, repo_root: Path, board_tag: str | None = None) -> dict[str, str]:
@@ -1769,10 +1790,18 @@ def render_board_section(tag: str, threads, moderation_state) -> str:
 
 def render_thread(thread_id: str) -> str:
     repo_root = get_repo_root()
-    posts, grouped_threads, _, _, moderation_state, identity_context = load_repository_state()
-    title_updates = load_thread_title_updates(repo_root)
-    threads = index_threads(grouped_threads)
-    thread = threads.get(thread_id)
+    posts, grouped_threads, _, _, moderation_state, identity_context = timed_request_step(
+        "thread_load_repository_state",
+        load_repository_state,
+    )
+    title_updates = timed_request_step(
+        "thread_load_title_updates",
+        lambda: load_thread_title_updates(repo_root),
+    )
+    thread = timed_request_step(
+        "thread_lookup_thread",
+        lambda: index_threads(grouped_threads).get(thread_id),
+    )
     if thread is None or thread_is_hidden(moderation_state, thread_id):
         raise LookupError(f"unknown thread: {thread_id}")
 
@@ -1831,34 +1860,36 @@ def render_thread(thread_id: str) -> str:
     feed_href = f"/threads/{thread_id}?format=rss"
     current_title = resolved_thread_heading(thread, title_updates)
 
-    content = load_template("thread.html").substitute(
-        thread_heading=html.escape(current_title),
-        thread_meta_html=thread_meta_html,
-        reply_link_html=reply_link_html,
-        change_title_link_html=change_title_link_html,
-        root_context_html=render_thread_root_context(thread),
-        root_post_html=render_post_card(
-            thread.root,
-            root_thread_id=thread.root.post_id,
-            identity_context=identity_context,
-            compact_thread_view=True,
-            show_subject=False,
-        ),
-        replies_section_html=replies_section_html,
-    )
-    return render_page(
-        title=current_title,
-        hero_kicker="",
-        hero_title="",
-        hero_text="",
-        page_header_html=render_site_header(
+    return timed_request_step(
+        "thread_render_page",
+        lambda: render_page(
+            title=current_title,
             hero_kicker="",
             hero_title="",
             hero_text="",
-            include_page_intro=False,
+            page_header_html=render_site_header(
+                hero_kicker="",
+                hero_title="",
+                hero_text="",
+                include_page_intro=False,
+            ),
+            content_html=load_template("thread.html").substitute(
+                thread_heading=html.escape(current_title),
+                thread_meta_html=thread_meta_html,
+                reply_link_html=reply_link_html,
+                change_title_link_html=change_title_link_html,
+                root_context_html=render_thread_root_context(thread),
+                root_post_html=render_post_card(
+                    thread.root,
+                    root_thread_id=thread.root.post_id,
+                    identity_context=identity_context,
+                    compact_thread_view=True,
+                    show_subject=False,
+                ),
+                replies_section_html=replies_section_html,
+            ),
+            head_extras_html=render_feed_head_link(feed_href),
         ),
-        content_html=content,
-        head_extras_html=render_feed_head_link(feed_href),
     )
 
 
@@ -2121,42 +2152,60 @@ def render_unpublished_profile_page(identity_id: str) -> str:
 
 
 def render_profile_for_request(identity_id: str, *, self_request: bool) -> str:
-    posts, _, _, _, _, identity_context = load_repository_state()
-    summary = find_profile_summary(
-        repo_root=get_repo_root(),
-        posts=posts,
-        identity_id=identity_id,
-        identity_context=identity_context,
+    posts, _, _, _, _, identity_context = timed_request_step(
+        "profile_load_repository_state",
+        load_repository_state,
+    )
+    summary = timed_request_step(
+        "profile_lookup_summary",
+        lambda: find_profile_summary(
+            repo_root=get_repo_root(),
+            posts=posts,
+            identity_id=identity_id,
+            identity_context=identity_context,
+        ),
     )
     if summary is None:
         if self_request:
             return render_unpublished_profile_page(identity_id)
         raise LookupError(f"unknown identity: {identity_id}")
-    return render_profile_page(
-        summary=summary,
-        posts=posts,
-        identity_context=identity_context,
-        route_path=f"/profiles/{identity_slug(summary.identity_id)}",
-        self_request=self_request,
+    return timed_request_step(
+        "profile_render_page",
+        lambda: render_profile_page(
+            summary=summary,
+            posts=posts,
+            identity_context=identity_context,
+            route_path=f"/profiles/{identity_slug(summary.identity_id)}",
+            self_request=self_request,
+        ),
     )
 
 
 def render_profile_by_username(username: str) -> str:
-    posts, _, _, _, _, identity_context = load_repository_state()
-    summary = resolve_profile_summary_by_username(
-        repo_root=get_repo_root(),
-        posts=posts,
-        username=username,
-        identity_context=identity_context,
+    posts, _, _, _, _, identity_context = timed_request_step(
+        "profile_load_repository_state",
+        load_repository_state,
+    )
+    summary = timed_request_step(
+        "profile_lookup_summary",
+        lambda: resolve_profile_summary_by_username(
+            repo_root=get_repo_root(),
+            posts=posts,
+            username=username,
+            identity_context=identity_context,
+        ),
     )
     if summary is None:
         raise LookupError(f"unknown username: {username}")
-    return render_profile_page(
-        summary=summary,
-        posts=posts,
-        identity_context=identity_context,
-        route_path=f"/user/{username_route_token(username)}",
-        self_request=False,
+    return timed_request_step(
+        "profile_render_page",
+        lambda: render_profile_page(
+            summary=summary,
+            posts=posts,
+            identity_context=identity_context,
+            route_path=f"/user/{username_route_token(username)}",
+            self_request=False,
+        ),
     )
 
 
