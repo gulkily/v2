@@ -3517,7 +3517,7 @@ def _dispatch_application(environ, start_response):
             )
             if streamed_response is not None:
                 return streamed_response
-    if not runs_once:
+    if not runs_once or _query_requests_post_index_rebuild(query_params):
         ensure_runtime_post_index_startup(repo_root)
     if not wants_rss and _request_supports_reindex_feedback(path, method=method):
         buffered_response = maybe_render_buffered_reindex_feedback_response(

@@ -9,7 +9,8 @@ import unittest
 from pathlib import Path
 from textwrap import dedent
 
-from forum_core.php_native_reads import rebuild_php_native_thread_snapshots, thread_snapshot_db_path
+from forum_core.identity import build_identity_id, fingerprint_from_public_key_text, identity_slug
+from forum_core.php_native_reads import rebuild_php_native_profile_snapshots, rebuild_php_native_thread_snapshots, thread_snapshot_db_path
 
 
 class PhpHostCacheTests(unittest.TestCase):
@@ -199,6 +200,10 @@ process.stdout.write(signature);
                 "dry_run": False,
             }
         ).encode("utf-8")
+
+    def profile_slug(self) -> str:
+        fingerprint = fingerprint_from_public_key_text(self.user_keys["publicKey"])
+        return identity_slug(build_identity_id(fingerprint))
 
     def cache_files(self) -> list[Path]:
         cache_root = Path(self.cache_tempdir.name) / "cache"
@@ -407,7 +412,7 @@ process.stdout.write(signature);
         )
         self.assertEqual(
             self.php_cache_helper(
-                "echo forum_static_html_request() ? 'yes' : 'no';",
+                "putenv('FORUM_ENABLE_USERNAME_CLAIM_CTA='); echo forum_static_html_request() ? 'yes' : 'no';",
                 path="/compose/thread",
                 cookie="forum_identity_hint=test",
             ),
@@ -765,6 +770,50 @@ process.stdout.write(signature);
         self.assertEqual(thread_response["status"], 200)
         self.assertNotIn("X-Forum-Php-Native: HIT", thread_response["headers"])
         self.assertIn("Unexpected cookie fallback", thread_response["body"])
+
+    def test_profile_route_can_render_from_php_native_snapshot_with_identity_hint_cookie(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-profile-native-001",
+            subject="Profile native seed",
+            body_text="Signed body for profile native seed.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+
+        rebuild_php_native_profile_snapshots(self.data_repo_root)
+
+        profile_response = self.php_request(f"/profiles/{self.profile_slug()}", cookie="forum_identity_hint=test")
+
+        self.assertEqual(profile_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", profile_response["headers"])
+        self.assertIn("X-Forum-Response-Source: php-native-profile", profile_response["headers"])
+
+    def test_profile_route_with_unexpected_cookie_bypasses_php_native_snapshot(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-profile-fallback-001",
+            subject="Profile fallback seed",
+            body_text="Signed body for profile fallback seed.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+
+        rebuild_php_native_profile_snapshots(self.data_repo_root)
+
+        profile_response = self.php_request(f"/profiles/{self.profile_slug()}", cookie="session=abc")
+
+        self.assertEqual(profile_response["status"], 200)
+        self.assertNotIn("X-Forum-Php-Native: HIT", profile_response["headers"])
+        self.assertIn("Profile fallback seed", profile_response["body"])
 
     def test_thread_static_html_takes_precedence_over_native_snapshot(self) -> None:
         payload = self.build_thread_payload(

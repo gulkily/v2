@@ -12,6 +12,7 @@ from forum_core.post_index import IndexedPostRow, load_indexed_root_posts
 from forum_core.php_native_reads_db import connect_php_native_reads_db, delete_php_native_snapshot, php_native_reads_db_path, save_php_native_snapshot
 from forum_core.thread_title_updates import parse_thread_title_update_record
 from forum_core.thread_title_updates import load_thread_title_update_records, resolve_current_thread_title, thread_title_updates_dir
+from forum_core.identity import identity_slug
 from forum_web.repository import group_threads, index_posts, index_threads, load_posts, root_thread_type
 
 
@@ -29,6 +30,10 @@ def board_index_snapshot_path(repo_root: Path) -> Path:
 
 def thread_snapshot_id(thread_id: str) -> str:
     return f"thread/{thread_id}"
+
+
+def profile_snapshot_id(profile_slug: str) -> str:
+    return f"profile/{profile_slug}"
 
 
 def thread_snapshot_db_path(repo_root: Path) -> Path:
@@ -227,9 +232,67 @@ def build_thread_snapshot(thread_id: str, repo_root: Path) -> dict[str, object]:
     }
 
 
+def build_profile_snapshot(identity_id: str, repo_root: Path) -> dict[str, object]:
+    from forum_web.web import render_profile_page
+    from forum_web.profiles import find_profile_summary, load_identity_context
+
+    posts = load_posts(post_records_dir(repo_root))
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+    summary = find_profile_summary(
+        repo_root=repo_root,
+        posts=posts,
+        identity_id=identity_id,
+        identity_context=identity_context,
+    )
+    if summary is None:
+        raise LookupError(f"unknown identity: {identity_id}")
+    profile_slug = identity_slug(summary.identity_id)
+    content_html = render_profile_page(
+        summary=summary,
+        posts=posts,
+        identity_context=identity_context,
+        route_path=f"/profiles/{profile_slug}",
+        self_request=False,
+    )
+    return {
+        "route": f"/profiles/{profile_slug}",
+        "identity_id": summary.identity_id,
+        "profile_slug": profile_slug,
+        "title": summary.display_name,
+        "content_html": content_html,
+    }
+
+
 def _all_thread_ids(repo_root: Path) -> list[str]:
     posts = load_posts(post_records_dir(repo_root))
     return sorted(post.post_id for post in posts if post.is_root)
+
+
+def _all_profile_identity_ids(repo_root: Path) -> list[str]:
+    from forum_web.profiles import find_profile_summary, load_identity_context
+
+    posts = load_posts(post_records_dir(repo_root))
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+    candidate_identity_ids = {
+        identity_id
+        for identity_id in identity_context.bootstraps_by_identity_id.keys()
+    }
+    candidate_identity_ids.update(
+        post.identity_id
+        for post in posts
+        if post.identity_id
+    )
+    resolved_identity_ids: set[str] = set()
+    for candidate_identity_id in candidate_identity_ids:
+        summary = find_profile_summary(
+            repo_root=repo_root,
+            posts=posts,
+            identity_id=candidate_identity_id,
+            identity_context=identity_context,
+        )
+        if summary is not None:
+            resolved_identity_ids.add(summary.identity_id)
+    return sorted(resolved_identity_ids)
 
 
 def _root_thread_id_for_post(repo_root: Path, post_id: str) -> str | None:
@@ -328,12 +391,40 @@ def refresh_thread_snapshot(repo_root: Path, thread_id: str, *, invalidated_by_p
         connection.close()
 
 
+def refresh_profile_snapshot(repo_root: Path, identity_id: str) -> None:
+    connection = connect_php_native_reads_db(repo_root)
+    try:
+        try:
+            snapshot = build_profile_snapshot(identity_id, repo_root)
+        except LookupError:
+            delete_php_native_snapshot(connection, profile_snapshot_id(identity_slug(identity_id)))
+            return
+        save_php_native_snapshot(
+            connection,
+            snapshot_id=profile_snapshot_id(snapshot["profile_slug"]),
+            entity_type="profile",
+            entity_id=identity_id,
+            snapshot=snapshot,
+        )
+    finally:
+        connection.close()
+
+
 def rebuild_php_native_thread_snapshots(repo_root: Path, *, thread_ids: Iterable[str] | None = None) -> list[str]:
     refreshed: list[str] = []
     target_thread_ids = sorted(set(thread_ids if thread_ids is not None else _all_thread_ids(repo_root)))
     for thread_id in target_thread_ids:
         refresh_thread_snapshot(repo_root, thread_id)
         refreshed.append(thread_id)
+    return refreshed
+
+
+def rebuild_php_native_profile_snapshots(repo_root: Path, *, identity_ids: Iterable[str] | None = None) -> list[str]:
+    refreshed: list[str] = []
+    target_identity_ids = sorted(set(identity_ids if identity_ids is not None else _all_profile_identity_ids(repo_root)))
+    for identity_id in target_identity_ids:
+        refresh_profile_snapshot(repo_root, identity_id)
+        refreshed.append(identity_id)
     return refreshed
 
 
@@ -346,3 +437,4 @@ def refresh_php_native_read_artifacts(repo_root: Path, *, touched_paths: Iterabl
     )
     for thread_id in affected_thread_ids_for_touched_paths(repo_root, touched_paths):
         refresh_thread_snapshot(repo_root, thread_id)
+    rebuild_php_native_profile_snapshots(repo_root)

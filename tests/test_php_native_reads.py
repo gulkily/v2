@@ -13,7 +13,9 @@ from forum_core.php_native_reads import (
     affected_thread_ids_for_touched_paths,
     board_index_snapshot_path,
     build_board_index_snapshot,
+    build_profile_snapshot,
     build_thread_snapshot,
+    rebuild_php_native_profile_snapshots,
     rebuild_php_native_thread_snapshots,
     thread_snapshot_db_path,
 )
@@ -232,6 +234,84 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
         self.assertIn("change title", snapshot["content_html"])
         self.assertIn("Replies", snapshot["content_html"])
         self.assertIn("First visible reply.", snapshot["content_html"])
+
+    def test_build_profile_snapshot_includes_expected_profile_page_content(self) -> None:
+        self.write_record(
+            "records/posts/root-301.txt",
+            """
+            Post-ID: root-301
+            Board-Tags: general
+            Subject: Profile seed
+            Signer-Fingerprint: ABCDEF0123456789ABCDEF0123456789ABCDEF01
+            Identity-ID: openpgp:ABCDEF0123456789ABCDEF0123456789ABCDEF01
+
+            Signed body.
+            """,
+        )
+        self.write_record(
+            "records/identity/identity-bootstrap-openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF01.txt",
+            """
+            Post-ID: identity-bootstrap-openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF01
+            Identity-ID: openpgp:ABCDEF0123456789ABCDEF0123456789ABCDEF01
+            Signer-Fingerprint: ABCDEF0123456789ABCDEF0123456789ABCDEF01
+            Bootstrap-By-Post: root-301
+            Bootstrap-By-Thread: root-301
+
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            Example key
+            -----END PGP PUBLIC KEY BLOCK-----
+            """,
+        )
+        self.commit_paths("records/posts", "records/identity", message="Seed profile snapshot fixture")
+
+        snapshot = build_profile_snapshot("openpgp:ABCDEF0123456789ABCDEF0123456789ABCDEF01", self.repo_root)
+
+        self.assertEqual(snapshot["route"], "/profiles/openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF01")
+        self.assertIn("Public profile for", snapshot["content_html"])
+        self.assertIn("root-301", snapshot["content_html"])
+        self.assertIn("visible posts", snapshot["content_html"])
+
+    def test_rebuild_php_native_profile_snapshots_backfills_sqlite_rows(self) -> None:
+        self.write_record(
+            "records/posts/root-302.txt",
+            """
+            Post-ID: root-302
+            Board-Tags: general
+            Subject: Profile target
+            Signer-Fingerprint: ABCDEF0123456789ABCDEF0123456789ABCDEF02
+            Identity-ID: openpgp:ABCDEF0123456789ABCDEF0123456789ABCDEF02
+
+            Snapshot me.
+            """,
+        )
+        self.write_record(
+            "records/identity/identity-bootstrap-openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF02.txt",
+            """
+            Post-ID: identity-bootstrap-openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF02
+            Identity-ID: openpgp:ABCDEF0123456789ABCDEF0123456789ABCDEF02
+            Signer-Fingerprint: ABCDEF0123456789ABCDEF0123456789ABCDEF02
+            Bootstrap-By-Post: root-302
+            Bootstrap-By-Thread: root-302
+
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            Example key
+            -----END PGP PUBLIC KEY BLOCK-----
+            """,
+        )
+        self.commit_paths("records/posts", "records/identity", message="Seed profile backfill fixture")
+
+        rebuilt = rebuild_php_native_profile_snapshots(self.repo_root)
+
+        self.assertEqual(rebuilt, ["openpgp:ABCDEF0123456789ABCDEF0123456789ABCDEF02"])
+        connection = sqlite3.connect(thread_snapshot_db_path(self.repo_root))
+        try:
+            snapshot = load_php_native_snapshot(connection, "profile/openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF02")
+        finally:
+            connection.close()
+        assert snapshot is not None
+        self.assertEqual(snapshot["route"], "/profiles/openpgp-ABCDEF0123456789ABCDEF0123456789ABCDEF02")
+        self.assertIn("Public profile for", snapshot["content_html"])
+        self.assertIn("root-302", snapshot["content_html"])
 
     def test_affected_thread_ids_for_post_moderation_and_title_updates(self) -> None:
         self.write_record(

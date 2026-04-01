@@ -628,6 +628,34 @@ function forum_php_native_thread_route(): ?string
     return $threadId;
 }
 
+function forum_php_native_profile_route(): ?string
+{
+    if (forum_request_method() !== 'GET') {
+        return null;
+    }
+    if (forum_post_index_rebuild_request()) {
+        return null;
+    }
+    if (forum_request_query_string() !== '') {
+        return null;
+    }
+    $path = forum_request_path();
+    if (forum_request_has_cache_busting_credentials($path)) {
+        return null;
+    }
+    if (!str_starts_with($path, '/profiles/')) {
+        return null;
+    }
+    if (str_contains($path, '/update') || str_contains($path, '/merge')) {
+        return null;
+    }
+    $profileSlug = trim(substr($path, strlen('/profiles/')), '/');
+    if ($profileSlug === '' || str_contains($profileSlug, '/')) {
+        return null;
+    }
+    return $profileSlug;
+}
+
 function forum_repo_root(): string
 {
     $configured = forum_host_config()['repo_root'] ?? '';
@@ -751,6 +779,44 @@ function forum_php_native_load_thread_snapshot(string $threadId): ?array
         return null;
     }
     if (($decoded['route'] ?? null) !== '/threads/' . $threadId) {
+        return null;
+    }
+    if (!isset($decoded['content_html']) || !is_string($decoded['content_html'])) {
+        return null;
+    }
+    return $decoded;
+}
+
+function forum_php_native_load_profile_snapshot(string $profileSlug): ?array
+{
+    $db = forum_php_native_open_db();
+    if (!($db instanceof SQLite3)) {
+        return null;
+    }
+    $statement = $db->prepare('SELECT snapshot_json FROM php_native_snapshots WHERE snapshot_id = :snapshot_id');
+    if (!($statement instanceof SQLite3Stmt)) {
+        $db->close();
+        return null;
+    }
+    $statement->bindValue(':snapshot_id', 'profile/' . $profileSlug, SQLITE3_TEXT);
+    $result = $statement->execute();
+    if (!($result instanceof SQLite3Result)) {
+        $statement->close();
+        $db->close();
+        return null;
+    }
+    $row = $result->fetchArray(SQLITE3_ASSOC);
+    $result->finalize();
+    $statement->close();
+    $db->close();
+    if (!is_array($row) || !isset($row['snapshot_json']) || !is_string($row['snapshot_json'])) {
+        return null;
+    }
+    $decoded = json_decode($row['snapshot_json'], true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    if (($decoded['route'] ?? null) !== '/profiles/' . $profileSlug) {
         return null;
     }
     if (!isset($decoded['content_html']) || !is_string($decoded['content_html'])) {
@@ -1122,6 +1188,27 @@ if (is_array($threadNativeAttempt['response'] ?? null)) {
     exit;
 }
 $threadFallbackHeaders = is_array($threadNativeAttempt['headers'] ?? null) ? $threadNativeAttempt['headers'] : [];
+
+$profileSlug = forum_php_native_profile_route();
+if (is_string($profileSlug) && $profileSlug !== '') {
+    $profileSnapshot = forum_php_native_load_profile_snapshot($profileSlug);
+    if (is_array($profileSnapshot)) {
+        forum_apply_native_response(
+            [
+                'status_code' => 200,
+                'headers' => [
+                    'Content-Type: text/html; charset=utf-8',
+                ],
+                'body' => (string) $profileSnapshot['content_html'],
+            ],
+            array_merge(
+                ['X-Forum-Php-Native: HIT'],
+                forum_timing_headers($forumRequestStartedAt, 'php-native-profile')
+            )
+        );
+        exit;
+    }
+}
 
 $cachedResponse = forum_read_cached_response();
 if (is_string($cachedResponse)) {

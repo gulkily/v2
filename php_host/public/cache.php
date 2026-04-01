@@ -132,6 +132,9 @@ function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
     if (str_starts_with($candidate, '/threads/')) {
         return !str_ends_with($candidate, '/title');
     }
+    if (str_starts_with($candidate, '/profiles/')) {
+        return !str_contains($candidate, '/update') && !str_contains($candidate, '/merge');
+    }
     if ($candidate === '/compose/thread' || $candidate === '/compose/thread/') {
         $ctaValue = getenv('FORUM_ENABLE_USERNAME_CLAIM_CTA');
         if (!is_string($ctaValue) || $ctaValue === '') {

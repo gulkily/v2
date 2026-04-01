@@ -30,3 +30,15 @@
   - Result: `9 passed in 4.09s`.
 - Notes:
   - The request-operation test fixture now prebuilds the post index so board/thread/profile requests exercise the actual render path rather than the stale-index refresh page.
+
+## Stage 4 - Add PHP-native profile reads
+- Changes:
+  - Extended PHP-native read artifacts to build and store `/profiles/<identity-slug>` snapshots in the shared SQLite snapshot store.
+  - Added PHP-host native route handling for queryless public profile pages and aligned profile cookie-safety rules with the existing public-read contract.
+  - Kept the expansion bounded to `/profiles/...` and left `/user/...`, merge, update, and request-shaped profile routes on the existing dynamic path.
+  - Added focused snapshot and PHP-host tests covering profile snapshot generation, profile native hits with `forum_identity_hint`, and fallback when unexpected cookies are present.
+- Verification:
+  - Ran `python3 -m pytest -q tests/test_php_native_reads.py tests/test_php_host_cache.py tests/test_post_index_startup.py`.
+  - Result: `41 passed in 15.03s`.
+- Notes:
+  - CGI rebuild requests still need the real startup rebuild path, so Stage 2 was narrowed to skip eager startup only for non-rebuild CGI reads.
