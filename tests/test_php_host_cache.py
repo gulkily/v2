@@ -379,7 +379,7 @@ process.stdout.write(signature);
                 path="/threads/example-thread",
                 cookie="forum_identity_hint=test",
             ),
-            "no",
+            "yes",
         )
         self.assertEqual(
             self.php_cache_helper(
@@ -606,6 +606,94 @@ process.stdout.write(signature);
         self.assertNotIn("X-Forum-Php-Native: HIT", response["headers"])
         self.assertIn("Forum CGI bridge failed.", response["body"])
 
+    def test_root_can_render_from_php_native_snapshot_with_identity_hint_cookie(self) -> None:
+        self.write_php_native_board_index_snapshot(
+            {
+                "route": "/",
+                "thread_rows": [
+                    {
+                        "post_id": "root-native-cookie-001",
+                        "thread_href": "/threads/root-native-cookie-001",
+                        "subject": "Native cookie-safe root",
+                        "preview": "Cookie-safe preview.",
+                        "tags": [],
+                        "reply_count": 0,
+                        "thread_type": None,
+                    }
+                ],
+                "stats": {
+                    "post_count": 1,
+                    "thread_count": 1,
+                    "board_tag_count": 0,
+                },
+            }
+        )
+        self.config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    "    'app_root' => '/definitely/missing-app-root',",
+                    f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        response = self.php_request("/", cookie="forum_identity_hint=test")
+
+        self.assertEqual(response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", response["headers"])
+        self.assertIn("Native cookie-safe root", response["body"])
+
+    def test_root_with_unexpected_cookie_bypasses_php_native_snapshot(self) -> None:
+        self.write_php_native_board_index_snapshot(
+            {
+                "route": "/",
+                "thread_rows": [],
+                "stats": {
+                    "post_count": 0,
+                    "thread_count": 0,
+                    "board_tag_count": 0,
+                },
+            }
+        )
+        self.config_path.write_text(
+            "\n".join(
+                [
+                    "<?php",
+                    "",
+                    "declare(strict_types=1);",
+                    "",
+                    "return [",
+                    "    'app_root' => '/definitely/missing-app-root',",
+                    f"    'repo_root' => {self.data_repo_root.as_posix()!r},",
+                    f"    'cache_dir' => {(Path(self.cache_tempdir.name) / 'cache').as_posix()!r},",
+                    f"    'static_html_dir' => {(Path(self.static_tempdir.name) / '_static_html').as_posix()!r},",
+                    "    'site_title' => 'zenmemes',",
+                    "    'microcache_ttl' => 5,",
+                    "];",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        response = self.php_request("/", cookie="session=abc")
+
+        self.assertEqual(response["status"], 500)
+        self.assertNotIn("X-Forum-Php-Native: HIT", response["headers"])
+        self.assertIn("Forum CGI bridge failed.", response["body"])
+
     def test_thread_route_can_render_from_php_native_sqlite_snapshot(self) -> None:
         payload = self.build_thread_payload(
             post_id="thread-native-001",
@@ -633,6 +721,50 @@ process.stdout.write(signature);
             self.php_native_counter_value("/threads/thread-native-001", "anonymous", "native_hit"),
             1,
         )
+
+    def test_thread_route_can_render_from_php_native_snapshot_with_identity_hint_cookie(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-native-cookie-001",
+            subject="Native thread cookie-safe",
+            body_text="Root body for native cookie-safe thread.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+
+        rebuild_php_native_thread_snapshots(self.data_repo_root)
+
+        thread_response = self.php_request("/threads/thread-native-cookie-001", cookie="forum_identity_hint=test")
+
+        self.assertEqual(thread_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", thread_response["headers"])
+        self.assertIn("Native thread cookie-safe", thread_response["body"])
+
+    def test_thread_route_with_unexpected_cookie_bypasses_php_native_snapshot(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-native-unexpected-cookie-001",
+            subject="Unexpected cookie fallback",
+            body_text="Root body for unexpected cookie fallback.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+
+        rebuild_php_native_thread_snapshots(self.data_repo_root)
+
+        thread_response = self.php_request("/threads/thread-native-unexpected-cookie-001", cookie="session=abc")
+
+        self.assertEqual(thread_response["status"], 200)
+        self.assertNotIn("X-Forum-Php-Native: HIT", thread_response["headers"])
+        self.assertIn("Unexpected cookie fallback", thread_response["body"])
 
     def test_thread_static_html_takes_precedence_over_native_snapshot(self) -> None:
         payload = self.build_thread_payload(

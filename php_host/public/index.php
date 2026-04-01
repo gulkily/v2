@@ -591,7 +591,7 @@ function forum_php_native_board_index_route(): ?string
     if (forum_request_query_string() !== '') {
         return null;
     }
-    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
+    if (forum_request_has_cache_busting_credentials('/')) {
         return null;
     }
     if (forum_request_path() !== '/') {
@@ -611,10 +611,10 @@ function forum_php_native_thread_route(): ?string
     if (forum_request_query_string() !== '') {
         return null;
     }
-    if (isset($_SERVER['HTTP_AUTHORIZATION']) || isset($_SERVER['PHP_AUTH_USER']) || isset($_SERVER['HTTP_COOKIE'])) {
+    $path = forum_request_path();
+    if (forum_request_has_cache_busting_credentials($path)) {
         return null;
     }
-    $path = forum_request_path();
     if (!str_starts_with($path, '/threads/')) {
         return null;
     }

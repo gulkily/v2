@@ -129,6 +129,9 @@ function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
     if ($candidate === '/' || $candidate === '/instance/' || $candidate === '/moderation/' || $candidate === '/llms.txt' || $candidate === '/activity/') {
         return true;
     }
+    if (str_starts_with($candidate, '/threads/')) {
+        return !str_ends_with($candidate, '/title');
+    }
     if ($candidate === '/compose/thread' || $candidate === '/compose/thread/') {
         $ctaValue = getenv('FORUM_ENABLE_USERNAME_CLAIM_CTA');
         if (!is_string($ctaValue) || $ctaValue === '') {
