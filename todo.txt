@@ -125,3 +125,5 @@ things that need to be folded into the dev process:
 
 - we have a lot of different failure modes for server errors, and they all suck, and we need to fix them. example:
 	- Signed posting failed: <!doctype html> <html lang="en"> <head> <meta charset="utf-8"> <title>Server Error</title> </head> <body> <pre>database is locked</pre> </body> </html>
+
+- current board-index PHP-native snapshot: change from JSON to SQLite?
