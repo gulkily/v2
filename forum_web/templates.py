@@ -13,6 +13,7 @@ from forum_core.runtime_env import env_flag_enabled as runtime_env_flag_enabled
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 PAGE_SHELL_CONTENT_PATH = TEMPLATE_DIR / "page_shell_content.json"
+ASSET_ROUTE_MANIFEST_PATH = TEMPLATE_DIR / "asset_routes.json"
 USERNAME_CLAIM_CTA_STORAGE_KEY = "forum_username_claim_cta"
 _CURRENT_USERNAME_CLAIM_BANNER_STATE: ContextVar["UsernameClaimBannerState | None"] = ContextVar(
     "current_username_claim_banner_state",
@@ -31,6 +32,30 @@ def load_page_shell_content() -> dict[str, object]:
     if not isinstance(loaded, dict):
         raise ValueError("page shell content must decode to an object")
     return loaded
+
+
+def load_asset_route_manifest() -> list[dict[str, object]]:
+    loaded = json.loads(ASSET_ROUTE_MANIFEST_PATH.read_text(encoding="utf-8"))
+    if not isinstance(loaded, list):
+        raise ValueError("asset route manifest must decode to a list")
+    manifest: list[dict[str, object]] = []
+    for entry in loaded:
+        if isinstance(entry, dict):
+            manifest.append(entry)
+    return manifest
+
+
+def resolve_asset_route(path: str) -> tuple[bytes, str] | None:
+    for entry in load_asset_route_manifest():
+        if str(entry.get("path", "")) != path:
+            continue
+        asset_name = str(entry["asset"])
+        content_kind = str(entry["content_kind"])
+        content_type = str(entry["content_type"])
+        if content_kind == "bytes":
+            return load_asset_bytes(asset_name), content_type
+        return load_asset_text(asset_name).encode("utf-8"), content_type
+    return None
 
 
 def env_flag_enabled(name: str, *, default: bool = False) -> bool:

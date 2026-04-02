@@ -4,7 +4,7 @@ This checklist turns the initial reduction review into an ordered execution plan
 
 The intent is to remove code safely, starting with high-confidence dead code and low-risk consolidation, then moving toward structural simplification where the regression risk is higher.
 
-Current focus: Phase 5, reviewing route and asset branches against the supported surface.
+Current focus: Phase 6, reviewing feature-slice ownership boundaries and simplifying the next high-duplication slice.
 
 ## Working Rules
 
@@ -82,10 +82,16 @@ Phase 4 verification:
 
 ## Phase 5: Route and Asset Surface Review
 
-- [ ] Verify every asset route in [`forum_web/web.py`](/home/wsl/v2/forum_web/web.py) is still needed by either page rendering, PHP host support, or tests.
-- [ ] Verify the PHP cache/static-html layer only special-cases assets and routes that are still part of the supported surface.
-- [ ] Remove asset or route branches only after confirming there is no template, PHP, or test dependency.
-- [ ] Re-check whether any compatibility-only paths can be collapsed into canonical routes.
+- [x] Verify every asset route in [`forum_web/web.py`](/home/wsl/v2/forum_web/web.py) is still needed by either page rendering, PHP host support, or tests.
+- [x] Verify the PHP cache/static-html layer only special-cases assets and routes that are still part of the supported surface.
+- [x] Remove asset or route branches only after confirming there is no template, PHP, or test dependency.
+- [x] Re-check whether any compatibility-only paths can be collapsed into canonical routes.
+
+Phase 5 verification:
+- Focused tests passed:
+  - `python3 -m unittest tests.test_compose_thread_page tests.test_site_css_asset tests.test_profile_key_viewer_asset tests.test_account_key_actions_asset tests.test_merge_management_page tests.test_username_profile_route tests.test_task_priorities_page tests.test_php_host_cache tests.test_llms_txt`
+- Review note:
+  - Asset dispatch now comes from [`templates/asset_routes.json`](/home/wsl/v2/templates/asset_routes.json), which also defines the PHP-cacheable subset.
 
 ## Phase 6: Feature Slice Simplification
 

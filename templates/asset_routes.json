@@ -1,0 +1,100 @@
+[
+  {
+    "asset": "site.css",
+    "content_kind": "text",
+    "content_type": "text/css; charset=utf-8",
+    "path": "/assets/site.css",
+    "php_cacheable": true
+  },
+  {
+    "asset": "favicon.svg",
+    "content_kind": "text",
+    "content_type": "image/svg+xml; charset=utf-8",
+    "path": "/assets/favicon.svg",
+    "php_cacheable": false
+  },
+  {
+    "asset": "favicon.ico",
+    "content_kind": "bytes",
+    "content_type": "image/x-icon",
+    "path": "/favicon.ico",
+    "php_cacheable": false
+  },
+  {
+    "asset": "browser_signing.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/browser_signing.js",
+    "php_cacheable": true
+  },
+  {
+    "asset": "profile_nav.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/profile_nav.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "copy_field.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/copy_field.js",
+    "php_cacheable": true
+  },
+  {
+    "asset": "username_claim_cta.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/username_claim_cta.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "openpgp_loader.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/openpgp_loader.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "profile_merge_suggestion.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/profile_merge_suggestion.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "profile_key_viewer.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/profile_key_viewer.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "account_key_actions.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/account_key_actions.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "merge_request_signing.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/merge_request_signing.js",
+    "php_cacheable": false
+  },
+  {
+    "asset": "task_priorities.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/task_priorities.js",
+    "php_cacheable": true
+  },
+  {
+    "asset": "vendor/openpgp.min.mjs",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/vendor/openpgp.min.mjs",
+    "php_cacheable": true
+  }
+]

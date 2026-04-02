@@ -50,25 +50,42 @@ function forum_post_index_rebuild_request(): bool
 function forum_asset_request_path(?string $path = null): ?string
 {
     $candidate = $path ?? forum_request_path();
-    if (!str_starts_with($candidate, '/assets/')) {
-        return null;
-    }
-    if ($candidate === '/assets/site.css') {
-        return $candidate;
-    }
-    if ($candidate === '/assets/browser_signing.js') {
-        return $candidate;
-    }
-    if ($candidate === '/assets/copy_field.js') {
-        return $candidate;
-    }
-    if ($candidate === '/assets/task_priorities.js') {
-        return $candidate;
-    }
-    if ($candidate === '/assets/vendor/openpgp.min.mjs') {
+    foreach (forum_asset_route_manifest() as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (($entry['path'] ?? null) !== $candidate) {
+            continue;
+        }
+        if (!($entry['php_cacheable'] ?? false)) {
+            return null;
+        }
         return $candidate;
     }
     return null;
+}
+
+function forum_asset_route_manifest(): array
+{
+    static $cached = null;
+    if (is_array($cached)) {
+        return $cached;
+    }
+
+    if (function_exists('forum_app_root')) {
+        $path = forum_app_root() . '/templates/asset_routes.json';
+    } else {
+        $path = dirname(forum_public_dir(), 2) . '/templates/asset_routes.json';
+    }
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        $cached = [];
+        return $cached;
+    }
+
+    $decoded = json_decode($raw, true);
+    $cached = is_array($decoded) ? $decoded : [];
+    return $cached;
 }
 
 function forum_static_html_request_path(?string $path = null): ?string

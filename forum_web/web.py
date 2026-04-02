@@ -116,6 +116,7 @@ from forum_web.templates import (
     merge_feature_enabled,
     render_page,
     render_username_claim_bar_html,
+    resolve_asset_route,
     render_profile_nav_script_tag,
     reset_current_username_claim_cta_state,
     set_current_username_claim_cta_state,
@@ -3937,87 +3938,10 @@ def _dispatch_application(environ, start_response):
             start_response("200 OK", headers)
             return [body]
 
-        if path == "/assets/site.css":
-            body = load_asset_text("site.css").encode("utf-8")
-            headers = [("Content-Type", "text/css; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/favicon.svg":
-            body = load_asset_text("favicon.svg").encode("utf-8")
-            headers = [("Content-Type", "image/svg+xml; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/favicon.ico":
-            body = load_asset_bytes("favicon.ico")
-            headers = [("Content-Type", "image/x-icon")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/browser_signing.js":
-            body = load_asset_text("browser_signing.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/profile_nav.js":
-            body = load_asset_text("profile_nav.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/copy_field.js":
-            body = load_asset_text("copy_field.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/username_claim_cta.js":
-            body = load_asset_text("username_claim_cta.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/openpgp_loader.js":
-            body = load_asset_text("openpgp_loader.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/profile_merge_suggestion.js":
-            body = load_asset_text("profile_merge_suggestion.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/profile_key_viewer.js":
-            body = load_asset_text("profile_key_viewer.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/account_key_actions.js":
-            body = load_asset_text("account_key_actions.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/merge_request_signing.js":
-            body = load_asset_text("merge_request_signing.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/task_priorities.js":
-            body = load_asset_text("task_priorities.js").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
-            start_response("200 OK", headers)
-            return [body]
-
-        if path == "/assets/vendor/openpgp.min.mjs":
-            body = load_asset_text("vendor/openpgp.min.mjs").encode("utf-8")
-            headers = [("Content-Type", "text/javascript; charset=utf-8")]
+        asset_response = resolve_asset_route(path)
+        if asset_response is not None:
+            body, content_type = asset_response
+            headers = [("Content-Type", content_type)]
             start_response("200 OK", headers)
             return [body]
 
