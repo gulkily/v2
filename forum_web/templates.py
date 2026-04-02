@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from string import Template
 from textwrap import dedent, indent
+from forum_core.runtime_env import env_flag_enabled as runtime_env_flag_enabled
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -25,24 +26,15 @@ class UsernameClaimBannerState:
 
 
 def env_flag_enabled(name: str, *, default: bool = False) -> bool:
-    raw_value = os.environ.get(name)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+    return runtime_env_flag_enabled(name, default=default)
 
 
 def merge_feature_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get("FORUM_ENABLE_ACCOUNT_MERGE", "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return runtime_env_flag_enabled("FORUM_ENABLE_ACCOUNT_MERGE", env=env)
 
 
 def username_claim_cta_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get("FORUM_ENABLE_USERNAME_CLAIM_CTA")
-    if raw_value is None:
-        return True
-    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+    return runtime_env_flag_enabled("FORUM_ENABLE_USERNAME_CLAIM_CTA", env=env, default=True)
 
 
 def site_title(env: dict[str, str] | None = None) -> str:

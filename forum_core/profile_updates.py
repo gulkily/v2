@@ -9,6 +9,7 @@ from pathlib import Path
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_path
 from forum_core.identity_links import ensure_identity_id_text
 from forum_core.public_keys import resolve_public_key_from_signature
+from forum_core.runtime_env import env_flag_enabled
 
 
 ALLOWED_PROFILE_UPDATE_ACTIONS = ("set_display_name",)
@@ -62,9 +63,7 @@ def profile_update_records_dir(repo_root: Path) -> Path:
 
 
 def prevent_duplicate_usernames_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get(PREVENT_DUPLICATE_USERNAMES_ENV, "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return env_flag_enabled(PREVENT_DUPLICATE_USERNAMES_ENV, env=env)
 
 
 def ensure_timestamp_text(timestamp_text: str) -> str:

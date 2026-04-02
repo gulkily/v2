@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 from pathlib import Path
+from typing import Mapping
 
 try:
     from dotenv import load_dotenv as _load_dotenv
@@ -19,9 +20,26 @@ _COMMENTED_ASSIGNMENT_RE = re.compile(
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC_NOTE = "# Added automatically from .env.example via ./forum env-sync."
 _GENERATED_NOTE = "# Added automatically by forum runtime."
+TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 logger = logging.getLogger(__name__)
 _NOTIFIED_MISSING_DEFAULTS: set[tuple[Path, str]] = set()
 _NOTIFIED_GENERATED_DEFAULTS: set[tuple[Path, str]] = set()
+
+
+def string_is_truthy(raw_value: str | None, *, default: bool = False) -> bool:
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in TRUTHY_ENV_VALUES
+
+
+def env_flag_enabled(
+    name: str,
+    *,
+    env: Mapping[str, str] | None = None,
+    default: bool = False,
+) -> bool:
+    source_env = os.environ if env is None else env
+    return string_is_truthy(source_env.get(name), default=default)
 
 
 def repo_env_paths(repo_root: Path | None = None) -> tuple[Path, Path]:

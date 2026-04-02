@@ -33,7 +33,7 @@ from forum_core.operation_events import (
 from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts, post_index_readiness, rebuild_post_index
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
-from forum_core.runtime_env import ensure_generated_env_default, load_repo_env, notify_missing_env_defaults
+from forum_core.runtime_env import env_flag_enabled, ensure_generated_env_default, load_repo_env, notify_missing_env_defaults
 from forum_core.merge_requests import derive_merge_management_summary
 from forum_core.moderation import (
     derive_moderation_state,
@@ -152,15 +152,11 @@ def ensure_identity_hint_secret() -> str:
 
 
 def unsigned_post_fallback_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get("FORUM_ENABLE_UNSIGNED_POST_FALLBACK", "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return env_flag_enabled("FORUM_ENABLE_UNSIGNED_POST_FALLBACK", env=env)
 
 
 def signing_debug_logging_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get("FORUM_ENABLE_SIGNING_DEBUG_LOGS", "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return env_flag_enabled("FORUM_ENABLE_SIGNING_DEBUG_LOGS", env=env)
 
 
 def _html_block(raw_text: str) -> str:

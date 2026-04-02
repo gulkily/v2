@@ -8,6 +8,7 @@ from pathlib import Path
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_path
 from forum_core.moderation import is_authorized_moderator
 from forum_core.public_keys import resolve_public_key_from_signature
+from forum_core.runtime_env import env_flag_enabled
 
 
 THREAD_TITLE_ANY_USER_EDIT_ENV = "FORUM_ENABLE_THREAD_TITLE_ANY_USER_EDIT"
@@ -36,9 +37,7 @@ def thread_title_updates_dir(repo_root: Path) -> Path:
 
 
 def thread_title_any_user_edit_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get(THREAD_TITLE_ANY_USER_EDIT_ENV, "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return env_flag_enabled(THREAD_TITLE_ANY_USER_EDIT_ENV, env=env)
 
 
 def ensure_timestamp_text(timestamp_text: str) -> str:

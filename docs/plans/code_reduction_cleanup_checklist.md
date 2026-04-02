@@ -4,7 +4,7 @@ This checklist turns the initial reduction review into an ordered execution plan
 
 The intent is to remove code safely, starting with high-confidence dead code and low-risk consolidation, then moving toward structural simplification where the regression risk is higher.
 
-Current focus: Phase 3, starting with env-flag parsing and duplicated truthy checks across Python and PHP.
+Current focus: Phase 4, reviewing duplicated page-shell rendering across Python and PHP.
 
 ## Working Rules
 
@@ -53,11 +53,17 @@ Phase 2 verification:
 
 ## Phase 3: Shared Flag and Environment Parsing Cleanup
 
-- [ ] Inventory env-flag parsing helpers and duplicated truthy parsing logic across Python and PHP surfaces.
-- [ ] Choose one canonical Python helper for env-flag evaluation and route new code through it.
-- [ ] Reduce repeated inline truthy parsing where it does not need route-local behavior.
-- [ ] Review whether any feature flags are effectively permanent and can be removed rather than preserved.
-- [ ] Add or update focused tests before collapsing any flag behavior.
+- [x] Inventory env-flag parsing helpers and duplicated truthy parsing logic across Python and PHP surfaces.
+- [x] Choose one canonical Python helper for env-flag evaluation and route new code through it.
+- [x] Reduce repeated inline truthy parsing where it does not need route-local behavior.
+- [x] Review whether any feature flags are effectively permanent and can be removed rather than preserved.
+- [x] Add or update focused tests before collapsing any flag behavior.
+
+Phase 3 verification:
+- Focused tests passed:
+  - `python3 -m unittest tests.test_merge_feature_flag tests.test_profile_update_feature_flag tests.test_proof_of_work tests.test_thread_title_updates tests.test_thread_auto_reply`
+- Review note:
+  - This phase kept the existing feature flags in place and only centralized their Python-side parsing.
 
 ## Phase 4: Shared Page Shell Consolidation
 

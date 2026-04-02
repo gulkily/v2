@@ -12,6 +12,7 @@ from forum_cgi.posting import PostingError, ensure_ascii_text
 from forum_cgi.signing import sign_detached_payload
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_text
 from forum_core.llm_provider import get_llm_model, run_llm
+from forum_core.runtime_env import env_flag_enabled
 from forum_web.repository import Post
 
 
@@ -42,7 +43,7 @@ class AutoReplyPayload:
 
 
 def thread_auto_reply_enabled() -> bool:
-    return _env_flag("FORUM_ENABLE_THREAD_AUTO_REPLY")
+    return env_flag_enabled("FORUM_ENABLE_THREAD_AUTO_REPLY")
 
 
 def get_thread_auto_reply_signing_config(repo_root: Path) -> AssistantSigningConfig:
@@ -179,13 +180,6 @@ def slug_from_text(text: str) -> str:
             previous_dash = True
     slug = "".join(slug_chars).strip("-")
     return slug[:24] or "reply"
-
-
-def _env_flag(name: str) -> bool:
-    value = os.getenv(name, "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
-
-
 def _optional_path_env(name: str) -> Path | None:
     raw_value = os.getenv(name, "").strip()
     if not raw_value:

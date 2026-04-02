@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from forum_core.identity import build_bootstrap_record_id, build_identity_id, fingerprint_from_public_key_text, normalize_fingerprint
+from forum_core.runtime_env import env_flag_enabled
 
 
 POW_FIRST_POST_FLAG_ENV = "FORUM_ENABLE_FIRST_POST_POW"
@@ -13,9 +14,7 @@ DEFAULT_POW_DIFFICULTY = 18
 
 
 def first_post_pow_enabled(env: dict[str, str] | None = None) -> bool:
-    source_env = os.environ if env is None else env
-    raw_value = source_env.get(POW_FIRST_POST_FLAG_ENV, "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return env_flag_enabled(POW_FIRST_POST_FLAG_ENV, env=env)
 
 
 def first_post_pow_difficulty(env: dict[str, str] | None = None) -> int:
