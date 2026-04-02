@@ -1,0 +1,35 @@
+{
+  "footer_lines": [
+    "Best read with a clear mind and a modest browser window.",
+    "[ slow web ]"
+  ],
+  "primary_nav": [
+    {
+      "href": "/",
+      "label": "Home"
+    },
+    {
+      "href": "/compose/thread",
+      "label": "Post"
+    },
+    {
+      "href": "/instance/",
+      "label": "Project info"
+    },
+    {
+      "href": "/activity/",
+      "label": "Activity"
+    }
+  ],
+  "shared_script_sources": [
+    "/assets/profile_nav.js",
+    "/assets/copy_field.js"
+  ],
+  "site_tagline": "calm threads from canonical text records",
+  "username_claim": {
+    "action_label": "Choose your username",
+    "kicker": "Account setup",
+    "text": "Now that you're participating, you can choose a username."
+  },
+  "username_claim_script_source": "/assets/username_claim_cta.js"
+}

@@ -12,6 +12,7 @@ from forum_core.runtime_env import env_flag_enabled as runtime_env_flag_enabled
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
+PAGE_SHELL_CONTENT_PATH = TEMPLATE_DIR / "page_shell_content.json"
 USERNAME_CLAIM_CTA_STORAGE_KEY = "forum_username_claim_cta"
 _CURRENT_USERNAME_CLAIM_BANNER_STATE: ContextVar["UsernameClaimBannerState | None"] = ContextVar(
     "current_username_claim_banner_state",
@@ -23,6 +24,13 @@ _CURRENT_USERNAME_CLAIM_BANNER_STATE: ContextVar["UsernameClaimBannerState | Non
 class UsernameClaimBannerState:
     visible: bool
     update_href: str = ""
+
+
+def load_page_shell_content() -> dict[str, object]:
+    loaded = json.loads(PAGE_SHELL_CONTENT_PATH.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError("page shell content must decode to an object")
+    return loaded
 
 
 def env_flag_enabled(name: str, *, default: bool = False) -> bool:
@@ -67,26 +75,32 @@ def render_username_claim_bar_html(
     href: str,
     data_attribute_html: str = "",
 ) -> str:
+    claim_content = load_page_shell_content()["username_claim"]
+    if not isinstance(claim_content, dict):
+        raise ValueError("username_claim shell content must be an object")
     data_attribute = f" {data_attribute_html.strip()}" if data_attribute_html.strip() else ""
     return _html_block(
         f"""
         <section class="site-username-claim panel"{data_attribute}>
           <div class="site-username-claim-copy">
-            <p class="site-username-claim-kicker">Account setup</p>
-            <p class="site-username-claim-text">Now that you're participating, you can choose a username.</p>
+            <p class="site-username-claim-kicker">{html.escape(str(claim_content["kicker"]))}</p>
+            <p class="site-username-claim-text">{html.escape(str(claim_content["text"]))}</p>
           </div>
-          <a class="thread-chip site-username-claim-link" href="{html.escape(href, quote=True)}">Choose your username</a>
+          <a class="thread-chip site-username-claim-link" data-username-claim-link href="{html.escape(href, quote=True)}">{html.escape(str(claim_content["action_label"]))}</a>
         </section>
         """
     )
 
 
 def render_primary_nav(*, aria_label: str = "Primary") -> str:
+    shell_content = load_page_shell_content()
+    raw_links = shell_content["primary_nav"]
+    if not isinstance(raw_links, list):
+        raise ValueError("primary_nav shell content must be a list")
     links = [
-        ("/", "Home"),
-        ("/compose/thread", "Post"),
-        ("/instance/", "Project info"),
-        ("/activity/", "Activity"),
+        (str(item["href"]), str(item["label"]))
+        for item in raw_links
+        if isinstance(item, dict)
     ]
     items = "\n".join(
         f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
@@ -115,6 +129,7 @@ def render_site_header(
     hero_action_html: str = "",
     include_page_intro: bool = True,
 ) -> str:
+    shell_content = load_page_shell_content()
     intro_html = ""
     header_band_html = ""
     if include_page_intro:
@@ -145,12 +160,12 @@ def render_site_header(
             f"""
             <div class="site-header-main">
               <div class="site-header-lockup">
-                <p class="site-header-mark">(*)</p>
-                <div class="site-header-copy">
-                  <p class="site-header-title"><a href="/">{html.escape(site_title())}</a></p>
-                  <p class="site-header-tagline">calm threads from canonical text records</p>
+                  <p class="site-header-mark">(*)</p>
+                  <div class="site-header-copy">
+                    <p class="site-header-title"><a href="/">{html.escape(site_title())}</a></p>
+                  <p class="site-header-tagline">{html.escape(str(shell_content["site_tagline"]))}</p>
+                  </div>
                 </div>
-              </div>
               {_indent_html_block(render_primary_nav(), 2)}
             </div>
             """
@@ -161,12 +176,16 @@ def render_site_header(
 
 
 def render_site_footer() -> str:
+    shell_content = load_page_shell_content()
+    footer_lines = shell_content["footer_lines"]
+    if not isinstance(footer_lines, list):
+        raise ValueError("footer_lines shell content must be a list")
+    footer_html = "\n".join(f"<p>{html.escape(str(line))}</p>" for line in footer_lines)
     return _html_block(
-        """
+        f"""
         <footer class="site-footer">
           <div class="site-footer-inner">
-            <p>Best read with a clear mind and a modest browser window.</p>
-            <p>[ slow web ]</p>
+            {footer_html}
           </div>
         </footer>
         """
@@ -305,12 +324,25 @@ def load_asset_bytes(name: str) -> bytes:
 
 
 def render_profile_nav_script_tag() -> str:
-    return '<script type="module" src="/assets/profile_nav.js"></script>'
+    shell_content = load_page_shell_content()
+    script_sources = shell_content["shared_script_sources"]
+    if not isinstance(script_sources, list) or not script_sources:
+        raise ValueError("shared_script_sources shell content must be a non-empty list")
+    return f'<script type="module" src="{html.escape(str(script_sources[0]), quote=True)}"></script>'
 
 
 def render_copy_field_script_tag() -> str:
-    return '<script type="module" src="/assets/copy_field.js"></script>'
+    shell_content = load_page_shell_content()
+    script_sources = shell_content["shared_script_sources"]
+    if not isinstance(script_sources, list) or len(script_sources) < 2:
+        raise ValueError("shared_script_sources shell content must include copy_field.js")
+    return f'<script type="module" src="{html.escape(str(script_sources[1]), quote=True)}"></script>'
 
 
 def render_username_claim_cta_script_tag() -> str:
-    return '<script type="module" src="/assets/username_claim_cta.js"></script>'
+    shell_content = load_page_shell_content()
+    return (
+        '<script type="module" src="'
+        f'{html.escape(str(shell_content["username_claim_script_source"]), quote=True)}'
+        '"></script>'
+    )

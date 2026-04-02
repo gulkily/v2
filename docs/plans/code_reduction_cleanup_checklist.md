@@ -4,7 +4,7 @@ This checklist turns the initial reduction review into an ordered execution plan
 
 The intent is to remove code safely, starting with high-confidence dead code and low-risk consolidation, then moving toward structural simplification where the regression risk is higher.
 
-Current focus: Phase 4, reviewing duplicated page-shell rendering across Python and PHP.
+Current focus: Phase 5, reviewing route and asset branches against the supported surface.
 
 ## Working Rules
 
@@ -67,15 +67,18 @@ Phase 3 verification:
 
 ## Phase 4: Shared Page Shell Consolidation
 
-- [ ] Review the duplicated page-shell rendering logic in:
+- [x] Review the duplicated page-shell rendering logic in:
   - [`forum_web/templates.py`](/home/wsl/v2/forum_web/templates.py)
   - [`php_host/public/index.php`](/home/wsl/v2/php_host/public/index.php)
-- [ ] Decide the canonical owner for shared shell content:
-  - Python-generated fragments reused by PHP, or
-  - a deliberately separate PHP shell with a narrower supported surface.
-- [ ] Consolidate duplicated nav markup, footer markup, username-claim CTA markup, and shared script tags.
-- [ ] Keep behavior and output stable while removing copy-pasted markup.
-- [ ] Re-run PHP host tests and route-level shell tests after each consolidation step.
+- [x] Decide the canonical owner for shared shell content:
+  - Shared shell copy and script metadata now live in [`templates/page_shell_content.json`](/home/wsl/v2/templates/page_shell_content.json), with Python and PHP continuing to render runtime-specific HTML around that shared data.
+- [x] Consolidate duplicated nav markup, footer markup, username-claim CTA markup, and shared script tags.
+- [x] Keep behavior and output stable while removing copy-pasted markup.
+- [x] Re-run PHP host tests and route-level shell tests after each consolidation step.
+
+Phase 4 verification:
+- Focused tests passed:
+  - `python3 -m unittest tests.test_board_index_page tests.test_compose_thread_page tests.test_account_setup_initial_render tests.test_php_host_cache tests.test_php_host_missing_config_page`
 
 ## Phase 5: Route and Asset Surface Review
 

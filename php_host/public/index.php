@@ -827,21 +827,27 @@ function forum_php_native_load_profile_snapshot(string $profileSlug): ?array
 
 function forum_render_primary_nav(): string
 {
+    $shell = forum_page_shell_content();
+    $links = $shell['primary_nav'] ?? [];
     $mergeEnabled = forum_env_flag_enabled('FORUM_ENABLE_ACCOUNT_MERGE') ? '1' : '0';
-    return <<<HTML
-<nav class="site-header-nav" aria-label="Primary">
-  <a href="/">Home</a>
-  <a href="/compose/thread">Post</a>
-  <a href="/instance/">Project info</a>
-  <a href="/activity/">Activity</a>
-  <a href="" data-profile-nav-link data-profile-nav-state="unresolved" data-merge-feature-enabled="{$mergeEnabled}" aria-disabled="true" tabindex="-1">My profile</a>
-</nav>
-HTML;
+    $items = [];
+    foreach ($links as $link) {
+        if (!is_array($link)) {
+            continue;
+        }
+        $href = forum_html_escape((string) ($link['href'] ?? ''));
+        $label = forum_html_escape((string) ($link['label'] ?? ''));
+        $items[] = '  <a href="' . $href . '">' . $label . '</a>';
+    }
+    $items[] = '  <a href="" data-profile-nav-link data-profile-nav-state="unresolved" data-merge-feature-enabled="' . $mergeEnabled . '" aria-disabled="true" tabindex="-1">My profile</a>';
+    return "<nav class=\"site-header-nav\" aria-label=\"Primary\">\n" . implode("\n", $items) . "\n</nav>";
 }
 
 function forum_render_page_header(): string
 {
+    $shell = forum_page_shell_content();
     $headerTitle = forum_html_escape(forum_site_title());
+    $tagline = forum_html_escape((string) ($shell['site_tagline'] ?? ''));
     $navHtml = forum_render_primary_nav();
     return <<<HTML
 <header class="site-header site-header--page">
@@ -850,7 +856,7 @@ function forum_render_page_header(): string
       <p class="site-header-mark">(*)</p>
       <div class="site-header-copy">
         <p class="site-header-title"><a href="/">{$headerTitle}</a></p>
-        <p class="site-header-tagline">calm threads from canonical text records</p>
+        <p class="site-header-tagline">{$tagline}</p>
       </div>
     </div>
     {$navHtml}
@@ -861,13 +867,18 @@ HTML;
 
 function forum_render_username_claim_cta(): string
 {
+    $shell = forum_page_shell_content();
+    $claim = is_array($shell['username_claim'] ?? null) ? $shell['username_claim'] : [];
+    $kicker = forum_html_escape((string) ($claim['kicker'] ?? 'Account setup'));
+    $text = forum_html_escape((string) ($claim['text'] ?? ''));
+    $actionLabel = forum_html_escape((string) ($claim['action_label'] ?? 'Choose your username'));
     return <<<HTML
 <section class="site-username-claim panel" data-username-claim-cta>
   <div class="site-username-claim-copy">
-    <p class="site-username-claim-kicker">Account setup</p>
-    <p class="site-username-claim-text">Now that you're participating, you can choose a username.</p>
+    <p class="site-username-claim-kicker">{$kicker}</p>
+    <p class="site-username-claim-text">{$text}</p>
   </div>
-  <a class="thread-chip site-username-claim-link" data-username-claim-link href="">Choose your username</a>
+  <a class="thread-chip site-username-claim-link" data-username-claim-link href="">{$actionLabel}</a>
 </section>
 <script>
 (function () {
@@ -885,14 +896,13 @@ HTML;
 
 function forum_render_page_footer(): string
 {
-    return <<<HTML
-<footer class="site-footer">
-  <div class="site-footer-inner">
-    <p>Best read with a clear mind and a modest browser window.</p>
-    <p>[ slow web ]</p>
-  </div>
-</footer>
-HTML;
+    $shell = forum_page_shell_content();
+    $lines = $shell['footer_lines'] ?? [];
+    $items = [];
+    foreach ($lines as $line) {
+        $items[] = '    <p>' . forum_html_escape((string) $line) . '</p>';
+    }
+    return "<footer class=\"site-footer\">\n  <div class=\"site-footer-inner\">\n" . implode("\n", $items) . "\n  </div>\n</footer>";
 }
 
 function forum_render_feed_head_link_html(string $feedHref): string
@@ -906,14 +916,34 @@ function forum_render_feed_head_link_html(string $feedHref): string
 
 function forum_render_page_scripts_html(bool $includeUsernameClaimScript = true): string
 {
-    $scripts = [
-        '<script type="module" src="/assets/profile_nav.js"></script>',
-        '<script type="module" src="/assets/copy_field.js"></script>',
-    ];
+    $shell = forum_page_shell_content();
+    $scripts = [];
+    foreach (($shell['shared_script_sources'] ?? []) as $source) {
+        $scripts[] = '<script type="module" src="' . forum_html_escape((string) $source) . '"></script>';
+    }
     if ($includeUsernameClaimScript) {
-        $scripts[] = '<script type="module" src="/assets/username_claim_cta.js"></script>';
+        $scripts[] = '<script type="module" src="' . forum_html_escape((string) ($shell['username_claim_script_source'] ?? '/assets/username_claim_cta.js')) . '"></script>';
     }
     return implode("\n", $scripts);
+}
+
+function forum_page_shell_content(): array
+{
+    static $cached = null;
+    if (is_array($cached)) {
+        return $cached;
+    }
+
+    $path = forum_app_root() . '/templates/page_shell_content.json';
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        $cached = [];
+        return $cached;
+    }
+
+    $decoded = json_decode($raw, true);
+    $cached = is_array($decoded) ? $decoded : [];
+    return $cached;
 }
 
 function forum_render_php_native_page(string $title, string $contentHtml, string $headExtrasHtml = ''): string

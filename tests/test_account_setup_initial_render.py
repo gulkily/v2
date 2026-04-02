@@ -65,10 +65,11 @@ class AccountSetupInitialRenderTests(unittest.TestCase):
         with mock.patch.dict(
             os.environ,
             {
+                **{key: value for key, value in os.environ.items() if not key.startswith("FORUM_")},
                 "FORUM_REPO_ROOT": str(self.repo_root),
                 "FORUM_IDENTITY_HINT_SECRET": "test-secret",
             },
-            clear=False,
+            clear=True,
         ):
             body = b"".join(application(environ, start_response)).decode("utf-8")
 
