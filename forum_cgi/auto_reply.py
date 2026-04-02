@@ -268,7 +268,3 @@ process.stdout.write(JSON.stringify({{
     except (KeyError, json.JSONDecodeError, PostingError) as exc:
         raise AutoReplySigningError("assistant signing key generation returned invalid output") from exc
     return private_key_text, public_key_text
-
-
-def get_thread_auto_reply_model() -> str:
-    return get_llm_model()

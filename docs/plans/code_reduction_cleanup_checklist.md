@@ -4,6 +4,8 @@ This checklist turns the initial reduction review into an ordered execution plan
 
 The intent is to remove code safely, starting with high-confidence dead code and low-risk consolidation, then moving toward structural simplification where the regression risk is higher.
 
+Current focus: Phase 2, starting with shared test helpers for temp repos, record writing, and WSGI requests.
+
 ## Working Rules
 
 - Do not delete anything based on grep alone.
@@ -14,14 +16,20 @@ The intent is to remove code safely, starting with high-confidence dead code and
 
 ## Phase 1: High-Confidence Dead Code
 
-- [ ] Remove unused helper `get_thread_auto_reply_model()` from [`forum_cgi/auto_reply.py`](/home/wsl/v2/forum_cgi/auto_reply.py).
-- [ ] Remove unused helper `index_moderation_records()` from [`forum_core/moderation.py`](/home/wsl/v2/forum_core/moderation.py).
-- [ ] Remove unused helper `php_host_config_example_path()` from [`forum_core/php_host_setup.py`](/home/wsl/v2/forum_core/php_host_setup.py).
-- [ ] Remove unused helper `list_snapshots_by_type()` from [`forum_core/php_native_reads_db.py`](/home/wsl/v2/forum_core/php_native_reads_db.py).
-- [ ] Remove unused helper `increment_php_native_read_counter()` from [`forum_core/php_native_reads_db.py`](/home/wsl/v2/forum_core/php_native_reads_db.py).
-- [ ] Remove unused dataclass `IndexedIdentityMemberRow` from [`forum_core/post_index.py`](/home/wsl/v2/forum_core/post_index.py).
-- [ ] Remove unused dataclass `IndexedMergeEdgeRow` from [`forum_core/post_index.py`](/home/wsl/v2/forum_core/post_index.py).
-- [ ] Run focused tests for the touched modules after the deletion pass.
+- [x] Remove unused helper `get_thread_auto_reply_model()` from [`forum_cgi/auto_reply.py`](/home/wsl/v2/forum_cgi/auto_reply.py).
+- [x] Remove unused helper `index_moderation_records()` from [`forum_core/moderation.py`](/home/wsl/v2/forum_core/moderation.py).
+- [x] Remove unused helper `php_host_config_example_path()` from [`forum_core/php_host_setup.py`](/home/wsl/v2/forum_core/php_host_setup.py).
+- [x] Remove unused helper `list_snapshots_by_type()` from [`forum_core/php_native_reads_db.py`](/home/wsl/v2/forum_core/php_native_reads_db.py).
+- [x] Remove unused helper `increment_php_native_read_counter()` from [`forum_core/php_native_reads_db.py`](/home/wsl/v2/forum_core/php_native_reads_db.py).
+- [x] Remove unused dataclass `IndexedIdentityMemberRow` from [`forum_core/post_index.py`](/home/wsl/v2/forum_core/post_index.py).
+- [x] Remove unused dataclass `IndexedMergeEdgeRow` from [`forum_core/post_index.py`](/home/wsl/v2/forum_core/post_index.py).
+- [x] Run focused tests for the touched modules after the deletion pass.
+
+Phase 1 verification:
+- Focused tests passed:
+  - `python3 -m unittest tests.test_thread_auto_reply tests.test_php_native_reads tests.test_thread_title_updates tests.test_merge_management_api tests.test_post_index.PostIndexSchemaTests tests.test_post_index.PostIndexAuthorHelpersTests`
+- Broader check note:
+  - `python3 -m unittest tests.test_post_index` currently contains an unrelated `MergeRequestState` constructor mismatch in `tests.test_post_index.PostIndexBuildTests.test_rebuild_post_index_caches_identity_members_username_claims_and_roots`.
 
 ## Phase 2: Test Harness Consolidation
 

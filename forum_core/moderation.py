@@ -150,12 +150,6 @@ def load_moderation_records(records_dir: Path) -> list[ModerationRecord]:
         return []
     records = [parse_moderation_record(path) for path in sorted(records_dir.glob("*.txt"))]
     return sorted(records, key=moderation_sort_key)
-
-
-def index_moderation_records(records: list[ModerationRecord]) -> dict[str, ModerationRecord]:
-    return {record.record_id: record for record in records}
-
-
 def derive_moderation_state(records: list[ModerationRecord]) -> ModerationState:
     hidden_post_ids: set[str] = set()
     hidden_thread_ids: set[str] = set()

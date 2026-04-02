@@ -105,12 +105,6 @@ def php_host_public_dir(repo_root: Path) -> Path:
 
 def php_host_config_path(repo_root: Path) -> Path:
     return php_host_public_dir(repo_root) / CONFIG_FILENAME
-
-
-def php_host_config_example_path(repo_root: Path) -> Path:
-    return php_host_public_dir(repo_root) / CONFIG_EXAMPLE_FILENAME
-
-
 def default_php_host_repo_root(repo_root: Path) -> Path:
     configured = os.environ.get("FORUM_REPO_ROOT", "").strip()
     if configured:

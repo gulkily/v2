@@ -117,23 +117,6 @@ class IndexedAuthorRow:
     display_name: str
     display_name_source: str
     signer_fingerprint: str | None
-
-
-@dataclass(frozen=True)
-class IndexedIdentityMemberRow:
-    canonical_identity_id: str
-    member_identity_id: str
-
-
-@dataclass(frozen=True)
-class IndexedMergeEdgeRow:
-    source_identity_id: str
-    target_identity_id: str
-    record_id: str
-    timestamp: str
-    edge_kind: str
-
-
 @dataclass(frozen=True)
 class IndexedUsernameClaimRow:
     canonical_identity_id: str

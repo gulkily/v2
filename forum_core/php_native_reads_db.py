@@ -118,31 +118,3 @@ def delete_php_native_snapshot(connection: sqlite3.Connection, snapshot_id: str)
         (snapshot_id,),
     )
     connection.commit()
-
-
-def list_snapshots_by_type(connection: sqlite3.Connection, entity_type: str) -> list[str]:
-    rows = connection.execute(
-        "SELECT snapshot_id FROM php_native_snapshots WHERE entity_type = ? ORDER BY snapshot_id",
-        (entity_type,),
-    ).fetchall()
-    return [str(row[0]) for row in rows]
-
-
-def increment_php_native_read_counter(
-    connection: sqlite3.Connection,
-    *,
-    route_path: str,
-    user_type: str,
-    outcome: str,
-) -> None:
-    now_text = _utc_now_text()
-    connection.execute(
-        """
-        INSERT INTO php_native_read_counters(route_path, user_type, outcome, count, updated_at)
-        VALUES (?, ?, ?, 1, ?)
-        ON CONFLICT(route_path, user_type, outcome)
-        DO UPDATE SET count = count + 1, updated_at = excluded.updated_at
-        """,
-        (route_path, user_type, outcome, now_text),
-    )
-    connection.commit()
