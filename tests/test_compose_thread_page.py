@@ -1,25 +1,15 @@
 from __future__ import annotations
 
-import os
-import tempfile
 import unittest
-from io import BytesIO
-from pathlib import Path
-from unittest import mock
 
-from forum_web.web import application
+from tests.helpers import ForumRepoTestCase
 
 
-class ComposeThreadPageTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.repo_root = Path(self.tempdir.name)
-
-    def tearDown(self) -> None:
-        self.tempdir.cleanup()
+class ComposeThreadPageTests(ForumRepoTestCase):
 
     def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
-        return self.get_with_env(path, query_string=query_string)
+        status, headers, body = self.request(path, query_string=query_string)
+        return status, headers, str(body)
 
     def get_bytes(
         self,
@@ -28,58 +18,17 @@ class ComposeThreadPageTests(unittest.TestCase):
         query_string: str = "",
         extra_env: dict[str, str] | None = None,
     ) -> tuple[str, dict[str, str], bytes]:
-        environ = {
-            "PATH_INFO": path,
-            "QUERY_STRING": query_string,
-            "REQUEST_METHOD": "GET",
-            "CONTENT_LENGTH": "0",
-            "wsgi.input": BytesIO(b""),
-        }
-        response: dict[str, object] = {}
-
-        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-            response["status"] = status
-            response["headers"] = headers
-
-        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
-        if extra_env:
-            env.update(extra_env)
-
-        with mock.patch.dict(os.environ, env):
-            body = b"".join(application(environ, start_response))
-
-        return (
-            response["status"],
-            dict(response["headers"]),
-            body,
+        status, headers, body = self.request(
+            path,
+            query_string=query_string,
+            extra_env=extra_env,
+            decode=False,
         )
+        return status, headers, bytes(body)
 
     def get_with_env(self, path: str, *, query_string: str = "", extra_env: dict[str, str] | None = None) -> tuple[str, dict[str, str], str]:
-        environ = {
-            "PATH_INFO": path,
-            "QUERY_STRING": query_string,
-            "REQUEST_METHOD": "GET",
-            "CONTENT_LENGTH": "0",
-            "wsgi.input": BytesIO(b""),
-        }
-        response: dict[str, object] = {}
-
-        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-            response["status"] = status
-            response["headers"] = headers
-
-        env = {"FORUM_REPO_ROOT": str(self.repo_root)}
-        if extra_env:
-            env.update(extra_env)
-
-        with mock.patch.dict(os.environ, env):
-            body = b"".join(application(environ, start_response)).decode("utf-8")
-
-        return (
-            response["status"],
-            dict(response["headers"]),
-            body,
-        )
+        status, headers, body = self.request(path, query_string=query_string, extra_env=extra_env)
+        return status, headers, str(body)
 
     def test_compose_thread_page_renders_shared_draft_status_hook(self) -> None:
         status, _, body = self.get("/compose/thread")

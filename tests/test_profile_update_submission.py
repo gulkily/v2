@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import tempfile
 import unittest
-from io import BytesIO
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
@@ -13,26 +10,17 @@ from unittest import mock
 from forum_core.identity import build_bootstrap_payload, build_identity_id, fingerprint_from_public_key_text, identity_slug
 from forum_core.post_index import ensure_post_index_current, load_indexed_username_roots
 from forum_core.public_keys import resolve_canonical_public_key_path
-from forum_web.web import application
+from tests.helpers import ForumRepoTestCase
 
 
-class ProfileUpdateSubmissionTests(unittest.TestCase):
+class ProfileUpdateSubmissionTests(ForumRepoTestCase):
     def setUp(self) -> None:
-        self.repo_tempdir = tempfile.TemporaryDirectory()
-        self.repo_root = Path(self.repo_tempdir.name)
+        super().setUp()
         self.openpgp_module_url = (
             Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
         ).as_uri()
 
-        self.run_command(
-            [
-                "git",
-                "init",
-            ],
-            cwd=self.repo_root,
-        )
-        self.run_command(["git", "config", "user.name", "Codex Test"], cwd=self.repo_root)
-        self.run_command(["git", "config", "user.email", "codex@example.com"], cwd=self.repo_root)
+        self.init_git_repo(user_name="Codex Test", user_email="codex@example.com")
 
         generated = self.generate_signing_keypair()
         self.private_key_text = generated["privateKey"]
@@ -49,26 +37,6 @@ class ProfileUpdateSubmissionTests(unittest.TestCase):
         self.write_record(
             f"records/identity/{bootstrap_record_id}.txt",
             bootstrap_payload,
-        )
-
-    def tearDown(self) -> None:
-        self.repo_tempdir.cleanup()
-
-    def run_command(
-        self,
-        command: list[str],
-        *,
-        cwd: Path | None = None,
-        input_text: str | None = None,
-    ) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            command,
-            cwd=cwd,
-            input=input_text,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True,
         )
 
     def run_node_module(self, script: str) -> str:
@@ -120,33 +88,9 @@ process.stdout.write(signature);
 """
         return self.run_node_module(script)
 
-    def write_record(self, relative_path: str, raw_text: str) -> None:
-        path = self.repo_root / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
-
     def request(self, path: str, *, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], str]:
-        environ = {
-            "PATH_INFO": path,
-            "QUERY_STRING": "",
-            "REQUEST_METHOD": method,
-            "CONTENT_LENGTH": str(len(body)),
-            "wsgi.input": BytesIO(body),
-        }
-        response: dict[str, object] = {}
-
-        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-            response["status"] = status
-            response["headers"] = headers
-
-        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
-            body_text = b"".join(application(environ, start_response)).decode("utf-8")
-
-        return (
-            response["status"],
-            dict(response["headers"]),
-            body_text,
-        )
+        status, headers, response_body = super().request(path, method=method, body=body)
+        return status, headers, str(response_body)
 
     def test_api_update_profile_writes_record_and_profile_readback(self) -> None:
         payload_text = dedent(

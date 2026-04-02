@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 import os
-import subprocess
-import tempfile
 import unittest
 from io import BytesIO
-from pathlib import Path
-from textwrap import dedent
 from unittest import mock
 
 from forum_core.post_index import ensure_post_index_current
-from forum_web.web import application
+from tests.helpers import ForumRepoTestCase
 
 
-class BoardIndexPageTests(unittest.TestCase):
+class BoardIndexPageTests(ForumRepoTestCase):
     def setUp(self) -> None:
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.repo_root = Path(self.tempdir.name)
+        super().setUp()
         self.write_record(
             "records/posts/root-001.txt",
             """
@@ -65,29 +60,8 @@ class BoardIndexPageTests(unittest.TestCase):
             """,
         )
 
-    def tearDown(self) -> None:
-        self.tempdir.cleanup()
-
-    def write_record(self, relative_path: str, raw_text: str) -> None:
-        path = self.repo_root / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(dedent(raw_text).lstrip(), encoding="ascii")
-
-    def run_git(self, *args: str, env: dict[str, str] | None = None) -> str:
-        result = subprocess.run(
-            ["git", "-C", str(self.repo_root), *args],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env,
-        )
-        return result.stdout.strip()
-
     def init_git_repo(self) -> None:
-        self.run_git("init")
-        self.run_git("config", "user.name", "Test User")
-        self.run_git("config", "user.email", "test@example.com")
+        super().init_git_repo()
 
     def commit_posts(self, message: str, timestamp: str) -> None:
         env = {
@@ -99,23 +73,8 @@ class BoardIndexPageTests(unittest.TestCase):
         self.run_git("commit", "-m", message, env=env)
 
     def get(self, path: str, query_string: str = "") -> tuple[str, dict[str, str], str]:
-        environ = {
-            "PATH_INFO": path,
-            "QUERY_STRING": query_string,
-            "REQUEST_METHOD": "GET",
-            "CONTENT_LENGTH": "0",
-            "wsgi.input": BytesIO(b""),
-        }
-        response: dict[str, object] = {}
-
-        def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-            response["status"] = status
-            response["headers"] = headers
-
-        with mock.patch.dict(os.environ, {"FORUM_REPO_ROOT": str(self.repo_root)}):
-            body = b"".join(application(environ, start_response)).decode("utf-8")
-
-        return response["status"], dict(response["headers"]), body
+        status, headers, body = self.request(path, query_string=query_string)
+        return status, headers, str(body)
 
     def test_board_index_uses_shared_page_shell(self) -> None:
         status, headers, body = self.get("/")
@@ -149,87 +108,24 @@ class BoardIndexPageTests(unittest.TestCase):
         self.assertNotIn('class="site-header-band"', default_body)
         self.assertNotIn("Kindness first.", default_body)
 
-        with mock.patch.dict(
-            os.environ,
-            {
-                "FORUM_REPO_ROOT": str(self.repo_root),
-                "FORUM_ENABLE_KINDNESS_HEADER": "1",
-            },
-            clear=False,
-        ):
-            environ = {
-                "PATH_INFO": "/",
-                "QUERY_STRING": "",
-                "REQUEST_METHOD": "GET",
-                "CONTENT_LENGTH": "0",
-                "wsgi.input": BytesIO(b""),
-            }
-            response: dict[str, object] = {}
+        status, _, enabled_body = self.request("/", extra_env={"FORUM_ENABLE_KINDNESS_HEADER": "1"})
 
-            def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-                response["status"] = status
-                response["headers"] = headers
-
-            enabled_body = b"".join(application(environ, start_response)).decode("utf-8")
-
-        self.assertEqual(response["status"], "200 OK")
+        self.assertEqual(status, "200 OK")
         self.assertIn('class="site-header-band"', enabled_body)
         self.assertIn("Kindness first.", enabled_body)
 
     def test_board_index_can_disable_username_claim_cta_via_feature_flag(self) -> None:
-        with mock.patch.dict(
-            os.environ,
-            {
-                "FORUM_REPO_ROOT": str(self.repo_root),
-                "FORUM_ENABLE_USERNAME_CLAIM_CTA": "0",
-            },
-            clear=False,
-        ):
-            environ = {
-                "PATH_INFO": "/",
-                "QUERY_STRING": "",
-                "REQUEST_METHOD": "GET",
-                "CONTENT_LENGTH": "0",
-                "wsgi.input": BytesIO(b""),
-            }
-            response: dict[str, object] = {}
+        status, _, body = self.request("/", extra_env={"FORUM_ENABLE_USERNAME_CLAIM_CTA": "0"})
 
-            def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-                response["status"] = status
-                response["headers"] = headers
-
-            body = b"".join(application(environ, start_response)).decode("utf-8")
-
-        self.assertEqual(response["status"], "200 OK")
+        self.assertEqual(status, "200 OK")
         self.assertNotIn('data-username-claim-cta', body)
         self.assertNotIn('/assets/username_claim_cta.js', body)
         self.assertNotIn("Choose your username", body)
 
     def test_board_index_uses_configured_site_title_when_present(self) -> None:
-        with mock.patch.dict(
-            os.environ,
-            {
-                "FORUM_REPO_ROOT": str(self.repo_root),
-                "FORUM_SITE_TITLE": "ZenMemes Forum",
-            },
-            clear=False,
-        ):
-            environ = {
-                "PATH_INFO": "/",
-                "QUERY_STRING": "",
-                "REQUEST_METHOD": "GET",
-                "CONTENT_LENGTH": "0",
-                "wsgi.input": BytesIO(b""),
-            }
-            response: dict[str, object] = {}
+        status, _, body = self.request("/", extra_env={"FORUM_SITE_TITLE": "ZenMemes Forum"})
 
-            def start_response(status: str, headers: list[tuple[str, str]]) -> None:
-                response["status"] = status
-                response["headers"] = headers
-
-            body = b"".join(application(environ, start_response)).decode("utf-8")
-
-        self.assertEqual(response["status"], "200 OK")
+        self.assertEqual(status, "200 OK")
         self.assertIn("<title>ZenMemes Forum</title>", body)
         self.assertIn('class="site-header-title"><a href="/">ZenMemes Forum</a>', body)
 

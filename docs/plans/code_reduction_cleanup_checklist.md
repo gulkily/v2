@@ -4,7 +4,7 @@ This checklist turns the initial reduction review into an ordered execution plan
 
 The intent is to remove code safely, starting with high-confidence dead code and low-risk consolidation, then moving toward structural simplification where the regression risk is higher.
 
-Current focus: Phase 2, starting with shared test helpers for temp repos, record writing, and WSGI requests.
+Current focus: Phase 3, starting with env-flag parsing and duplicated truthy checks across Python and PHP.
 
 ## Working Rules
 
@@ -33,19 +33,23 @@ Phase 1 verification:
 
 ## Phase 2: Test Harness Consolidation
 
-- [ ] Create a shared test helper module for temporary repo setup, record writing, and WSGI request execution.
-- [ ] Consolidate repeated `setUp()` and `tearDown()` tempdir patterns used across page and API tests.
-- [ ] Consolidate repeated `write_record()` helpers used across record-driven tests.
-- [ ] Consolidate repeated `get()` and `request()` WSGI helpers used across page and API tests.
-- [ ] Consolidate repeated `run_git()` and command-runner helpers where the semantics are the same.
-- [ ] Collapse byte-vs-text request duplication by making one helper support both response modes.
-- [ ] Update the heaviest repeated test files first:
+- [x] Create a shared test helper module for temporary repo setup, record writing, and WSGI request execution.
+- [x] Consolidate repeated `setUp()` and `tearDown()` tempdir patterns used across page and API tests.
+- [x] Consolidate repeated `write_record()` helpers used across record-driven tests.
+- [x] Consolidate repeated `get()` and `request()` WSGI helpers used across page and API tests.
+- [x] Consolidate repeated `run_git()` and command-runner helpers where the semantics are the same.
+- [x] Collapse byte-vs-text request duplication by making one helper support both response modes.
+- [x] Update the heaviest repeated test files first:
   - [`tests/test_compose_thread_page.py`](/home/wsl/v2/tests/test_compose_thread_page.py)
   - [`tests/test_compose_reply_page.py`](/home/wsl/v2/tests/test_compose_reply_page.py)
   - [`tests/test_board_index_page.py`](/home/wsl/v2/tests/test_board_index_page.py)
   - [`tests/test_profile_update_submission.py`](/home/wsl/v2/tests/test_profile_update_submission.py)
   - [`tests/test_thread_title_update_submission.py`](/home/wsl/v2/tests/test_thread_title_update_submission.py)
-- [ ] Run the affected test slices after each helper migration batch.
+- [x] Run the affected test slices after each helper migration batch.
+
+Phase 2 verification:
+- Focused tests passed:
+  - `python3 -m unittest tests.test_compose_thread_page tests.test_compose_reply_page tests.test_board_index_page tests.test_profile_update_submission tests.test_thread_title_update_submission`
 
 ## Phase 3: Shared Flag and Environment Parsing Cleanup
 
