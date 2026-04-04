@@ -117,19 +117,29 @@ def render_username_claim_bar_html(
     )
 
 
-def render_primary_nav(*, aria_label: str = "Primary") -> str:
+def render_primary_nav(*, aria_label: str = "Primary", active_section: str | None = None) -> str:
     shell_content = load_page_shell_content()
     raw_links = shell_content["primary_nav"]
     if not isinstance(raw_links, list):
         raise ValueError("primary_nav shell content must be a list")
-    links = [
-        (str(item["href"]), str(item["label"]))
-        for item in raw_links
-        if isinstance(item, dict)
-    ]
+    links = []
+    for item in raw_links:
+        if not isinstance(item, dict):
+            continue
+        links.append(
+            (
+                str(item.get("section", "")),
+                str(item["href"]),
+                str(item["label"]),
+            )
+        )
     items = "\n".join(
-        f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
-        for path, label in links
+        (
+            f'<a href="{html.escape(path)}" aria-current="page">{html.escape(label)}</a>'
+            if section and section == active_section
+            else f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
+        )
+        for section, path, label in links
     )
     items += (
         "\n"
@@ -153,6 +163,7 @@ def render_site_header(
     hero_text: str,
     hero_action_html: str = "",
     include_page_intro: bool = True,
+    active_section: str | None = None,
 ) -> str:
     shell_content = load_page_shell_content()
     intro_html = ""
@@ -191,7 +202,7 @@ def render_site_header(
                   <p class="site-header-tagline">{html.escape(str(shell_content["site_tagline"]))}</p>
                   </div>
                 </div>
-              {_indent_html_block(render_primary_nav(), 2)}
+              {_indent_html_block(render_primary_nav(active_section=active_section), 2)}
             </div>
             """
         ),
@@ -298,6 +309,7 @@ def render_page(
     page_banner_html: str | None = None,
     page_footer_html: str = "",
     head_extras_html: str = "",
+    active_section: str | None = None,
 ) -> str:
     base = load_template("base.html")
     if page_header_html is None:
@@ -306,6 +318,7 @@ def render_page(
             hero_title=hero_title,
             hero_text=hero_text,
             hero_action_html=hero_action_html,
+            active_section=active_section,
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()

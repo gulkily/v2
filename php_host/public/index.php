@@ -825,7 +825,7 @@ function forum_php_native_load_profile_snapshot(string $profileSlug): ?array
     return $decoded;
 }
 
-function forum_render_primary_nav(): string
+function forum_render_primary_nav(?string $activeSection = null): string
 {
     $shell = forum_page_shell_content();
     $links = $shell['primary_nav'] ?? [];
@@ -835,20 +835,22 @@ function forum_render_primary_nav(): string
         if (!is_array($link)) {
             continue;
         }
+        $section = (string) ($link['section'] ?? '');
         $href = forum_html_escape((string) ($link['href'] ?? ''));
         $label = forum_html_escape((string) ($link['label'] ?? ''));
-        $items[] = '  <a href="' . $href . '">' . $label . '</a>';
+        $activeAttribute = ($section !== '' && $section === $activeSection) ? ' aria-current="page"' : '';
+        $items[] = '  <a href="' . $href . '"' . $activeAttribute . '>' . $label . '</a>';
     }
     $items[] = '  <a href="" data-profile-nav-link data-profile-nav-state="unresolved" data-merge-feature-enabled="' . $mergeEnabled . '" aria-disabled="true" tabindex="-1">My profile</a>';
     return "<nav class=\"site-header-nav\" aria-label=\"Primary\">\n" . implode("\n", $items) . "\n</nav>";
 }
 
-function forum_render_page_header(): string
+function forum_render_page_header(?string $activeSection = null): string
 {
     $shell = forum_page_shell_content();
     $headerTitle = forum_html_escape(forum_site_title());
     $tagline = forum_html_escape((string) ($shell['site_tagline'] ?? ''));
-    $navHtml = forum_render_primary_nav();
+    $navHtml = forum_render_primary_nav($activeSection);
     return <<<HTML
 <header class="site-header site-header--page">
   <div class="site-header-main">
@@ -946,14 +948,14 @@ function forum_page_shell_content(): array
     return $cached;
 }
 
-function forum_render_php_native_page(string $title, string $contentHtml, string $headExtrasHtml = ''): string
+function forum_render_php_native_page(string $title, string $contentHtml, string $headExtrasHtml = '', ?string $activeSection = null): string
 {
     $documentTitle = forum_html_escape($title);
     $usernameClaimBootstrap = forum_render_username_claim_bootstrap();
     $rawUsernameClaim = getenv('FORUM_ENABLE_USERNAME_CLAIM_CTA');
     $usernameClaimEnabled = !is_string($rawUsernameClaim) || $rawUsernameClaim === '' || forum_env_flag_enabled('FORUM_ENABLE_USERNAME_CLAIM_CTA');
     $usernameClaimHtml = $usernameClaimEnabled ? forum_render_username_claim_cta() : '';
-    $headerHtml = forum_render_page_header();
+    $headerHtml = forum_render_page_header($activeSection);
     $footerHtml = forum_render_page_footer();
     $scriptsHtml = forum_render_page_scripts_html($usernameClaimEnabled);
     return <<<HTML

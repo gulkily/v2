@@ -5,18 +5,22 @@
   ],
   "primary_nav": [
     {
+      "section": "home",
       "href": "/",
       "label": "Home"
     },
     {
+      "section": "post",
       "href": "/compose/thread",
       "label": "Post"
     },
     {
+      "section": "project-info",
       "href": "/instance/",
       "label": "Project info"
     },
     {
+      "section": "activity",
       "href": "/activity/",
       "label": "Activity"
     }
