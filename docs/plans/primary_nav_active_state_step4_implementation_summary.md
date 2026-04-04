@@ -28,3 +28,15 @@
 - Notes:
   - Activity subsection chips still indicate the current stream independently of the top-level nav.
   - The next step is Stage 3: add the shared active-nav styling and expand regression coverage around the final selected-state presentation.
+
+## Stage 3 - Shared selected-state styling and final regression coverage
+- Changes:
+  - Added shared primary-nav active-state theme tokens and `aria-current="page"` styling in [`templates/assets/site.css`](/home/wsl/v2/templates/assets/site.css) so the selected top-level section reads clearly without reusing the activity chip treatment.
+  - Extended the shared CSS asset coverage in [`tests/test_site_css_asset.py`](/home/wsl/v2/tests/test_site_css_asset.py) to assert the active-nav selector and theme-variable usage.
+  - Re-ran the focused route and PHP-native regression suites now that both the markup contract and the selected-state styling are in place.
+- Verification:
+  - `python -m unittest tests.test_primary_nav_active_state tests.test_board_index_page tests.test_compose_thread_page tests.test_site_activity_page tests.test_instance_info_page tests.test_site_css_asset`
+  - `python -m unittest tests.test_php_host_cache.PhpHostCacheTests.test_root_can_render_from_php_native_snapshot_without_python_bridge tests.test_php_host_cache.PhpHostCacheTests.test_thread_route_can_render_from_php_native_sqlite_snapshot`
+  - `php -l php_host/public/index.php`
+- Notes:
+  - The top-level primary-nav state now stays consistent across Python and PHP shells, and `Activity` remains selected across its subsection filters while the filter chips keep their local selection treatment.

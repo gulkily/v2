@@ -23,6 +23,8 @@
   --surface-chip: rgba(255, 249, 240, 0.65);
   --surface-chip-active-border: rgba(139, 94, 52, 0.34);
   --surface-chip-active: rgba(240, 220, 191, 0.92);
+  --surface-nav-active: #2d5b73;
+  --surface-nav-active-outline: rgba(45, 91, 115, 0.22);
   --surface-card-border: rgba(139, 94, 52, 0.16);
   --surface-card-top: rgba(255, 250, 241, 0.97);
   --surface-card-bottom: rgba(247, 238, 225, 0.97);
@@ -48,6 +50,7 @@
   --surface-task-context: rgba(255, 249, 240, 0.72);
   --surface-board-hover: #e4ece6;
   --surface-board-divider: #cfd7d1;
+  --ink-nav-active: #fbfaf5;
 
 }
 
@@ -76,6 +79,8 @@
     --surface-chip: rgba(32, 42, 52, 0.92);
     --surface-chip-active-border: rgba(143, 196, 223, 0.38);
     --surface-chip-active: rgba(40, 57, 71, 0.98);
+    --surface-nav-active: #8fc4df;
+    --surface-nav-active-outline: rgba(143, 196, 223, 0.3);
     --surface-card-border: rgba(143, 196, 223, 0.18);
     --surface-card-top: rgba(30, 40, 50, 0.98);
     --surface-card-bottom: rgba(21, 29, 37, 0.98);
@@ -101,6 +106,7 @@
     --surface-task-context: rgba(30, 40, 50, 0.92);
     --surface-board-hover: #263742;
     --surface-board-divider: #41515a;
+    --ink-nav-active: #0a1016;
   }
 }
 
@@ -264,6 +270,14 @@ html:not([data-username-claim-visible]) .site-username-claim[data-username-claim
   border: 1px solid var(--accent-soft);
   color: var(--ink);
   text-decoration: none;
+}
+
+.site-header-nav a[aria-current="page"] {
+  border-color: var(--surface-nav-active);
+  background: var(--surface-nav-active);
+  color: var(--ink-nav-active);
+  box-shadow: 0 0 0 2px var(--surface-nav-active-outline);
+  font-weight: 600;
 }
 
 .site-header-page-intro {
