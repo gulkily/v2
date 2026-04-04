@@ -133,6 +133,8 @@ class BoardIndexPageTests(ForumRepoTestCase):
         status, _, body = self.get("/")
 
         self.assertEqual(status, "200 OK")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/" aria-current="page">Home</a>', body)
         self.assertIn('/compose/thread', body)
         self.assertIn('/instance/', body)
         self.assertIn('/activity/', body)

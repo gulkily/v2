@@ -34,6 +34,8 @@ class ComposeThreadPageTests(ForumRepoTestCase):
         status, _, body = self.get("/compose/thread")
 
         self.assertEqual(status, "200 OK")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/compose/thread" aria-current="page">Post</a>', body)
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertIn("Compose a signed thread", body)

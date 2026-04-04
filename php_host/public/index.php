@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+const FORUM_PRIMARY_NAV_SECTION_HOME = 'home';
+
 function forum_source_script_path(): string
 {
     $resolved = realpath(__FILE__);
@@ -936,15 +938,23 @@ function forum_page_shell_content(): array
         return $cached;
     }
 
-    $path = forum_app_root() . '/templates/page_shell_content.json';
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        $cached = [];
-        return $cached;
+    $paths = [
+        forum_app_root() . '/templates/page_shell_content.json',
+        dirname(forum_source_dir(), 2) . '/templates/page_shell_content.json',
+    ];
+    foreach (array_unique($paths) as $path) {
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            continue;
+        }
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            $cached = $decoded;
+            return $cached;
+        }
     }
 
-    $decoded = json_decode($raw, true);
-    $cached = is_array($decoded) ? $decoded : [];
+    $cached = [];
     return $cached;
 }
 
@@ -1103,6 +1113,7 @@ HTML;
         forum_site_title(),
         $contentHtml,
         forum_render_feed_head_link_html('/?format=rss'),
+        FORUM_PRIMARY_NAV_SECTION_HOME,
     );
 }
 
@@ -1118,6 +1129,7 @@ function forum_render_php_native_thread_page(array $snapshot): string
         $title,
         $contentHtml,
         forum_render_feed_head_link_html($feedHref),
+        FORUM_PRIMARY_NAV_SECTION_HOME,
     );
 }
 

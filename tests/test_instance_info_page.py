@@ -87,6 +87,8 @@ class InstanceInfoPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/instance/" aria-current="page">Project info</a>', body)
         self.assertIn("Project overview", body)
         self.assertTrue(body.index("Project FAQ") < body.index("Facts"))
         self.assertTrue(body.index("Facts") < body.index("Project overview"))
@@ -162,6 +164,8 @@ class InstanceInfoPageTests(unittest.TestCase):
             status, _, body = self.get("/operations/slow/")
 
         self.assertEqual(status, "200 OK")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/instance/" aria-current="page">Project info</a>', body)
         self.assertIn("Recent slow operations", body)
         self.assertIn("GET /activity/", body)
         self.assertIn("method: GET", body)

@@ -135,6 +135,10 @@ POST_INDEX_REBUILD_REQUEST_HEADER = "X-Forum-Post-Index-Rebuild-Path"
 POST_INDEX_REBUILD_QUERY_PARAM = "__forum_rebuild"
 IDENTITY_HINT_SYNC_PATH = "/api/set_identity_hint"
 T = TypeVar("T")
+PRIMARY_NAV_SECTION_HOME = "home"
+PRIMARY_NAV_SECTION_POST = "post"
+PRIMARY_NAV_SECTION_PROJECT_INFO = "project-info"
+PRIMARY_NAV_SECTION_ACTIVITY = "activity"
 
 
 def get_repo_root() -> Path:
@@ -1358,6 +1362,7 @@ def render_profile_page(
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_HOME,
         ),
     )
 
@@ -1379,6 +1384,7 @@ def render_account_key_page() -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_POST,
         ),
     )
 
@@ -1421,6 +1427,7 @@ def render_board_index(*, board_tag: str | None = None) -> str:
                 hero_title="",
                 hero_text="",
                 include_page_intro=False,
+                active_section=PRIMARY_NAV_SECTION_HOME,
             ),
             content_html=load_template("board_index.html").substitute(context),
             head_extras_html=render_feed_head_link(feed_href),
@@ -1739,6 +1746,7 @@ def render_site_activity_page(*, view_mode: str, page: int) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_ACTIVITY,
         ),
         content_html=content,
         head_extras_html=render_feed_head_link(feed_href),
@@ -1869,6 +1877,7 @@ def render_thread(thread_id: str) -> str:
                 hero_title="",
                 hero_text="",
                 include_page_intro=False,
+                active_section=PRIMARY_NAV_SECTION_HOME,
             ),
             content_html=load_template("thread.html").substitute(
                 thread_heading=html.escape(current_title),
@@ -1922,6 +1931,7 @@ def render_thread_title_update_page(thread_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_POST,
         ),
         page_banner_html="",
     )
@@ -1979,6 +1989,7 @@ def render_post(post_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_HOME,
         ),
         content_html=content,
     )
@@ -2027,6 +2038,7 @@ def render_moderation_log_page(*, limit: int, before: str | None) -> str:
         hero_title="Signed moderation records",
         hero_text="This log reflects the visible moderation records in the current repository state and provides the audit trail behind public-instance moderation effects.",
         content_html=content,
+        active_section=PRIMARY_NAV_SECTION_ACTIVITY,
     )
 
 
@@ -2060,6 +2072,7 @@ def render_instance_info_page() -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_PROJECT_INFO,
         ),
         page_banner_html="",
     )
@@ -2074,6 +2087,7 @@ def render_recent_operations_page() -> str:
         hero_title="Recent slow operations",
         hero_text="Recent request, startup, and maintenance operations recorded with named timing steps.",
         content_html=content,
+        active_section=PRIMARY_NAV_SECTION_PROJECT_INFO,
     )
 
 
@@ -2144,6 +2158,7 @@ def render_unpublished_profile_page(identity_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_HOME,
         ),
     )
 
@@ -2243,6 +2258,7 @@ def render_profile_update_page(identity_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_HOME,
         ),
         page_banner_html="",
     )
@@ -2405,6 +2421,7 @@ def render_merge_management_page(identity_id: str) -> str:
         hero_title="Manage identity merges",
         hero_text="Review same-name identity matches, send merge requests, and respond to incoming approvals from one focused management page.",
         content_html=content,
+        active_section=PRIMARY_NAV_SECTION_HOME,
     )
 
 
@@ -2489,6 +2506,7 @@ def render_merge_request_action_page(
         hero_text="Prepare a signed merge workflow action in the browser and submit it through the canonical merge-request API.",
         content_html=content,
         page_script_html='<script type="module" src="/assets/merge_request_signing.js"></script>',
+        active_section=PRIMARY_NAV_SECTION_HOME,
     )
 
 
@@ -2864,6 +2882,7 @@ def render_task_priorities_page(*, view_mode: str) -> str:
         content_html=content,
         page_script_html='<script src="/assets/task_priorities.js"></script>',
         page_shell_class="page-shell-wide",
+        active_section=PRIMARY_NAV_SECTION_HOME,
     )
 
 
@@ -3004,6 +3023,7 @@ def render_task_detail_page(
         hero_title=current_title,
         hero_text="This task view is derived from one task-typed root thread. The root carries structured task metadata, and the same thread remains the discussion surface.",
         content_html=content,
+        active_section=PRIMARY_NAV_SECTION_HOME,
     )
 
 
@@ -3242,6 +3262,7 @@ def render_compose_page(
             hero_title=compose_heading,
             hero_text=compose_text,
             include_page_intro=False,
+            active_section=PRIMARY_NAV_SECTION_POST,
         ),
         page_script_html='<script type="module" src="/assets/browser_signing.js"></script>',
     )

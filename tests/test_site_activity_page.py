@@ -115,6 +115,8 @@ class SiteActivityPageTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/activity/" aria-current="page">Activity</a>', body)
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertNotIn('class="front-layout"', body)
@@ -153,6 +155,14 @@ class SiteActivityPageTests(unittest.TestCase):
         _, _, moderation_body = self.get("/activity/", "view=moderation")
         _, _, code_body = self.get("/activity/", "view=code")
 
+        self.assertEqual(all_body.count('aria-current="page"'), 1)
+        self.assertEqual(content_body.count('aria-current="page"'), 1)
+        self.assertEqual(moderation_body.count('aria-current="page"'), 1)
+        self.assertEqual(code_body.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/activity/" aria-current="page">Activity</a>', all_body)
+        self.assertIn('<a href="/activity/" aria-current="page">Activity</a>', content_body)
+        self.assertIn('<a href="/activity/" aria-current="page">Activity</a>', moderation_body)
+        self.assertIn('<a href="/activity/" aria-current="page">Activity</a>', code_body)
         self.assertIn("Add reply", all_body)
         self.assertIn("pin thread", all_body)
         self.assertIn("Add ui helper", all_body)
