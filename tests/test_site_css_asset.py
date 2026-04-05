@@ -56,11 +56,10 @@ class SiteCssAssetTests(unittest.TestCase):
         self.assertIn("background: var(--surface-band);", body)
         self.assertIn(".site-username-claim {", body)
         self.assertIn("background: linear-gradient(135deg, var(--surface-claim-top), var(--surface-claim-bottom));", body)
-        self.assertIn("--surface-nav-active:", body)
-        self.assertIn("--ink-nav-active:", body)
         self.assertIn('.site-header-nav a[aria-current="page"] {', body)
-        self.assertIn("background: var(--surface-nav-active);", body)
-        self.assertIn("color: var(--ink-nav-active);", body)
+        self.assertIn("border-color: var(--surface-chip-active-border);", body)
+        self.assertIn("background: var(--surface-chip-active);", body)
+        self.assertIn("color: var(--accent);", body)
 
     def test_site_css_routes_shared_components_through_theme_variables(self) -> None:
         _, _, body = self.get("/assets/site.css")
