@@ -230,7 +230,7 @@ class BoardIndexPageTests(ForumRepoTestCase):
         status, _, body = self.get("/")
 
         self.assertEqual(status, "200 OK")
-        self.assertIn('last active <span class="friendly-timestamp" title="March 17, 2026 · 12:00:00 UTC">', body)
+        self.assertIn('<span class="friendly-timestamp" title="March 17, 2026 · 12:00:00 UTC">', body)
         self.assertIn("ago</span>", body)
 
     def test_board_index_omits_last_active_timestamp_when_indexed_timestamps_are_unavailable(self) -> None:

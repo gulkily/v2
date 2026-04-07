@@ -1121,7 +1121,7 @@ function forum_render_board_index_thread_row_html(int $rank, array $threadRow): 
     if ($lastActivityAt !== '') {
         $timestampHtml = forum_render_timestamp_html($lastActivityAt, 'friendly-timestamp');
         if ($timestampHtml !== '') {
-            $metaParts[] = 'last active ' . $timestampHtml;
+            $metaParts[] = $timestampHtml;
         }
     }
     $tagsLineHtml = '';

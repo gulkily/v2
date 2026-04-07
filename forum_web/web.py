@@ -1604,7 +1604,7 @@ def render_board_index_thread_row(rank: int, thread, moderation_state, *, title_
     if timestamp_text:
         rendered_timestamp = render_timestamp_html(timestamp_text, css_class="friendly-timestamp")
         if rendered_timestamp:
-            timestamp_html = f'last active {rendered_timestamp}'
+            timestamp_html = rendered_timestamp
             meta_parts.append(timestamp_html)
     meta_text = " · ".join(meta_parts)
     tags_line_html = ""
