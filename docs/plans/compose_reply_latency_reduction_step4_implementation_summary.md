@@ -21,3 +21,14 @@
   - Confirmed the focused suite passed after the route simplification and helper contract update.
 - Notes:
   - This stage keeps `/compose/reply` on Python but removes duplicate repository work and makes the remaining data dependencies explicit for the PHP-native stages.
+
+## Stage 3 - Add a PHP-ready compose-reply snapshot contract
+- Changes:
+  - Added compose-reply snapshot ids, builders, refresh helpers, and backfill support in [php_native_reads.py](/home/wsl/v2/forum_core/php_native_reads.py).
+  - Extended the existing PHP-native artifact refresh path so write-time refreshes now also rebuild compose-reply snapshots for affected threads.
+  - Added focused native-read tests for building a compose-reply snapshot and backfilling compose-reply snapshot rows in [test_php_native_reads.py](/home/wsl/v2/tests/test_php_native_reads.py).
+- Verification:
+  - Ran `python3 -m unittest tests.test_php_native_reads`.
+  - Confirmed the focused native-read suite passed with the new compose-reply snapshot coverage.
+- Notes:
+  - The Stage 3 artifact stores a durable reply-compose page payload in the same SQLite snapshot store already used for thread and profile native reads, which keeps the Stage 4 PHP host work on the same storage model.

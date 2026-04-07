@@ -12,9 +12,11 @@ from forum_cgi.posting import commit_post
 from forum_core.php_native_reads import (
     affected_thread_ids_for_touched_paths,
     board_index_snapshot_path,
+    build_compose_reply_snapshot,
     build_board_index_snapshot,
     build_profile_snapshot,
     build_thread_snapshot,
+    rebuild_php_native_compose_reply_snapshots,
     rebuild_php_native_profile_snapshots,
     rebuild_php_native_thread_snapshots,
     thread_snapshot_db_path,
@@ -251,6 +253,41 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
         self.assertIn("Replies", snapshot["content_html"])
         self.assertIn("First visible reply.", snapshot["content_html"])
 
+    def test_build_compose_reply_snapshot_includes_expected_reply_page_content(self) -> None:
+        self.write_record(
+            "records/posts/root-201.txt",
+            """
+            Post-ID: root-201
+            Board-Tags: general
+            Subject: Root thread
+
+            Root body.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-201.txt",
+            """
+            Post-ID: reply-201
+            Board-Tags: general
+            Subject: Reply target
+            Thread-ID: root-201
+            Parent-ID: root-201
+
+            Target reply body.
+            """,
+        )
+        self.commit_paths("records/posts", message="Seed compose reply snapshot fixture")
+
+        snapshot = build_compose_reply_snapshot("root-201", "reply-201", self.repo_root)
+
+        self.assertEqual(snapshot["route"], "/compose/reply?thread_id=root-201&parent_id=reply-201")
+        self.assertEqual(snapshot["thread_id"], "root-201")
+        self.assertEqual(snapshot["parent_id"], "reply-201")
+        self.assertEqual(snapshot["title"], "Compose a signed reply")
+        self.assertIn("Compose a signed reply", snapshot["page_html"])
+        self.assertIn("Replying to", snapshot["page_html"])
+        self.assertIn("Target reply body.", snapshot["page_html"])
+
     def test_build_profile_snapshot_includes_expected_profile_page_content(self) -> None:
         self.write_record(
             "records/posts/root-301.txt",
@@ -410,6 +447,49 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
         assert snapshot is not None
         self.assertEqual(snapshot["route"], "/threads/root-101")
         self.assertIn("Snapshot target", snapshot["content_html"])
+
+    def test_rebuild_php_native_compose_reply_snapshots_backfills_sqlite_rows(self) -> None:
+        self.write_record(
+            "records/posts/root-401.txt",
+            """
+            Post-ID: root-401
+            Board-Tags: general
+            Subject: Compose reply thread
+
+            Root body.
+            """,
+        )
+        self.write_record(
+            "records/posts/reply-401.txt",
+            """
+            Post-ID: reply-401
+            Board-Tags: general
+            Subject: Compose reply target
+            Thread-ID: root-401
+            Parent-ID: root-401
+
+            Reply body.
+            """,
+        )
+        self.commit_paths("records/posts", message="Seed compose reply snapshot backfill fixture")
+
+        rebuilt = rebuild_php_native_compose_reply_snapshots(self.repo_root)
+
+        self.assertEqual(
+            rebuilt,
+            [
+                "compose-reply/root-401/root-401",
+                "compose-reply/root-401/reply-401",
+            ],
+        )
+        connection = sqlite3.connect(thread_snapshot_db_path(self.repo_root))
+        try:
+            snapshot = load_php_native_snapshot(connection, "compose-reply/root-401/reply-401")
+        finally:
+            connection.close()
+        assert snapshot is not None
+        self.assertEqual(snapshot["route"], "/compose/reply?thread_id=root-401&parent_id=reply-401")
+        self.assertIn("Compose a signed reply", snapshot["page_html"])
 
 
 if __name__ == "__main__":

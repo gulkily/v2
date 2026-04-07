@@ -36,6 +36,10 @@ def profile_snapshot_id(profile_slug: str) -> str:
     return f"profile/{profile_slug}"
 
 
+def compose_reply_snapshot_id(thread_id: str, parent_id: str) -> str:
+    return f"compose-reply/{thread_id}/{parent_id}"
+
+
 def thread_snapshot_db_path(repo_root: Path) -> Path:
     return php_native_reads_db_path(repo_root)
 
@@ -270,6 +274,59 @@ def build_profile_snapshot(identity_id: str, repo_root: Path) -> dict[str, objec
     }
 
 
+def build_compose_reply_snapshot(thread_id: str, parent_id: str, repo_root: Path) -> dict[str, object]:
+    from forum_web.profiles import load_identity_context
+    from forum_web.web import describe_board_tags, render_compose_page, render_compose_reference
+
+    posts = load_posts(post_records_dir(repo_root))
+    posts_by_id = index_posts(posts)
+    moderation_state = derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root)))
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
+
+    thread = posts_by_id.get(thread_id)
+    if thread is None or not thread.is_root or thread_is_hidden(moderation_state, thread_id):
+        raise LookupError(f"unknown thread: {thread_id}")
+    if moderation_state.locks_thread(thread_id):
+        raise LookupError(f"locked thread: {thread_id}")
+
+    resolved_parent_id = parent_id or thread.post_id
+    parent_post = posts_by_id.get(resolved_parent_id)
+    if (
+        parent_post is None
+        or parent_post.root_thread_id != thread.post_id
+        or post_is_hidden(moderation_state, resolved_parent_id, thread.post_id)
+    ):
+        raise LookupError(f"unknown post: {resolved_parent_id}")
+
+    board_tags = " ".join(thread.board_tags)
+    page_html = render_compose_page(
+        command_name="create_reply",
+        endpoint_path="/api/create_reply",
+        compose_heading="Compose a signed reply",
+        compose_text="Generate or import a local OpenPGP key, sign a canonical reply payload in the browser, and submit the signed reply directly into repository storage.",
+        dry_run=False,
+        board_tags=board_tags,
+        context_text=f"This signed reply will go into thread {thread.post_id} in {describe_board_tags(board_tags)} under parent {resolved_parent_id}. Reply linkage is filled in automatically.",
+        thread_id=thread_id,
+        parent_id=resolved_parent_id,
+        compose_path="/compose/reply",
+        breadcrumb_label="compose reply",
+        reply_target_html=render_compose_reference(
+            parent_post,
+            root_thread_id=thread.post_id,
+            identity_context=identity_context,
+            all_posts=posts,
+        ),
+    )
+    return {
+        "route": f"/compose/reply?thread_id={thread_id}&parent_id={resolved_parent_id}",
+        "thread_id": thread_id,
+        "parent_id": resolved_parent_id,
+        "title": "Compose a signed reply",
+        "page_html": page_html,
+    }
+
+
 def _all_thread_ids(repo_root: Path) -> list[str]:
     posts = load_posts(post_records_dir(repo_root))
     return sorted(post.post_id for post in posts if post.is_root)
@@ -300,6 +357,24 @@ def _all_profile_identity_ids(repo_root: Path) -> list[str]:
         if summary is not None:
             resolved_identity_ids.add(summary.identity_id)
     return sorted(resolved_identity_ids)
+
+
+def _all_compose_reply_targets_for_thread(repo_root: Path, thread_id: str) -> list[str]:
+    posts_by_id = index_posts(load_posts(post_records_dir(repo_root)))
+    moderation_state = derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root)))
+    thread = posts_by_id.get(thread_id)
+    if thread is None or not thread.is_root or thread_is_hidden(moderation_state, thread_id) or moderation_state.locks_thread(thread_id):
+        return []
+    targets = [thread.post_id]
+    for post in sorted(posts_by_id.values(), key=lambda candidate: candidate.post_id):
+        if post.post_id == thread.post_id:
+            continue
+        if post.root_thread_id != thread_id:
+            continue
+        if post_is_hidden(moderation_state, post.post_id, thread_id):
+            continue
+        targets.append(post.post_id)
+    return targets
 
 
 def _root_thread_id_for_post(repo_root: Path, post_id: str) -> str | None:
@@ -417,6 +492,26 @@ def refresh_profile_snapshot(repo_root: Path, identity_id: str) -> None:
         connection.close()
 
 
+def refresh_compose_reply_snapshot(repo_root: Path, thread_id: str, parent_id: str) -> None:
+    connection = connect_php_native_reads_db(repo_root)
+    try:
+        try:
+            snapshot = build_compose_reply_snapshot(thread_id, parent_id, repo_root)
+        except LookupError:
+            delete_php_native_snapshot(connection, compose_reply_snapshot_id(thread_id, parent_id))
+            return
+        save_php_native_snapshot(
+            connection,
+            snapshot_id=compose_reply_snapshot_id(thread_id, parent_id),
+            entity_type="compose_reply",
+            entity_id=f"{thread_id}:{parent_id}",
+            snapshot=snapshot,
+            invalidated_by_post_id=parent_id,
+        )
+    finally:
+        connection.close()
+
+
 def rebuild_php_native_thread_snapshots(repo_root: Path, *, thread_ids: Iterable[str] | None = None) -> list[str]:
     refreshed: list[str] = []
     target_thread_ids = sorted(set(thread_ids if thread_ids is not None else _all_thread_ids(repo_root)))
@@ -435,6 +530,16 @@ def rebuild_php_native_profile_snapshots(repo_root: Path, *, identity_ids: Itera
     return refreshed
 
 
+def rebuild_php_native_compose_reply_snapshots(repo_root: Path, *, thread_ids: Iterable[str] | None = None) -> list[str]:
+    refreshed: list[str] = []
+    target_thread_ids = sorted(set(thread_ids if thread_ids is not None else _all_thread_ids(repo_root)))
+    for thread_id in target_thread_ids:
+        for parent_id in _all_compose_reply_targets_for_thread(repo_root, thread_id):
+            refresh_compose_reply_snapshot(repo_root, thread_id, parent_id)
+            refreshed.append(compose_reply_snapshot_id(thread_id, parent_id))
+    return refreshed
+
+
 def refresh_php_native_read_artifacts(repo_root: Path, *, touched_paths: Iterable[str] = ()) -> None:
     snapshot_path = board_index_snapshot_path(repo_root)
     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
@@ -442,6 +547,8 @@ def refresh_php_native_read_artifacts(repo_root: Path, *, touched_paths: Iterabl
         json.dumps(build_board_index_snapshot(repo_root), indent=2, sort_keys=True),
         encoding="utf-8",
     )
-    for thread_id in affected_thread_ids_for_touched_paths(repo_root, touched_paths):
+    affected_thread_ids = affected_thread_ids_for_touched_paths(repo_root, touched_paths)
+    for thread_id in affected_thread_ids:
         refresh_thread_snapshot(repo_root, thread_id)
+    rebuild_php_native_compose_reply_snapshots(repo_root, thread_ids=affected_thread_ids)
     rebuild_php_native_profile_snapshots(repo_root)
