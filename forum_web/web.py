@@ -692,10 +692,22 @@ def describe_timestamp_display(raw_value: str, *, now: datetime | None = None) -
     parsed = parse_display_timestamp(raw_value)
     if parsed is None:
         return None
+    return describe_datetime_timestamp_display(parsed, now=now)
+
+
+def describe_datetime_timestamp_display(value: datetime, *, now: datetime | None = None) -> TimestampDisplay:
+    normalized = ensure_utc_datetime(value)
     return TimestampDisplay(
-        relative_text=format_relative_timestamp(parsed, now=now),
-        exact_text=format_exact_timestamp(parsed),
-        datetime_value=parsed,
+        relative_text=format_relative_timestamp(normalized, now=now),
+        exact_text=format_exact_timestamp(normalized),
+        datetime_value=normalized,
+    )
+
+
+def render_timestamp_display(display: TimestampDisplay, *, css_class: str) -> str:
+    return (
+        f'<span class="{html.escape(css_class, quote=True)}" '
+        f'title="{html.escape(display.exact_text, quote=True)}">{html.escape(display.relative_text)}</span>'
     )
 
 
@@ -703,10 +715,21 @@ def render_timestamp_html(raw_value: str, *, css_class: str, now: datetime | Non
     display = describe_timestamp_display(raw_value, now=now)
     if display is None:
         return ""
-    return (
-        f'<span class="{html.escape(css_class, quote=True)}" '
-        f'title="{html.escape(display.exact_text, quote=True)}">{html.escape(display.relative_text)}</span>'
-    )
+    return render_timestamp_display(display, css_class=css_class)
+
+
+def describe_post_timestamp_display(post_id: str, *, now: datetime | None = None) -> TimestampDisplay | None:
+    timestamp = post_datetime_from_id(post_id)
+    if timestamp is None:
+        return None
+    return describe_datetime_timestamp_display(timestamp, now=now)
+
+
+def render_post_timestamp_html(post_id: str, *, css_class: str, now: datetime | None = None) -> str:
+    display = describe_post_timestamp_display(post_id, now=now)
+    if display is None:
+        return ""
+    return render_timestamp_display(display, css_class=css_class)
 
 
 def post_datetime_from_id(post_id: str) -> datetime | None:
@@ -1649,11 +1672,10 @@ def git_status_summary(repo_root: Path) -> dict[str, str]:
 def format_commit_date(commit_date: str) -> str:
     if not commit_date:
         return "unknown date"
-    try:
-        timestamp = datetime.fromisoformat(commit_date)
-    except ValueError:
+    display = describe_timestamp_display(commit_date)
+    if display is None:
         return commit_date
-    return timestamp.strftime("%b %d, %Y · %H:%M:%S %z")
+    return display.exact_text
 
 
 def format_commit_area_summary(file_summary: CommitFileSummary) -> str:
@@ -1702,7 +1724,7 @@ def render_commit_card(
     details = [
         f'<p class="post-link">{html.escape(activity_label)}</p>',
         f'<p class="commit-id">Commit {html.escape(commit.short_id)}</p>',
-        f'<p class="commit-date">{html.escape(format_commit_date(commit.commit_date))}</p>',
+        f'<p class="commit-date">{render_timestamp_html(commit.commit_date, css_class="friendly-timestamp") or html.escape(format_commit_date(commit.commit_date))}</p>',
         f'<p class="post-link">Author {html.escape(commit.author_name)} &lt;{html.escape(commit.author_email)}&gt;</p>',
         f'<p class="commit-subject">{html.escape(commit.subject or "No message")}</p>',
         f'<p class="post-link">{html.escape(format_commit_area_summary(commit.file_summary))}</p>',
@@ -2237,7 +2259,7 @@ def render_recent_operation_card(operation) -> str:
         '<article class="post-card">'
         f'<p class="post-link">{html.escape(operation.operation_name)}</p>'
         f'<p class="thread-meta">{html.escape(operation.operation_kind)} · {html.escape(operation.state)} · {html.escape(duration_text)}</p>'
-        f'<p class="thread-meta">started {html.escape(operation.started_at)}</p>'
+        f'<p class="thread-meta">started {render_timestamp_html(operation.started_at, css_class="friendly-timestamp") or html.escape(operation.started_at)}</p>'
         f"{error_html}"
         f'<p class="thread-meta">{metadata_html}</p>'
         f"<ul>{steps_html}</ul>"
@@ -2409,9 +2431,9 @@ def render_merge_management_page(identity_id: str) -> str:
         if candidate_summary is None:
             return f'<p><strong>Identity:</strong> <code>{html.escape(candidate_identity_id)}</code></p>'
 
-        last_activity_text = "No visible signed posts yet"
+        last_activity_html = "<span>No visible signed posts yet</span>"
         if candidate_summary.post_ids:
-            last_activity_text = format_post_timestamp(candidate_summary.post_ids[-1])
+            last_activity_html = render_post_timestamp_html(candidate_summary.post_ids[-1], css_class="friendly-timestamp") or "<span>unknown date</span>"
 
         post_links_html = "".join(
             render_post_link_chip(post_id, posts_index)
@@ -2421,7 +2443,7 @@ def render_merge_management_page(identity_id: str) -> str:
         return (
             f'<p><strong>{html.escape(candidate_summary.display_name)}</strong> · '
             f'<a href="/profiles/{html.escape(identity_slug(candidate_summary.identity_id))}">{html.escape(candidate_summary.identity_id)}</a></p>'
-            f'<p><strong>Last activity:</strong> <code>{html.escape(last_activity_text)}</code></p>'
+            f'<p><strong>Last activity:</strong> {last_activity_html}</p>'
             f'<p><strong>Visible posts:</strong> {post_links_html}</p>'
         )
 
@@ -2671,12 +2693,14 @@ def render_post_card(
     meta_html = ""
     if not compact_thread_view:
         board_tags = " ".join("/" + html.escape(tag) + "/" for tag in post.board_tags)
-        timestamp_label = html.escape(format_post_timestamp(post.post_id))
+        timestamp_html = render_post_timestamp_html(post.post_id, css_class="friendly-timestamp")
+        if not timestamp_html:
+            timestamp_html = html.escape(format_post_timestamp(post.post_id))
         meta_html = (
             '<div class="post-meta-row">'
             f'<p class="post-id">{html.escape(post.post_id)}</p>'
             f'<p class="post-tags">{board_tags}</p>'
-            f'<p class="post-timestamp">{timestamp_label}</p>'
+            f'<p class="post-timestamp">{timestamp_html}</p>'
             "</div>"
         )
     permalink_label = format_post_permalink_label(post.post_id)
@@ -2705,14 +2729,10 @@ def format_post_permalink_label(post_id: str) -> str:
 
 
 def format_post_timestamp(post_id: str) -> str:
-    match = re.search(r"-(\d{14})-", post_id)
-    if match is None:
+    display = describe_post_timestamp_display(post_id)
+    if display is None:
         return "unknown date"
-    try:
-        timestamp = datetime.strptime(match.group(1), "%Y%m%d%H%M%S")
-    except ValueError:
-        return "unknown date"
-    return timestamp.strftime("%B %d, %Y · %H:%M:%S UTC")
+    return display.exact_text
 
 
 def render_compose_reference(post, *, root_thread_id: str, identity_context) -> str:
@@ -2761,7 +2781,7 @@ def render_moderation_card(record, *, identity_context, posts: list[Post] | None
         '<article class="post-card moderation-card">'
         '<div class="post-meta-row">'
         f'<p class="post-id">{html.escape(record.record_id)}</p>'
-        f'<p class="post-tags">{html.escape(record.timestamp)}</p>'
+        f'<p class="post-tags">{render_timestamp_html(record.timestamp, css_class="friendly-timestamp") or html.escape(record.timestamp)}</p>'
         "</div>"
         f'<h3 class="post-subject">{html.escape(record.action)} {html.escape(record.target_type)}</h3>'
         f'<p class="post-relation">target <a href="{target_href}">{html.escape(record.target_id)}</a></p>'

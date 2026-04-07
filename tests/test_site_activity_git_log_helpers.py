@@ -27,6 +27,7 @@ from forum_web.web import (
     load_board_feed_items,
     load_thread_feed_items,
     parse_display_timestamp,
+    render_post_timestamp_html,
     render_timestamp_html,
     render_rss_feed,
     resolve_commit_posts,
@@ -126,6 +127,19 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
             '<span class="thread-timestamp" title="April 07, 2026 · 09:00:00 UTC">3 hours ago</span>',
         )
         self.assertEqual(render_timestamp_html("invalid", css_class="thread-timestamp", now=now), "")
+
+    def test_render_post_timestamp_html_uses_post_id_timestamp_for_friendly_label_and_title(self) -> None:
+        now = datetime.fromisoformat("2026-04-07T12:00:00+00:00")
+
+        self.assertEqual(
+            render_post_timestamp_html(
+                "reply-20260407100000-example-12345678",
+                css_class="post-timestamp",
+                now=now,
+            ),
+            '<span class="post-timestamp" title="April 07, 2026 · 10:00:00 UTC">2 hours ago</span>',
+        )
+        self.assertEqual(render_post_timestamp_html("reply-without-timestamp", css_class="post-timestamp", now=now), "")
 
     def test_fetch_recent_commits_returns_commits_with_files(self) -> None:
         self.write_record(

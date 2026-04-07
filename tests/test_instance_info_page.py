@@ -171,6 +171,8 @@ class InstanceInfoPageTests(unittest.TestCase):
         self.assertIn("method: GET", body)
         self.assertIn("path: /activity/", body)
         self.assertIn("view: code", body)
+        self.assertIn('class="friendly-timestamp"', body)
+        self.assertIn('title="March 20, 2026 · 02:00:00 UTC"', body)
 
     def test_slow_operations_page_renders_integer_metadata_values(self) -> None:
         expected_operations = (

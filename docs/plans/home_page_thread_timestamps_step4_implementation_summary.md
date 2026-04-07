@@ -18,3 +18,14 @@
   - Result: `35 passed`
 - Notes:
   - The home page now shows thread recency only when indexed timestamps are available, preserving the previous lean fallback when index data is missing.
+
+## Stage 3 - Shared timestamp surface migration
+- Changes:
+  - Migrated existing human-facing timestamp surfaces onto the shared timestamp contract for commit/activity cards, moderation records, recent slow-operation cards, merge-management last-activity text, and post timestamp rendering.
+  - Added post-ID-based friendly timestamp rendering helpers so post-derived times can use the same exact-tooltip presentation as ISO-style record timestamps.
+  - Expanded regression coverage for helper behavior and affected activity/operations page rendering.
+- Verification:
+  - Ran `python -m pytest tests/test_site_activity_git_log_helpers.py tests/test_site_activity_page.py tests/test_instance_info_page.py`
+  - Result: `34 passed`
+- Notes:
+  - Machine-readable RSS publication dates were left unchanged.
