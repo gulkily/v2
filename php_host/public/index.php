@@ -1024,6 +1024,71 @@ function forum_render_board_index_stats_html(array $stats): string
 HTML;
 }
 
+function forum_parse_timestamp_epoch(string $rawValue): ?int
+{
+    $normalized = trim($rawValue);
+    if ($normalized === '') {
+        return null;
+    }
+    $timestamp = strtotime($normalized);
+    if ($timestamp === false) {
+        return null;
+    }
+    return (int) $timestamp;
+}
+
+function forum_format_exact_timestamp(int $timestamp): string
+{
+    return gmdate('F d, Y · H:i:s \U\T\C', $timestamp);
+}
+
+function forum_format_relative_timestamp(int $timestamp, ?int $nowTimestamp = null): string
+{
+    $now = $nowTimestamp ?? time();
+    $seconds = $now - $timestamp;
+    if (abs($seconds) < 5) {
+        return 'just now';
+    }
+    $future = $seconds < 0;
+    $seconds = abs($seconds);
+    $units = [
+        [365 * 24 * 60 * 60, 'year'],
+        [30 * 24 * 60 * 60, 'month'],
+        [7 * 24 * 60 * 60, 'week'],
+        [24 * 60 * 60, 'day'],
+        [60 * 60, 'hour'],
+        [60, 'minute'],
+        [1, 'second'],
+    ];
+    $unitSeconds = 1;
+    $unitName = 'second';
+    foreach ($units as [$candidateSeconds, $candidateName]) {
+        if ($seconds >= $candidateSeconds) {
+            $unitSeconds = $candidateSeconds;
+            $unitName = $candidateName;
+            break;
+        }
+    }
+    $quantity = max(1, intdiv($seconds, $unitSeconds));
+    $label = $quantity === 1 ? $unitName : $unitName . 's';
+    if ($future) {
+        return 'in ' . $quantity . ' ' . $label;
+    }
+    return $quantity . ' ' . $label . ' ago';
+}
+
+function forum_render_timestamp_html(string $rawValue, string $cssClass): string
+{
+    $timestamp = forum_parse_timestamp_epoch($rawValue);
+    if ($timestamp === null) {
+        return '';
+    }
+    $classHtml = forum_html_escape($cssClass);
+    $titleHtml = forum_html_escape(forum_format_exact_timestamp($timestamp));
+    $labelHtml = forum_html_escape(forum_format_relative_timestamp($timestamp));
+    return '<span class="' . $classHtml . '" title="' . $titleHtml . '">' . $labelHtml . '</span>';
+}
+
 function forum_render_board_index_thread_row_html(int $rank, array $threadRow): string
 {
     $subject = trim((string) ($threadRow['subject'] ?? ''));
@@ -1051,6 +1116,13 @@ function forum_render_board_index_thread_row_html(int $rank, array $threadRow): 
     }
     if ($threadType !== '') {
         $metaParts[] = forum_html_escape($threadType);
+    }
+    $lastActivityAt = trim((string) ($threadRow['last_activity_at'] ?? ''));
+    if ($lastActivityAt !== '') {
+        $timestampHtml = forum_render_timestamp_html($lastActivityAt, 'friendly-timestamp');
+        if ($timestampHtml !== '') {
+            $metaParts[] = 'last active ' . $timestampHtml;
+        }
     }
     $tagsLineHtml = '';
     if ($tags !== []) {

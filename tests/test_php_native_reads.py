@@ -117,7 +117,14 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            snapshot["thread_rows"],
+            [
+                {
+                    key: value
+                    for key, value in thread_row.items()
+                    if key != "last_activity_at"
+                }
+                for thread_row in snapshot["thread_rows"]
+            ],
             [
                 {
                     "post_id": "root-002",
@@ -130,6 +137,7 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
                 }
             ],
         )
+        self.assertTrue(snapshot["thread_rows"][0]["last_activity_at"])
 
     def test_commit_post_refreshes_board_index_snapshot(self) -> None:
         post_path = self.write_record(
@@ -153,7 +161,14 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["stats"]["thread_count"], 1)
         self.assertEqual(snapshot["stats"]["board_tag_count"], 2)
         self.assertEqual(
-            snapshot["thread_rows"],
+            [
+                {
+                    key: value
+                    for key, value in thread_row.items()
+                    if key != "last_activity_at"
+                }
+                for thread_row in snapshot["thread_rows"]
+            ],
             [
                 {
                     "post_id": "root-101",
@@ -166,6 +181,7 @@ class PhpNativeReadSnapshotTests(unittest.TestCase):
                 }
             ],
         )
+        self.assertTrue(snapshot["thread_rows"][0]["last_activity_at"])
 
     def test_build_board_index_snapshot_uses_resolved_thread_title(self) -> None:
         self.write_record(

@@ -527,6 +527,7 @@ process.stdout.write(signature);
                         "tags": ["meta"],
                         "reply_count": 2,
                         "thread_type": "task",
+                        "last_activity_at": "2026-03-17T12:00:00Z",
                     }
                 ],
                 "stats": {
@@ -567,6 +568,8 @@ process.stdout.write(signature);
         self.assertIn("[meta]", response["body"])
         self.assertIn("2 replies", response["body"])
         self.assertIn("task", response["body"])
+        self.assertIn('class="friendly-timestamp"', response["body"])
+        self.assertIn('title="March 17, 2026 · 12:00:00 UTC"', response["body"])
         self.assertIn("<title>zenmemes</title>", response["body"])
         self.assertIn('class="site-header-title"><a href="/">zenmemes</a>', response["body"])
         self.assertEqual(response["body"].count('aria-current="page"'), 1)
@@ -626,6 +629,7 @@ process.stdout.write(signature);
                         "tags": [],
                         "reply_count": 0,
                         "thread_type": None,
+                        "last_activity_at": "2026-03-17T12:00:00Z",
                     }
                 ],
                 "stats": {

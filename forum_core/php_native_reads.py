@@ -78,6 +78,12 @@ def _visible_reply_count(thread, moderation_state) -> int:
     )
 
 
+def _thread_timestamp_text(indexed_root: IndexedPostRow | None) -> str | None:
+    if indexed_root is None:
+        return None
+    return indexed_root.updated_at or indexed_root.created_at
+
+
 def build_board_index_snapshot(repo_root: Path) -> dict[str, object]:
     posts = load_posts(post_records_dir(repo_root))
     threads = group_threads(posts)
@@ -115,6 +121,7 @@ def build_board_index_snapshot(repo_root: Path) -> dict[str, object]:
                 "tags": list(visible_tags),
                 "reply_count": _visible_reply_count(thread, moderation_state),
                 "thread_type": root_thread_type(thread.root),
+                "last_activity_at": _thread_timestamp_text(indexed_roots.get(thread.root.post_id)),
             }
         )
     return {

@@ -29,3 +29,14 @@
   - Result: `34 passed`
 - Notes:
   - Machine-readable RSS publication dates were left unchanged.
+
+## Stage 4 - PHP/native home page timestamp parity
+- Changes:
+  - Extended the board-index PHP/native snapshot contract with `last_activity_at` so the public fast path can render the same recency signal as the Python board index.
+  - Added PHP-side timestamp parsing and friendly-plus-exact rendering for native board-index rows so the PHP host shows the same tooltip-backed timestamps.
+  - Updated snapshot and PHP host cache tests to cover the new contract and visible timestamp output.
+- Verification:
+  - Ran `python -m pytest tests/test_php_native_reads.py tests/test_php_host_cache.py tests/test_board_index_page.py`
+  - Result: `45 passed`
+- Notes:
+  - The PHP/native path computes friendly relative labels at request time from snapshot timestamps, keeping it aligned with the Python render path without storing presentation text in the snapshot.
