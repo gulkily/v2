@@ -260,6 +260,38 @@ process.stdout.write(signature);
         self.assertIn("board_build_page_context", step_names)
         self.assertIn("board_render_page", step_names)
 
+    def test_compose_reply_request_records_route_specific_timing_steps(self) -> None:
+        self.write_record(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: general
+            Subject: Reply target
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Target reply body.
+            """,
+        )
+        self.run_command(["git", "add", "."], cwd=self.repo_root)
+        self.run_command(["git", "commit", "-m", "add reply target"], cwd=self.repo_root)
+        ensure_post_index_current(self.repo_root).connection.close()
+
+        status, _, _ = self.request(
+            "/compose/reply",
+            query_string="thread_id=root-001&parent_id=reply-001",
+        )
+
+        self.assertEqual(status, "200 OK")
+        operations = load_recent_operations(self.repo_root)
+        compose_reply_operation = next(event for event in operations if event.operation_name == "GET /compose/reply")
+        step_names = tuple(step.name for step in compose_reply_operation.steps)
+        self.assertIn("compose_reply_load_repository_state", step_names)
+        self.assertIn("compose_reply_lookup_thread", step_names)
+        self.assertIn("compose_reply_build_posts_index", step_names)
+        self.assertIn("compose_reply_lookup_parent_post", step_names)
+        self.assertIn("compose_reply_render_page", step_names)
+
     def test_thread_request_records_route_specific_timing_steps(self) -> None:
         status, _, _ = self.request("/threads/root-001")
 

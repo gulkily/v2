@@ -4029,8 +4029,14 @@ def _dispatch_application(environ, start_response):
                 start_response("404 Not Found", headers)
                 return [body]
 
-            posts, grouped_threads, _, _, moderation_state, identity_context = load_repository_state()
-            thread = index_threads(grouped_threads).get(thread_id)
+            posts, grouped_threads, _, _, moderation_state, identity_context = timed_request_step(
+                "compose_reply_load_repository_state",
+                load_repository_state,
+            )
+            thread = timed_request_step(
+                "compose_reply_lookup_thread",
+                lambda: index_threads(grouped_threads).get(thread_id),
+            )
             if thread is None or thread_is_hidden(moderation_state, thread_id):
                 body = render_missing_resource("thread").encode("utf-8")
                 headers = [("Content-Type", "text/html; charset=utf-8")]
@@ -4048,10 +4054,16 @@ def _dispatch_application(environ, start_response):
                 start_response("409 Conflict", headers)
                 return [body]
 
-            posts_by_id = index_posts(posts)
+            posts_by_id = timed_request_step(
+                "compose_reply_build_posts_index",
+                lambda: index_posts(posts),
+            )
             if not parent_id:
                 parent_id = thread.root.post_id
-            parent_post = posts_by_id.get(parent_id)
+            parent_post = timed_request_step(
+                "compose_reply_lookup_parent_post",
+                lambda: posts_by_id.get(parent_id),
+            )
             if (
                 parent_post is None
                 or parent_post.root_thread_id != thread.root.post_id
@@ -4063,24 +4075,27 @@ def _dispatch_application(environ, start_response):
                 return [body]
 
             board_tags = " ".join(thread.root.board_tags)
-            body = render_compose_page(
-                command_name="create_reply",
-                endpoint_path="/api/create_reply",
-                compose_heading="Compose a signed reply",
-                compose_text="Generate or import a local OpenPGP key, sign a canonical reply payload in the browser, and submit the signed reply directly into repository storage.",
-                dry_run=False,
-                board_tags=board_tags,
-                context_text=f"This signed reply will go into thread {thread.root.post_id} in {describe_board_tags(board_tags)} under parent {parent_id}. Reply linkage is filled in automatically.",
-                thread_id=thread_id,
-                parent_id=parent_id,
-                compose_path="/compose/reply",
-                breadcrumb_label="compose reply",
-                reply_target_html=render_compose_reference(
-                    parent_post,
-                    root_thread_id=thread.root.post_id,
-                    identity_context=identity_context,
-                ),
-            ).encode("utf-8")
+            body = timed_request_step(
+                "compose_reply_render_page",
+                lambda: render_compose_page(
+                    command_name="create_reply",
+                    endpoint_path="/api/create_reply",
+                    compose_heading="Compose a signed reply",
+                    compose_text="Generate or import a local OpenPGP key, sign a canonical reply payload in the browser, and submit the signed reply directly into repository storage.",
+                    dry_run=False,
+                    board_tags=board_tags,
+                    context_text=f"This signed reply will go into thread {thread.root.post_id} in {describe_board_tags(board_tags)} under parent {parent_id}. Reply linkage is filled in automatically.",
+                    thread_id=thread_id,
+                    parent_id=parent_id,
+                    compose_path="/compose/reply",
+                    breadcrumb_label="compose reply",
+                    reply_target_html=render_compose_reference(
+                        parent_post,
+                        root_thread_id=thread.root.post_id,
+                        identity_context=identity_context,
+                    ),
+                ).encode("utf-8"),
+            )
             headers = [("Content-Type", "text/html; charset=utf-8")]
             start_response("200 OK", headers)
             return [body]
