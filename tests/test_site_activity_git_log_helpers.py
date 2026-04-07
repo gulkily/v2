@@ -4,6 +4,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
@@ -15,13 +16,18 @@ from forum_web.web import (
     build_posts_index,
     classify_commit_activity,
     classify_commit_area,
+    describe_timestamp_display,
     fetch_recent_commits,
     fetch_recent_repository_commits,
+    format_exact_timestamp,
+    format_relative_timestamp,
     github_commit_url_for,
     load_activity_feed_items,
     load_activity_events,
     load_board_feed_items,
     load_thread_feed_items,
+    parse_display_timestamp,
+    render_timestamp_html,
     render_rss_feed,
     resolve_commit_posts,
     summarize_commit_files,
@@ -82,6 +88,44 @@ class SiteActivityGitLogHelpersTests(unittest.TestCase):
             text=True,
         )
         return result.stdout.strip()
+
+    def test_parse_display_timestamp_normalizes_zulu_and_offsets_to_utc(self) -> None:
+        zulu_timestamp = parse_display_timestamp("2026-04-07T10:00:00Z")
+        offset_timestamp = parse_display_timestamp("2026-04-07T06:00:00-04:00")
+
+        self.assertEqual(zulu_timestamp, offset_timestamp)
+        self.assertEqual(format_exact_timestamp(zulu_timestamp), "April 07, 2026 · 10:00:00 UTC")
+
+    def test_format_relative_timestamp_uses_friendly_labels_for_past_and_future(self) -> None:
+        now = datetime.fromisoformat("2026-04-07T12:00:00+00:00")
+
+        self.assertEqual(
+            format_relative_timestamp(datetime.fromisoformat("2026-04-07T10:00:00+00:00"), now=now),
+            "2 hours ago",
+        )
+        self.assertEqual(
+            format_relative_timestamp(datetime.fromisoformat("2026-04-07T12:30:00+00:00"), now=now),
+            "in 30 minutes",
+        )
+        self.assertEqual(
+            format_relative_timestamp(datetime.fromisoformat("2026-04-07T11:59:58+00:00"), now=now),
+            "just now",
+        )
+
+    def test_describe_and_render_timestamp_display_include_relative_label_and_exact_title(self) -> None:
+        now = datetime.fromisoformat("2026-04-07T12:00:00+00:00")
+
+        display = describe_timestamp_display("2026-04-07T09:00:00Z", now=now)
+
+        self.assertIsNotNone(display)
+        assert display is not None
+        self.assertEqual(display.relative_text, "3 hours ago")
+        self.assertEqual(display.exact_text, "April 07, 2026 · 09:00:00 UTC")
+        self.assertEqual(
+            render_timestamp_html("2026-04-07T09:00:00Z", css_class="thread-timestamp", now=now),
+            '<span class="thread-timestamp" title="April 07, 2026 · 09:00:00 UTC">3 hours ago</span>',
+        )
+        self.assertEqual(render_timestamp_html("invalid", css_class="thread-timestamp", now=now), "")
 
     def test_fetch_recent_commits_returns_commits_with_files(self) -> None:
         self.write_record(

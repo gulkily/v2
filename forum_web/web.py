@@ -619,6 +619,13 @@ class FeedItem:
     published_at: datetime | None = None
 
 
+@dataclass(frozen=True)
+class TimestampDisplay:
+    relative_text: str
+    exact_text: str
+    datetime_value: datetime
+
+
 ACTIVITY_PAGE_SIZE = 12
 
 
@@ -630,6 +637,76 @@ def ensure_utc_datetime(value: datetime) -> datetime:
 
 def format_rss_pubdate(value: datetime) -> str:
     return format_datetime(ensure_utc_datetime(value))
+
+
+def parse_display_timestamp(raw_value: str) -> datetime | None:
+    normalized = raw_value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    return ensure_utc_datetime(parsed)
+
+
+def format_exact_timestamp(value: datetime) -> str:
+    normalized = ensure_utc_datetime(value)
+    return normalized.strftime("%B %d, %Y · %H:%M:%S UTC")
+
+
+def format_relative_timestamp(value: datetime, *, now: datetime | None = None) -> str:
+    normalized_value = ensure_utc_datetime(value)
+    comparison_now = ensure_utc_datetime(now or datetime.now(timezone.utc))
+    seconds = int(round((comparison_now - normalized_value).total_seconds()))
+    if abs(seconds) < 5:
+        return "just now"
+    future = seconds < 0
+    seconds = abs(seconds)
+    units = (
+        (60 * 60 * 24 * 365, "year"),
+        (60 * 60 * 24 * 30, "month"),
+        (60 * 60 * 24 * 7, "week"),
+        (60 * 60 * 24, "day"),
+        (60 * 60, "hour"),
+        (60, "minute"),
+        (1, "second"),
+    )
+    unit_seconds = 1
+    unit_name = "second"
+    for candidate_seconds, candidate_name in units:
+        if seconds >= candidate_seconds:
+            unit_seconds = candidate_seconds
+            unit_name = candidate_name
+            break
+    quantity = max(1, seconds // unit_seconds)
+    label = unit_name if quantity == 1 else f"{unit_name}s"
+    if future:
+        return f"in {quantity} {label}"
+    return f"{quantity} {label} ago"
+
+
+def describe_timestamp_display(raw_value: str, *, now: datetime | None = None) -> TimestampDisplay | None:
+    parsed = parse_display_timestamp(raw_value)
+    if parsed is None:
+        return None
+    return TimestampDisplay(
+        relative_text=format_relative_timestamp(parsed, now=now),
+        exact_text=format_exact_timestamp(parsed),
+        datetime_value=parsed,
+    )
+
+
+def render_timestamp_html(raw_value: str, *, css_class: str, now: datetime | None = None) -> str:
+    display = describe_timestamp_display(raw_value, now=now)
+    if display is None:
+        return ""
+    return (
+        f'<span class="{html.escape(css_class, quote=True)}" '
+        f'title="{html.escape(display.exact_text, quote=True)}">{html.escape(display.relative_text)}</span>'
+    )
 
 
 def post_datetime_from_id(post_id: str) -> datetime | None:
