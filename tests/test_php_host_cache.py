@@ -10,7 +10,12 @@ from pathlib import Path
 from textwrap import dedent
 
 from forum_core.identity import build_identity_id, fingerprint_from_public_key_text, identity_slug
-from forum_core.php_native_reads import rebuild_php_native_profile_snapshots, rebuild_php_native_thread_snapshots, thread_snapshot_db_path
+from forum_core.php_native_reads import (
+    rebuild_php_native_compose_reply_snapshots,
+    rebuild_php_native_profile_snapshots,
+    rebuild_php_native_thread_snapshots,
+    thread_snapshot_db_path,
+)
 
 
 class PhpHostCacheTests(unittest.TestCase):
@@ -778,6 +783,154 @@ process.stdout.write(signature);
         self.assertEqual(thread_response["status"], 200)
         self.assertNotIn("X-Forum-Php-Native: HIT", thread_response["headers"])
         self.assertIn("Unexpected cookie fallback", thread_response["body"])
+
+    def test_compose_reply_route_can_render_from_php_native_snapshot(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-compose-native-001",
+            subject="Compose reply native thread",
+            body_text="Root body for compose reply native thread.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+        reply_payload = dedent(
+            """
+            Post-ID: reply-compose-native-001
+            Board-Tags: general
+            Subject: Compose reply native target
+            Thread-ID: thread-compose-native-001
+            Parent-ID: thread-compose-native-001
+
+            Reply body for native compose reply.
+            """
+        ).lstrip()
+        (self.data_repo_root / "records" / "posts" / "reply-compose-native-001.txt").write_text(reply_payload, encoding="utf-8")
+        self.run_command(["git", "add", "records/posts/reply-compose-native-001.txt"], cwd=self.data_repo_root)
+        self.run_command(["git", "commit", "-m", "Add compose reply target"], cwd=self.data_repo_root)
+
+        rebuild_php_native_compose_reply_snapshots(self.data_repo_root)
+
+        compose_response = self.php_request(
+            "/compose/reply",
+            query_string="thread_id=thread-compose-native-001&parent_id=reply-compose-native-001",
+        )
+
+        self.assertEqual(compose_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", compose_response["headers"])
+        self.assertIn("X-Forum-Response-Source: php-native-compose-reply", compose_response["headers"])
+        self.assertIn("Compose a signed reply", compose_response["body"])
+        self.assertIn("Replying to", compose_response["body"])
+        self.assertIn("Reply body for native compose reply.", compose_response["body"])
+        self.assertEqual(
+            self.php_native_counter_value(
+                "/compose/reply?thread_id=thread-compose-native-001&parent_id=reply-compose-native-001",
+                "anonymous",
+                "native_hit",
+            ),
+            1,
+        )
+
+    def test_compose_reply_route_can_render_from_php_native_snapshot_with_identity_hint_cookie(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-compose-cookie-001",
+            subject="Compose reply cookie-safe thread",
+            body_text="Root body for compose reply cookie-safe thread.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+        reply_payload = dedent(
+            """
+            Post-ID: reply-compose-cookie-001
+            Board-Tags: general
+            Subject: Compose reply cookie-safe target
+            Thread-ID: thread-compose-cookie-001
+            Parent-ID: thread-compose-cookie-001
+
+            Reply body for cookie-safe compose reply.
+            """
+        ).lstrip()
+        (self.data_repo_root / "records" / "posts" / "reply-compose-cookie-001.txt").write_text(reply_payload, encoding="utf-8")
+        self.run_command(["git", "add", "records/posts/reply-compose-cookie-001.txt"], cwd=self.data_repo_root)
+        self.run_command(["git", "commit", "-m", "Add cookie-safe compose reply target"], cwd=self.data_repo_root)
+
+        rebuild_php_native_compose_reply_snapshots(self.data_repo_root)
+
+        compose_response = self.php_request(
+            "/compose/reply",
+            query_string="thread_id=thread-compose-cookie-001&parent_id=reply-compose-cookie-001",
+            cookie="forum_identity_hint=test",
+        )
+
+        self.assertEqual(compose_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", compose_response["headers"])
+        self.assertIn("Reply body for cookie-safe compose reply.", compose_response["body"])
+
+    def test_compose_reply_snapshot_miss_falls_through_and_is_counted(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-compose-fallback-001",
+            subject="Compose reply fallback thread",
+            body_text="Root body for compose reply fallback thread.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response["status"], 200)
+        reply_payload = dedent(
+            """
+            Post-ID: reply-compose-fallback-001
+            Board-Tags: general
+            Subject: Compose reply fallback target
+            Thread-ID: thread-compose-fallback-001
+            Parent-ID: thread-compose-fallback-001
+
+            Reply body for fallback compose reply.
+            """
+        ).lstrip()
+        (self.data_repo_root / "records" / "posts" / "reply-compose-fallback-001.txt").write_text(reply_payload, encoding="utf-8")
+        self.run_command(["git", "add", "records/posts/reply-compose-fallback-001.txt"], cwd=self.data_repo_root)
+        self.run_command(["git", "commit", "-m", "Add fallback compose reply target"], cwd=self.data_repo_root)
+
+        rebuild_php_native_compose_reply_snapshots(self.data_repo_root)
+        db_path = thread_snapshot_db_path(self.data_repo_root)
+        connection = sqlite3.connect(db_path)
+        try:
+            connection.execute(
+                "DELETE FROM php_native_snapshots WHERE snapshot_id = ?",
+                ("compose-reply/thread-compose-fallback-001/reply-compose-fallback-001",),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        compose_response = self.php_request(
+            "/compose/reply",
+            query_string="thread_id=thread-compose-fallback-001&parent_id=reply-compose-fallback-001",
+        )
+
+        self.assertEqual(compose_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native-Fallback: snapshot-missing", compose_response["headers"])
+        self.assertNotIn("X-Forum-Php-Native: HIT", compose_response["headers"])
+        self.assertIn("Reply body for fallback compose reply.", compose_response["body"])
+        self.assertEqual(
+            self.php_native_counter_value(
+                "/compose/reply?thread_id=thread-compose-fallback-001&parent_id=reply-compose-fallback-001",
+                "anonymous",
+                "snapshot_missing",
+            ),
+            1,
+        )
 
     def test_profile_route_can_render_from_php_native_snapshot_with_identity_hint_cookie(self) -> None:
         payload = self.build_thread_payload(

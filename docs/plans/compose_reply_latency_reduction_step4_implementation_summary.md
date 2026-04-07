@@ -32,3 +32,14 @@
   - Confirmed the focused native-read suite passed with the new compose-reply snapshot coverage.
 - Notes:
   - The Stage 3 artifact stores a durable reply-compose page payload in the same SQLite snapshot store already used for thread and profile native reads, which keeps the Stage 4 PHP host work on the same storage model.
+
+## Stage 4 - Add the PHP-native /compose/reply route
+- Changes:
+  - Added PHP host route detection, snapshot loading, native-hit accounting, and snapshot-missing fallback handling for `/compose/reply` in [index.php](/home/wsl/v2/php_host/public/index.php).
+  - Extended PHP host cache and identity-hint cookie safety rules so `/compose/reply` can participate in the same cache-safe/native-read path model in [cache.php](/home/wsl/v2/php_host/public/cache.php).
+  - Added focused PHP host tests covering native snapshot hits, identity-hint cookie hits, and snapshot-missing fallback for reply compose in [test_php_host_cache.py](/home/wsl/v2/tests/test_php_host_cache.py).
+- Verification:
+  - Ran `python3 -m unittest tests.test_php_host_cache.PhpHostCacheTests.test_compose_reply_route_can_render_from_php_native_snapshot tests.test_php_host_cache.PhpHostCacheTests.test_compose_reply_route_can_render_from_php_native_snapshot_with_identity_hint_cookie tests.test_php_host_cache.PhpHostCacheTests.test_compose_reply_snapshot_miss_falls_through_and_is_counted`.
+  - Confirmed the focused PHP host suite passed with native hits and explicit snapshot-missing fallback behavior.
+- Notes:
+  - The PHP host now serves warmed `/compose/reply` snapshots directly and preserves an explicit CGI fallback when the compose-reply snapshot is absent.

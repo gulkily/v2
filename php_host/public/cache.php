@@ -159,6 +159,9 @@ function forum_identity_hint_cookie_cache_safe_path(?string $path = null): bool
         }
         return !in_array(strtolower(trim($ctaValue)), ['1', 'true', 'yes', 'on'], true);
     }
+    if ($candidate === '/compose/reply' || $candidate === '/compose/reply/') {
+        return true;
+    }
     return false;
 }
 
@@ -325,6 +328,9 @@ function forum_cacheable_read_request(): bool
         return true;
     }
     if ($path === '/compose/thread' || $path === '/compose/thread/') {
+        return true;
+    }
+    if ($path === '/compose/reply' || $path === '/compose/reply/') {
         return true;
     }
     if (

@@ -658,6 +658,39 @@ function forum_php_native_profile_route(): ?string
     return $profileSlug;
 }
 
+function forum_php_native_compose_reply_route(): ?array
+{
+    if (forum_request_method() !== 'GET') {
+        return null;
+    }
+    if (forum_post_index_rebuild_request()) {
+        return null;
+    }
+    $path = forum_request_path();
+    if ($path !== '/compose/reply' && $path !== '/compose/reply/') {
+        return null;
+    }
+    if (forum_request_has_cache_busting_credentials('/compose/reply')) {
+        return null;
+    }
+    $threadId = trim((string) (forum_request_query_param('thread_id') ?? ''));
+    if ($threadId === '' || str_contains($threadId, '/')) {
+        return null;
+    }
+    $parentId = trim((string) (forum_request_query_param('parent_id') ?? ''));
+    if ($parentId === '') {
+        $parentId = $threadId;
+    }
+    if (str_contains($parentId, '/')) {
+        return null;
+    }
+    return [
+        'thread_id' => $threadId,
+        'parent_id' => $parentId,
+        'route_path' => '/compose/reply?thread_id=' . rawurlencode($threadId) . '&parent_id=' . rawurlencode($parentId),
+    ];
+}
+
 function forum_repo_root(): string
 {
     $configured = forum_host_config()['repo_root'] ?? '';
@@ -822,6 +855,44 @@ function forum_php_native_load_profile_snapshot(string $profileSlug): ?array
         return null;
     }
     if (!isset($decoded['content_html']) || !is_string($decoded['content_html'])) {
+        return null;
+    }
+    return $decoded;
+}
+
+function forum_php_native_load_compose_reply_snapshot(string $threadId, string $parentId): ?array
+{
+    $db = forum_php_native_open_db();
+    if (!($db instanceof SQLite3)) {
+        return null;
+    }
+    $statement = $db->prepare('SELECT snapshot_json FROM php_native_snapshots WHERE snapshot_id = :snapshot_id');
+    if (!($statement instanceof SQLite3Stmt)) {
+        $db->close();
+        return null;
+    }
+    $statement->bindValue(':snapshot_id', 'compose-reply/' . $threadId . '/' . $parentId, SQLITE3_TEXT);
+    $result = $statement->execute();
+    if (!($result instanceof SQLite3Result)) {
+        $statement->close();
+        $db->close();
+        return null;
+    }
+    $row = $result->fetchArray(SQLITE3_ASSOC);
+    $result->finalize();
+    $statement->close();
+    $db->close();
+    if (!is_array($row) || !isset($row['snapshot_json']) || !is_string($row['snapshot_json'])) {
+        return null;
+    }
+    $decoded = json_decode($row['snapshot_json'], true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    if (($decoded['route'] ?? null) !== '/compose/reply?thread_id=' . $threadId . '&parent_id=' . $parentId) {
+        return null;
+    }
+    if (!isset($decoded['page_html']) || !is_string($decoded['page_html'])) {
         return null;
     }
     return $decoded;
@@ -1255,6 +1326,39 @@ function forum_read_php_native_thread_response(): array
     ];
 }
 
+function forum_read_php_native_compose_reply_response(): array
+{
+    $route = forum_php_native_compose_reply_route();
+    if (!is_array($route)) {
+        return [
+            'response' => null,
+            'headers' => [],
+        ];
+    }
+    $threadId = (string) ($route['thread_id'] ?? '');
+    $parentId = (string) ($route['parent_id'] ?? '');
+    $routePath = (string) ($route['route_path'] ?? '/compose/reply');
+    $snapshot = forum_php_native_load_compose_reply_snapshot($threadId, $parentId);
+    if ($snapshot === null) {
+        forum_php_native_increment_counter($routePath, 'anonymous', 'snapshot_missing');
+        return [
+            'response' => null,
+            'headers' => ['X-Forum-Php-Native-Fallback: snapshot-missing'],
+        ];
+    }
+    forum_php_native_increment_counter($routePath, 'anonymous', 'native_hit');
+    return [
+        'response' => [
+            'status_code' => 200,
+            'headers' => [
+                'Content-Type: text/html; charset=utf-8',
+            ],
+            'body' => (string) ($snapshot['page_html'] ?? ''),
+        ],
+        'headers' => [],
+    ];
+}
+
 function forum_apply_native_response(array $parsed, array $extraHeaders = []): void
 {
     http_response_code((int) ($parsed['status_code'] ?? 200));
@@ -1305,6 +1409,16 @@ if (is_array($threadNativeAttempt['response'] ?? null)) {
 }
 $threadFallbackHeaders = is_array($threadNativeAttempt['headers'] ?? null) ? $threadNativeAttempt['headers'] : [];
 
+$composeReplyNativeAttempt = forum_read_php_native_compose_reply_response();
+if (is_array($composeReplyNativeAttempt['response'] ?? null)) {
+    forum_apply_native_response($composeReplyNativeAttempt['response'], array_merge(
+        ['X-Forum-Php-Native: HIT'],
+        forum_timing_headers($forumRequestStartedAt, 'php-native-compose-reply')
+    ));
+    exit;
+}
+$composeReplyFallbackHeaders = is_array($composeReplyNativeAttempt['headers'] ?? null) ? $composeReplyNativeAttempt['headers'] : [];
+
 $profileSlug = forum_php_native_profile_route();
 if (is_string($profileSlug) && $profileSlug !== '') {
     $profileSnapshot = forum_php_native_load_profile_snapshot($profileSlug);
@@ -1331,6 +1445,7 @@ if (is_string($cachedResponse)) {
     forum_apply_cgi_response($cachedResponse, array_merge(
         ['X-Forum-Php-Cache: HIT'],
         $threadFallbackHeaders,
+        $composeReplyFallbackHeaders,
         forum_asset_cache_headers(),
         forum_timing_headers($forumRequestStartedAt, 'php-microcache')
     ));
@@ -1351,6 +1466,7 @@ if (!is_resource($process)) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
     forum_apply_response_headers($threadFallbackHeaders);
+    forum_apply_response_headers($composeReplyFallbackHeaders);
     echo "Failed to start forum CGI bridge.\n";
     exit;
 }
@@ -1372,6 +1488,7 @@ if ($exitCode !== 0) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
     forum_apply_response_headers($threadFallbackHeaders);
+    forum_apply_response_headers($composeReplyFallbackHeaders);
     echo "Forum CGI bridge failed.\n";
     if ($stderr !== '') {
         echo $stderr;
@@ -1385,6 +1502,7 @@ if (forum_is_post_index_rebuild_status_response($parsed)) {
     forum_apply_post_index_rebuild_status_response($parsed, array_merge(
         ['X-Forum-Php-Cache: MISS'],
         $threadFallbackHeaders,
+        $composeReplyFallbackHeaders,
         forum_timing_headers($forumRequestStartedAt, 'cgi', $cgiStartedAt)
     ));
     exit;
@@ -1394,6 +1512,7 @@ forum_store_cached_response($parsed, $response);
 forum_apply_cgi_response($response, array_merge(
     ['X-Forum-Php-Cache: MISS'],
     $threadFallbackHeaders,
+    $composeReplyFallbackHeaders,
     forum_asset_cache_headers(),
     forum_timing_headers($forumRequestStartedAt, 'cgi', $cgiStartedAt)
 ));
