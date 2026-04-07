@@ -580,6 +580,12 @@ html:not([data-username-claim-visible]) .site-username-claim[data-username-claim
   font-size: 0.9rem;
 }
 
+.friendly-timestamp {
+  text-decoration: underline dotted currentColor;
+  text-underline-offset: 0.12em;
+  cursor: help;
+}
+
 .post-subject {
   margin: 0 0 0.7rem;
   font-size: 1.35rem;

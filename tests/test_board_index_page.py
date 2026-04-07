@@ -210,6 +210,35 @@ class BoardIndexPageTests(ForumRepoTestCase):
         self.assertEqual(status, "200 OK")
         self.assertTrue(body.index("/threads/root-001") < body.index("/threads/root-002"))
 
+    def test_board_index_shows_friendly_last_active_timestamp_with_exact_title(self) -> None:
+        self.init_git_repo()
+        self.commit_posts("Add roots", "2026-03-17T09:00:00+00:00")
+
+        self.write_record(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general meta
+            Subject: Hello world
+
+            Freshly updated body.
+            """,
+        )
+        self.commit_posts("Update root-001", "2026-03-17T12:00:00+00:00")
+        ensure_post_index_current(self.repo_root)
+
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn('last active <span class="friendly-timestamp" title="March 17, 2026 · 12:00:00 UTC">', body)
+        self.assertIn("ago</span>", body)
+
+    def test_board_index_omits_last_active_timestamp_when_indexed_timestamps_are_unavailable(self) -> None:
+        status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertNotIn("last active", body)
+
     def test_board_index_route_can_render_rss_feed(self) -> None:
         self.init_git_repo()
         self.commit_posts("Add roots", "2026-03-17T09:00:00+00:00")

@@ -1516,9 +1516,19 @@ def render_board_index(*, board_tag: str | None = None) -> str:
 def build_board_index_page_context(posts, threads, moderation_state, *, title_updates, repo_root: Path, board_tag: str | None = None) -> dict[str, str]:
     public_threads = visible_threads(threads, moderation_state, board_tag=board_tag, repo_root=repo_root)
     board_tags = sorted({tag for thread in public_threads for tag in thread.root.board_tags})
+    indexed_roots: dict[str, IndexedPostRow] = {}
+    try:
+        indexed_roots = load_indexed_root_posts(repo_root, board_tag=board_tag)
+    except Exception:
+        indexed_roots = {}
     return {
         "stats_html": render_board_index_stats(len(posts), len(public_threads), len(board_tags)),
-        "thread_rows_html": render_board_index_thread_rows(public_threads, moderation_state, title_updates=title_updates),
+        "thread_rows_html": render_board_index_thread_rows(
+            public_threads,
+            moderation_state,
+            title_updates=title_updates,
+            indexed_roots=indexed_roots,
+        ),
     }
 
 
@@ -1534,14 +1544,26 @@ def render_board_index_stats(post_count: int, thread_count: int, board_tag_count
     )
 
 
-def render_board_index_thread_rows(threads, moderation_state, *, title_updates) -> str:
+def board_index_thread_timestamp_text(indexed_root: IndexedPostRow | None) -> str | None:
+    if indexed_root is None:
+        return None
+    return indexed_root.updated_at or indexed_root.created_at
+
+
+def render_board_index_thread_rows(threads, moderation_state, *, title_updates, indexed_roots: dict[str, IndexedPostRow]) -> str:
     return "\n".join(
-        render_board_index_thread_row(index, thread, moderation_state, title_updates=title_updates)
+        render_board_index_thread_row(
+            index,
+            thread,
+            moderation_state,
+            title_updates=title_updates,
+            indexed_roots=indexed_roots,
+        )
         for index, thread in enumerate(threads, start=1)
     )
 
 
-def render_board_index_thread_row(rank: int, thread, moderation_state, *, title_updates) -> str:
+def render_board_index_thread_row(rank: int, thread, moderation_state, *, title_updates, indexed_roots: dict[str, IndexedPostRow]) -> str:
     subject = resolved_thread_heading(thread, title_updates)
     preview = first_line(thread.root.body) or "No preview available."
     visible_tags = [tag for tag in thread.root.board_tags if tag]
@@ -1554,6 +1576,13 @@ def render_board_index_thread_row(rank: int, thread, moderation_state, *, title_
         meta_parts.append(f"{reply_count} repl{'y' if reply_count == 1 else 'ies'}")
     if root_thread_type(thread.root):
         meta_parts.append(html.escape(root_thread_type(thread.root)))
+    timestamp_html = ""
+    timestamp_text = board_index_thread_timestamp_text(indexed_roots.get(thread.root.post_id))
+    if timestamp_text:
+        rendered_timestamp = render_timestamp_html(timestamp_text, css_class="friendly-timestamp")
+        if rendered_timestamp:
+            timestamp_html = f'last active {rendered_timestamp}'
+            meta_parts.append(timestamp_html)
     meta_text = " · ".join(meta_parts)
     tags_line_html = ""
     if tags_html:
