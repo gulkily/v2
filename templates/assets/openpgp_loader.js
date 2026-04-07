@@ -9,7 +9,6 @@ class OpenPgpUnavailableError extends Error {
 
 let openpgpModulePromise = null;
 let openpgpModuleFailure = null;
-const OPENPGP_IMPORT_TIMEOUT_MS = 2000;
 const OPENPGP_DEBUG_STORAGE_KEY = "forum_debug_signing";
 
 function openPgpDebugEnabled() {
@@ -134,7 +133,6 @@ async function loadOpenPgp() {
   }
 
   if (!openpgpModulePromise) {
-    let importPromise;
     const moduleSpecifier = "./vendor/openpgp.min.mjs";
     logOpenPgpDebug("begin_import", {
       moduleSpecifier,
@@ -148,7 +146,18 @@ async function loadOpenPgp() {
         "specifier",
         "return import(specifier);",
       );
-      importPromise = importModule(moduleSpecifier);
+      openpgpModulePromise = importModule(moduleSpecifier).catch((error) => {
+        logOpenPgpDebug("import_failed", {
+          moduleSpecifier,
+          diagnosticMessage: formatDiagnosticMessage(error),
+        });
+        openpgpModuleFailure = new OpenPgpUnavailableError(
+          "openpgp_import_failed",
+          "Browser signing is unavailable because the OpenPGP module failed to load.",
+          formatDiagnosticMessage(error),
+        );
+        throw openpgpModuleFailure;
+      });
     } catch (error) {
       logOpenPgpDebug("import_setup_failed", {
         moduleSpecifier,
@@ -161,33 +170,6 @@ async function loadOpenPgp() {
       );
       throw openpgpModuleFailure;
     }
-    const timeoutPromise = new Promise((_, reject) => {
-      globalThis.setTimeout(() => {
-        logOpenPgpDebug("import_timeout", {
-          moduleSpecifier,
-          timeoutMs: OPENPGP_IMPORT_TIMEOUT_MS,
-        });
-        reject(
-          new OpenPgpUnavailableError(
-            "openpgp_import_failed",
-            "Browser signing is unavailable because the OpenPGP module failed to load.",
-            "timed out while loading the OpenPGP module",
-          ),
-        );
-      }, OPENPGP_IMPORT_TIMEOUT_MS);
-    });
-    openpgpModulePromise = Promise.race([importPromise, timeoutPromise]).catch((error) => {
-      logOpenPgpDebug("import_failed", {
-        moduleSpecifier,
-        diagnosticMessage: formatDiagnosticMessage(error),
-      });
-      openpgpModuleFailure = new OpenPgpUnavailableError(
-        "openpgp_import_failed",
-        "Browser signing is unavailable because the OpenPGP module failed to load.",
-        formatDiagnosticMessage(error),
-      );
-      throw openpgpModuleFailure;
-    });
   }
 
   try {
