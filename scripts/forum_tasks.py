@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -53,6 +54,8 @@ class TaskRequest:
     command: str
     install_target: str | None = None
     test_pattern: str | None = None
+    start_php_host: str | None = None
+    start_php_port: int | None = None
     git_recover_apply: bool = False
     git_upgrade_remote: str | None = None
     git_upgrade_branch: str | None = None
@@ -213,6 +216,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Clear caches only and skip the derived post-index rebuild.",
     )
     subparsers.add_parser("start", help="Start the local read-only forum server.")
+    start_php_parser = subparsers.add_parser(
+        "start-php",
+        help="Start the local PHP built-in server for the PHP host frontend.",
+    )
+    start_php_parser.add_argument(
+        "--host",
+        help="Override the bind host. Defaults to FORUM_HOST or 127.0.0.1.",
+    )
+    start_php_parser.add_argument(
+        "--port",
+        type=int,
+        help="Override the bind port. Defaults to FORUM_PORT or 8000.",
+    )
 
     test_parser = subparsers.add_parser("test", help="Run the unittest suite.")
     test_parser.add_argument(
@@ -278,6 +294,12 @@ def parse_task_args(argv: list[str] | None = None) -> tuple[argparse.ArgumentPar
         )
     if args.command == "start":
         return parser, TaskRequest(command="start")
+    if args.command == "start-php":
+        return parser, TaskRequest(
+            command="start-php",
+            start_php_host=args.host,
+            start_php_port=args.port,
+        )
     if args.command == "test":
         return parser, TaskRequest(command="test", test_pattern=args.pattern)
     raise AssertionError(f"Unhandled command: {args.command}")
@@ -320,6 +342,8 @@ def run_task(request: TaskRequest) -> int:
         return run_php_host_refresh(request)
     if request.command == "start":
         return run_start()
+    if request.command == "start-php":
+        return run_start_php(host_text=request.start_php_host, port=request.start_php_port)
     if request.command == "test":
         return run_tests(request.test_pattern)
     print(f"Unknown command: {request.command}", file=sys.stderr)
@@ -404,6 +428,29 @@ def run_start() -> int:
     if not ensure_runtime_dependencies():
         return 1
     command = [sys.executable, str(REPO_ROOT / "scripts/run_read_only.py")]
+    return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
+
+
+def run_start_php(*, host_text: str | None = None, port: int | None = None) -> int:
+    php_executable = shutil.which("php")
+    if not php_executable:
+        print("Missing `php` executable on PATH. Install PHP first.", file=sys.stderr)
+        return 1
+
+    load_repo_env(repo_root=REPO_ROOT)
+    host = host_text or os.environ.get("FORUM_HOST", "127.0.0.1")
+    bind_port = port if port is not None else int(os.environ.get("FORUM_PORT", "8000"))
+    public_dir = REPO_ROOT / "php_host" / "public"
+    router_path = public_dir / "router.php"
+    command = [
+        php_executable,
+        "-S",
+        f"{host}:{bind_port}",
+        "-t",
+        str(public_dir),
+        str(router_path),
+    ]
+    print(f"Serving PHP host frontend on http://{host}:{bind_port}")
     return subprocess.run(command, check=False, cwd=REPO_ROOT).returncode
 
 

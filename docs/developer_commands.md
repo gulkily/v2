@@ -17,6 +17,7 @@ Use `./forum` as the short repo-root command for common local tasks.
 - `./forum php-host-setup /absolute/path/to/public-web-root`: generate PHP-host config and publish the required public files into a PHP web root.
 - `./forum php-host-refresh`: rebuild the derived post index and clear the configured PHP microcache plus generated static HTML artifacts.
 - `./forum start`: run the local read-only forum server.
+- `./forum start-php`: run the local PHP built-in server against `php_host/public`.
 - `./forum test`: run the full unittest suite.
 - `./forum test test_profile_update_page.py`: run one unittest discovery pattern.
 
@@ -56,6 +57,7 @@ The command contract is intentionally small: future backends such as Perl should
 ## Direct entrypoints still supported
 - `python3 scripts/forum_tasks.py ...`: direct Python reference runner.
 - `python3 scripts/run_read_only.py`: direct local server entrypoint.
+- `php -S 127.0.0.1:8000 -t php_host/public php_host/public/router.php`: direct PHP local server entrypoint equivalent to `./forum start-php`.
 - `python3 -m unittest discover -s tests [-p PATTERN]`: direct test invocation.
 - `cgi-bin/create_thread.py` and `cgi-bin/create_reply.py`: direct write-command entrypoints for lower-level testing and parity work.
 
@@ -67,6 +69,7 @@ The command contract is intentionally small: future backends such as Perl should
 - Restart the relevant process after changing `.env`.
 - Explicit process environment variables still override `.env`.
 - `FORUM_HOST` and `FORUM_PORT` control the local server bind address for `./forum start`.
+- The same `FORUM_HOST` and `FORUM_PORT` settings also control `./forum start-php` unless `--host` or `--port` is passed explicitly.
 - `DEDALUS_API_KEY` enables the server-side `/api/call_llm` baseline LLM endpoint.
 - `FORUM_ENABLE_THREAD_AUTO_REPLY=1` enables one best-effort Dedalus-generated assistant reply after successful thread creation.
 - `FORUM_THREAD_AUTO_REPLY_PRIVATE_KEY_PATH` and `FORUM_THREAD_AUTO_REPLY_PUBLIC_KEY_PATH` are optional overrides for the assistant's ASCII-armored signing key files. If they are unset or missing, the server will try to generate key files automatically.

@@ -208,6 +208,14 @@ class ForumTasksTests(unittest.TestCase):
         self.assertEqual(request.php_host_refresh_static_html_dir, "/tmp/_static_html")
         self.assertTrue(request.php_host_refresh_skip_rebuild_index)
 
+    def test_parse_task_args_accepts_start_php(self) -> None:
+        _, request = self.module.parse_task_args(["start-php", "--host", "0.0.0.0", "--port", "8090"])
+
+        self.assertIsNotNone(request)
+        self.assertEqual(request.command, "start-php")
+        self.assertEqual(request.start_php_host, "0.0.0.0")
+        self.assertEqual(request.start_php_port, 8090)
+
     def test_run_env_sync_creates_env_from_example(self) -> None:
         self.write_example("# FORUM_HOST=127.0.0.1\nFORUM_PORT=8000\n")
 
@@ -422,6 +430,50 @@ class ForumTasksTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         mocked.assert_called_once_with(request)
+
+    def test_run_task_dispatches_start_php(self) -> None:
+        request = self.module.TaskRequest(command="start-php", start_php_host="127.0.0.1", start_php_port=8090)
+
+        with mock.patch.object(self.module, "run_start_php", return_value=0) as mocked:
+            exit_code = self.module.run_task(request)
+
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(host_text="127.0.0.1", port=8090)
+
+    def test_run_start_php_invokes_php_builtin_server(self) -> None:
+        calls: list[list[str]] = []
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        def fake_run(command: list[str], check: bool, cwd: Path) -> mock.Mock:
+            del check
+            self.assertEqual(cwd, self.repo_root)
+            calls.append(command)
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(self.module, "REPO_ROOT", self.repo_root):
+            with mock.patch.object(self.module.shutil, "which", return_value="/usr/bin/php"):
+                with mock.patch.object(self.module, "load_repo_env") as mocked_load_env:
+                    with mock.patch.object(self.module.subprocess, "run", side_effect=fake_run):
+                        with redirect_stdout(stdout), redirect_stderr(stderr):
+                            exit_code = self.module.run_start_php(host_text="127.0.0.1", port=8091)
+
+        public_dir = self.repo_root / "php_host" / "public"
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        mocked_load_env.assert_called_once_with(repo_root=self.repo_root)
+        self.assertEqual(
+            calls,
+            [[
+                "/usr/bin/php",
+                "-S",
+                "127.0.0.1:8091",
+                "-t",
+                str(public_dir),
+                str(public_dir / "router.php"),
+            ]],
+        )
+        self.assertIn("Serving PHP host frontend on http://127.0.0.1:8091", stdout.getvalue())
 
     def test_parse_task_args_accepts_php_host_setup(self) -> None:
         _, request = self.module.parse_task_args(["php-host-setup", "/tmp/public"])

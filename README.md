@@ -64,6 +64,8 @@ If you prefer a repo-local virtual environment instead of a user-profile install
 
 4. Open `http://127.0.0.1:8000/`.
 
+To test the PHP frontend locally instead, run `./forum start-php` and open the same URL. The command serves `php_host/public` through PHP's built-in server and uses `FORUM_HOST` and `FORUM_PORT` by default.
+
 ## Common Commands
 
 - `./forum help`
@@ -74,6 +76,7 @@ If you prefer a repo-local virtual environment instead of a user-profile install
 - `./forum rebuild-index`
 - `./forum php-host-refresh`
 - `./forum start`
+- `./forum start-php`
 - `./forum test`
 
 More command and runtime details are in [docs/developer_commands.md](docs/developer_commands.md).
