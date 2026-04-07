@@ -43,3 +43,13 @@
   - Confirmed the focused PHP host suite passed with native hits and explicit snapshot-missing fallback behavior.
 - Notes:
   - The PHP host now serves warmed `/compose/reply` snapshots directly and preserves an explicit CGI fallback when the compose-reply snapshot is absent.
+
+## Stage 5 - Add parity and operator verification for the warmed path
+- Changes:
+  - Added an end-to-end PHP host test proving the normal `create_thread` write path warms the root `/compose/reply` snapshot automatically in [test_php_host_cache.py](/home/wsl/v2/tests/test_php_host_cache.py).
+  - Added [compose_reply_latency_reduction_operator_checklist.md](/home/wsl/v2/docs/plans/compose_reply_latency_reduction_operator_checklist.md) with concrete production checks for native hits, identity-hint safety, and snapshot-missing fallback verification.
+- Verification:
+  - Ran `python3 -m unittest tests.test_php_host_cache.PhpHostCacheTests.test_create_thread_write_path_warms_root_compose_reply_snapshot tests.test_php_host_cache.PhpHostCacheTests.test_compose_reply_route_can_render_from_php_native_snapshot`.
+  - Confirmed the normal-flow warmup path and the native compose-reply route both passed in the focused PHP host suite.
+- Notes:
+  - This stage verifies the feature through a normal UI-facing flow rather than relying only on manual snapshot backfill helpers.

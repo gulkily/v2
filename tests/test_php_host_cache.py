@@ -932,6 +932,31 @@ process.stdout.write(signature);
             1,
         )
 
+    def test_create_thread_write_path_warms_root_compose_reply_snapshot(self) -> None:
+        payload = self.build_thread_payload(
+            post_id="thread-compose-warm-001",
+            subject="Compose reply warm path thread",
+            body_text="Root body for compose reply warm path thread.",
+        )
+        response = self.php_request(
+            "/api/create_thread",
+            method="POST",
+            body=self.build_create_thread_body(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response["status"], 200)
+
+        compose_response = self.php_request(
+            "/compose/reply",
+            query_string="thread_id=thread-compose-warm-001&parent_id=thread-compose-warm-001",
+        )
+
+        self.assertEqual(compose_response["status"], 200)
+        self.assertIn("X-Forum-Php-Native: HIT", compose_response["headers"])
+        self.assertIn("X-Forum-Response-Source: php-native-compose-reply", compose_response["headers"])
+        self.assertIn("Compose reply warm path thread", compose_response["body"])
+
     def test_profile_route_can_render_from_php_native_snapshot_with_identity_hint_cookie(self) -> None:
         payload = self.build_thread_payload(
             post_id="thread-profile-native-001",
