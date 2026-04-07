@@ -749,21 +749,32 @@ class ForumTasksTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
         request = self.module.TaskRequest(command="php-host-refresh")
-        with mock.patch.object(self.module, "rebuild_post_index") as mocked:
+        with mock.patch.object(self.module, "rebuild_post_index") as mocked_rebuild_index, mock.patch.object(
+            self.module, "refresh_php_native_read_artifacts"
+        ) as mocked_refresh_php_native, mock.patch.object(
+            self.module, "rebuild_php_native_thread_snapshots",
+            return_value=["thread-1"],
+        ) as mocked_rebuild_php_native_threads:
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = self.module.run_php_host_refresh(request)
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stderr.getvalue(), "")
-        mocked.assert_called_once_with(self.repo_root.resolve())
+        mocked_rebuild_index.assert_called_once_with(self.repo_root.resolve())
+        mocked_refresh_php_native.assert_called_once_with(self.repo_root.resolve())
+        mocked_rebuild_php_native_threads.assert_called_once_with(self.repo_root.resolve())
+        self.assertTrue(cache_dir.is_dir())
         self.assertEqual(list(cache_dir.iterdir()), [])
-        self.assertFalse(static_html_dir.exists() and any(static_html_dir.iterdir()))
+        self.assertTrue(static_html_dir.is_dir())
+        self.assertEqual(list(static_html_dir.iterdir()), [])
         self.assertIn("PHP host refresh plan", stdout.getvalue())
-        self.assertIn("Step 1/3: rebuilding derived post index...", stdout.getvalue())
-        self.assertIn("Step 2/3: clearing PHP microcache...", stdout.getvalue())
-        self.assertIn("Step 3/3: clearing generated static HTML artifacts...", stdout.getvalue())
-        self.assertIn("Cleared PHP microcache", stdout.getvalue())
+        self.assertIn("Step 1/4: rebuilding derived post index...", stdout.getvalue())
+        self.assertIn("Step 2/4: rebuilding PHP-native read artifacts...", stdout.getvalue())
+        self.assertIn("Step 3/4: resetting PHP microcache directory...", stdout.getvalue())
+        self.assertIn("Step 4/4: clearing generated static HTML artifacts...", stdout.getvalue())
+        self.assertIn("Reset PHP microcache directory", stdout.getvalue())
         self.assertIn("Cleared static HTML artifacts", stdout.getvalue())
+        self.assertIn("Fallback recovery if stale PHP reads persist", stdout.getvalue())
         self.assertIn("PHP host refresh complete.", stdout.getvalue())
 
     def test_run_php_host_refresh_requires_resolvable_cache_paths(self) -> None:
@@ -803,16 +814,24 @@ class ForumTasksTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
         request = self.module.TaskRequest(command="php-host-refresh")
-        with mock.patch.object(self.module, "rebuild_post_index") as mocked:
+        with mock.patch.object(self.module, "rebuild_post_index") as mocked_rebuild_index, mock.patch.object(
+            self.module, "refresh_php_native_read_artifacts"
+        ) as mocked_refresh_php_native, mock.patch.object(
+            self.module, "rebuild_php_native_thread_snapshots",
+            return_value=[],
+        ) as mocked_rebuild_php_native_threads:
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = self.module.run_php_host_refresh(request)
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stderr.getvalue(), "")
-        mocked.assert_called_once_with(self.repo_root.resolve())
+        mocked_rebuild_index.assert_called_once_with(self.repo_root.resolve())
+        mocked_refresh_php_native.assert_called_once_with(self.repo_root.resolve())
+        mocked_rebuild_php_native_threads.assert_called_once_with(self.repo_root.resolve())
+        self.assertTrue(cache_dir.is_dir())
         self.assertEqual(list(cache_dir.iterdir()), [])
         self.assertEqual(list(static_html_dir.iterdir()), [])
-        self.assertIn("Step 3/3: clearing generated static HTML artifacts...", stdout.getvalue())
+        self.assertIn("Step 4/4: clearing generated static HTML artifacts...", stdout.getvalue())
         self.assertIn(str(static_html_dir), stdout.getvalue())
 
 

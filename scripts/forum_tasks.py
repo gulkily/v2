@@ -24,6 +24,7 @@ from forum_git_recover import run_git_recover
 from forum_content_purge import run_content_purge
 
 from forum_core.php_native_reads import rebuild_php_native_thread_snapshots
+from forum_core.php_native_reads import refresh_php_native_read_artifacts
 from forum_core.post_index import rebuild_post_index
 from forum_core.runtime_env import (
     dotenv_available,
@@ -514,6 +515,14 @@ def clear_directory_contents(path: Path) -> tuple[int, int]:
     return removed_files, removed_dirs
 
 
+def recreate_directory(path: Path) -> bool:
+    existed = path.exists()
+    if existed:
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return existed
+
+
 def run_php_host_refresh(request: TaskRequest) -> int:
     config_path = (
         Path(request.php_host_refresh_config_path).expanduser()
@@ -567,27 +576,43 @@ def run_php_host_refresh(request: TaskRequest) -> int:
     print(f"- Rebuild index: {'yes' if not request.php_host_refresh_skip_rebuild_index else 'no'}")
     print(f"- PHP microcache dir: {cache_dir if cache_dir is not None else 'not configured'}")
     print(f"- Static HTML dir: {static_html_dir}")
+    print(f"- PHP-native reads dir: {repo_root / 'state' / 'cache' / 'php_native_reads'}")
+    print(f"- PHP-native reads DB: {repo_root / 'state' / 'cache' / 'php_native_reads.sqlite3'}")
 
     if not request.php_host_refresh_skip_rebuild_index:
-        print("Step 1/3: rebuilding derived post index...")
+        print("Step 1/4: rebuilding derived post index...")
         rebuild_post_index(repo_root)
         print(f"Rebuilt post index for {repo_root}")
     else:
-        print("Step 1/3: skipping derived post index rebuild.")
+        print("Step 1/4: skipping derived post index rebuild.")
+
+    print("Step 2/4: rebuilding PHP-native read artifacts...")
+    refresh_php_native_read_artifacts(repo_root)
+    refreshed_threads = rebuild_php_native_thread_snapshots(repo_root)
+    print(
+        "Rebuilt PHP-native read artifacts "
+        f"({len(refreshed_threads)} thread snapshots, board index snapshot, profile snapshots)."
+    )
 
     if cache_dir is not None:
-        print("Step 2/3: clearing PHP microcache...")
-        removed_files, removed_dirs = clear_directory_contents(cache_dir)
-        print(f"Cleared PHP microcache at {cache_dir} ({removed_files} files, {removed_dirs} directories removed).")
+        print("Step 3/4: resetting PHP microcache directory...")
+        existed = recreate_directory(cache_dir)
+        print(
+            f"Reset PHP microcache directory at {cache_dir} "
+            f"({'recreated existing directory' if existed else 'created fresh directory'})."
+        )
     else:
-        print("Step 2/3: skipping PHP microcache clearing.")
-        print("Skipped PHP microcache clearing because no cache_dir was configured.")
+        print("Step 3/4: skipping PHP microcache reset.")
+        print("Skipped PHP microcache reset because no cache_dir was configured.")
 
-    print("Step 3/3: clearing generated static HTML artifacts...")
+    print("Step 4/4: clearing generated static HTML artifacts...")
     removed_files, removed_dirs = clear_directory_contents(static_html_dir)
+    static_html_dir.mkdir(parents=True, exist_ok=True)
     print(
         f"Cleared static HTML artifacts at {static_html_dir} ({removed_files} files, {removed_dirs} directories removed)."
     )
+    if cache_dir is not None:
+        print(f"Fallback recovery if stale PHP reads persist: remove {cache_dir} and retry the request.")
     print("PHP host refresh complete.")
     return 0
 

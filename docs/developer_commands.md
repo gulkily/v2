@@ -49,8 +49,9 @@ The command contract is intentionally small: future backends such as Perl should
 
 ## PHP-host refresh after purge or rewrite
 - For the Python read path, run `./forum rebuild-index` after a destructive history rewrite so the derived SQLite post index matches the new checkout.
-- For the PHP-primary path, `./forum php-host-refresh` rebuilds the index and clears the configured PHP microcache directory (`cache_dir`) plus generated static HTML tree (`static_html_dir`) from `forum_host_config.php`.
+- For the PHP-primary path, `./forum php-host-refresh` rebuilds the index, refreshes PHP-native read artifacts, recreates the configured PHP microcache directory (`cache_dir`), and clears the generated static HTML tree (`static_html_dir`) from `forum_host_config.php`.
 - The PHP shim launches the Python CGI bridge per request, so stale frontend output after a purge is usually cached data, not a long-lived Python worker.
+- If stale PHP-rendered pages still persist after `./forum php-host-refresh`, remove `state/php_host_cache/` completely and let the next request recreate it.
 
 ## Direct entrypoints still supported
 - `python3 scripts/forum_tasks.py ...`: direct Python reference runner.

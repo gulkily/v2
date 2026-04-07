@@ -93,6 +93,8 @@ For future clean-start resets, operators can archive and purge canonical content
 If the PHP-primary frontend still shows stale threads after a history rewrite or large cleanup:
 
 - Run `./forum php-host-refresh`.
+- The refresh command now rebuilds the derived post index, refreshes PHP-native read artifacts, recreates the PHP microcache directory, and clears generated static HTML artifacts.
+- If stale PHP-rendered reads still persist after `./forum php-host-refresh`, remove `state/php_host_cache/` entirely and let the adapter recreate it on the next request.
 - If you only need the Python read path, `./forum rebuild-index` still rebuilds the derived index by itself.
 
 ## Deployment
