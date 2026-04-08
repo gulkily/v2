@@ -28,6 +28,13 @@
     "php_cacheable": true
   },
   {
+    "asset": "primary_nav.js",
+    "content_kind": "text",
+    "content_type": "text/javascript; charset=utf-8",
+    "path": "/assets/primary_nav.js",
+    "php_cacheable": false
+  },
+  {
     "asset": "profile_nav.js",
     "content_kind": "text",
     "content_type": "text/javascript; charset=utf-8",

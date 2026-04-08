@@ -35,7 +35,7 @@ class ComposeThreadPageTests(ForumRepoTestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(body.count('aria-current="page"'), 1)
-        self.assertIn('<a href="/compose/thread" aria-current="page">Post</a>', body)
+        self.assertIn('<a data-primary-nav-link href="/compose/thread" aria-current="page">Post</a>', body)
         self.assertIn('class="site-header site-header--page"', body)
         self.assertIn('class="site-footer"', body)
         self.assertIn("Compose a signed thread", body)
@@ -95,6 +95,13 @@ class ComposeThreadPageTests(ForumRepoTestCase):
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers.get("Content-Type"), "text/javascript; charset=utf-8")
         self.assertIn('document.addEventListener("click"', body)
+
+    def test_primary_nav_asset_is_served(self) -> None:
+        status, headers, body = self.get("/assets/primary_nav.js")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers.get("Content-Type"), "text/javascript; charset=utf-8")
+        self.assertIn("export function enhancePrimaryNav", body)
 
     def test_site_css_declares_dark_mode_theme_tokens(self) -> None:
         status, headers, body = self.get("/assets/site.css")
@@ -167,12 +174,13 @@ class ComposeThreadPageTests(ForumRepoTestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn('<header class="site-header site-header--page">\n', body)
-        self.assertIn('<nav class="site-header-nav" aria-label="Primary">\n', body)
+        self.assertIn('<nav class="site-header-nav" data-primary-nav aria-label="Primary">\n', body)
         self.assertIn('</section>\n    <script>\n', body)
         self.assertIn('</nav>\n', body)
         self.assertIn('</header>\n    <main class="content-shell">', body)
         self.assertIn(
-            '<script type="module" src="/assets/profile_nav.js"></script>\n'
+            '<script type="module" src="/assets/primary_nav.js"></script>\n'
+            '  <script type="module" src="/assets/profile_nav.js"></script>\n'
             '  <script type="module" src="/assets/username_claim_cta.js"></script>\n'
             '  <script type="module" src="/assets/copy_field.js"></script>\n'
             '  <script type="module" src="/assets/browser_signing.js"></script>',

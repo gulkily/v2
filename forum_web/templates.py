@@ -140,13 +140,14 @@ def render_primary_nav(
         )
     items = "\n".join(
         (
-            f'<a href="{html.escape(path)}" aria-current="page">{html.escape(label)}</a>'
+            f'<a data-primary-nav-link href="{html.escape(path)}" aria-current="page">{html.escape(label)}</a>'
             if section and section == active_section
-            else f'<a href="{html.escape(path)}">{html.escape(label)}</a>'
+            else f'<a data-primary-nav-link href="{html.escape(path)}">{html.escape(label)}</a>'
         )
         for section, path, label in links
     )
     profile_attributes = [
+        'data-primary-nav-link',
         'data-profile-nav-link',
         f'data-profile-nav-state="{"resolved" if current_profile_href else "unresolved"}"',
         f'data-merge-feature-enabled="{"1" if merge_feature_enabled() else "0"}"',
@@ -160,7 +161,7 @@ def render_primary_nav(
     items += "\n" + f'<a {" ".join(profile_attributes)}>My profile</a>'
     return _html_block(
         f"""
-        <nav class="site-header-nav" aria-label="{html.escape(aria_label)}">
+        <nav class="site-header-nav" data-primary-nav aria-label="{html.escape(aria_label)}">
         {_indent_html_block(items, 2)}
         </nav>
         """
@@ -348,6 +349,7 @@ def render_page(
         head_extras_html,
     )
     page_script_html = _join_html_blocks(
+        render_primary_nav_script_tag(),
         render_profile_nav_script_tag(),
         cta_script_html,
         render_copy_field_script_tag(),
@@ -373,6 +375,15 @@ def load_asset_text(name: str) -> str:
 def load_asset_bytes(name: str) -> bytes:
     asset_path = TEMPLATE_DIR / "assets" / name
     return asset_path.read_bytes()
+
+
+def render_primary_nav_script_tag() -> str:
+    shell_content = load_page_shell_content()
+    return (
+        '<script type="module" src="'
+        f'{html.escape(str(shell_content["primary_nav_script_source"]), quote=True)}'
+        '"></script>'
+    )
 
 
 def render_profile_nav_script_tag() -> str:

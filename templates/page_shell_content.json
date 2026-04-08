@@ -29,6 +29,7 @@
     "/assets/profile_nav.js",
     "/assets/copy_field.js"
   ],
+  "primary_nav_script_source": "/assets/primary_nav.js",
   "site_tagline": "calm threads from canonical text records",
   "username_claim": {
     "action_label": "Choose your username",
