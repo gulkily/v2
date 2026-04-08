@@ -272,7 +272,7 @@ html:not([data-username-claim-visible]) .site-username-claim[data-username-claim
   font-weight: 700;
 }
 
-.site-header-nav[data-primary-nav-pending="true"] a[data-primary-nav-pending="true"] {
+[data-primary-nav-pending="true"] a[data-primary-nav-pending="true"] {
   border-color: var(--accent);
   background: var(--surface-chip-active);
   color: var(--accent);

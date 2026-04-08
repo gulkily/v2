@@ -1790,7 +1790,7 @@ def render_activity_filter_nav(*, current_mode: str) -> str:
         classes = "thread-chip"
         if mode == current_mode:
             classes += " thread-chip-active"
-        parts.append(f'<a class="{classes}" href="{href}">{html.escape(label)}</a>')
+        parts.append(f'<a class="{classes}" data-primary-nav-link href="{href}">{html.escape(label)}</a>')
     return "\n".join(parts)
 
 
@@ -1798,11 +1798,11 @@ def render_activity_pagination_nav(*, current_mode: str, page: int, has_next_pag
     parts: list[str] = []
     if page > 1:
         parts.append(
-            f'<a class="thread-chip" href="/activity/?view={html.escape(current_mode)}&page={page - 1}">newer activity</a>'
+            f'<a class="thread-chip" data-primary-nav-link href="/activity/?view={html.escape(current_mode)}&page={page - 1}">newer activity</a>'
         )
     if has_next_page:
         parts.append(
-            f'<a class="thread-chip" href="/activity/?view={html.escape(current_mode)}&page={page + 1}">older activity</a>'
+            f'<a class="thread-chip" data-primary-nav-link href="/activity/?view={html.escape(current_mode)}&page={page + 1}">older activity</a>'
         )
     return "\n".join(parts)
 

@@ -185,7 +185,7 @@ const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(assetSource).
 const {{ enhancePrimaryNav }} = await import(assetModuleUrl);
 
 const registered = [];
-const navRoot = {{
+const navRoots = [{{
   addEventListener(type, handler, options) {{
     registered.push({{
       type,
@@ -193,10 +193,13 @@ const navRoot = {{
       useCapture: options === true,
     }});
   }},
-}};
+}}];
 const doc = {{
-  querySelector(selector) {{
-    return selector === "[data-primary-nav]" ? navRoot : null;
+  querySelector() {{
+    return null;
+  }},
+  querySelectorAll(selector) {{
+    return selector === "[data-primary-nav]" ? navRoots : [];
   }},
 }};
 
@@ -215,6 +218,50 @@ process.stdout.write(JSON.stringify({{
                 {"type": "click", "hasHandler": True, "useCapture": False},
                 {"type": "pointerenter", "hasHandler": True, "useCapture": True},
                 {"type": "focusin", "hasHandler": True, "useCapture": False},
+            ],
+        )
+
+    def test_enhance_primary_nav_registers_handlers_for_multiple_pending_nav_roots(self) -> None:
+        asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "primary_nav.js").as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(assetSource).toString("base64")}}`;
+const {{ enhancePrimaryNav }} = await import(assetModuleUrl);
+
+const registeredCounts = [];
+const navRoots = [0, 1].map(() => {{
+  const events = [];
+  registeredCounts.push(events);
+  return {{
+    addEventListener(type) {{
+      events.push(type);
+    }},
+  }};
+}});
+const doc = {{
+  querySelector() {{
+    return null;
+  }},
+  querySelectorAll(selector) {{
+    return selector === "[data-primary-nav]" ? navRoots : [];
+  }},
+}};
+
+const enhanced = enhancePrimaryNav(doc);
+process.stdout.write(JSON.stringify({{
+  enhanced,
+  registeredCounts,
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertTrue(payload["enhanced"])
+        self.assertEqual(
+            payload["registeredCounts"],
+            [
+                ["click", "pointerenter", "focusin"],
+                ["click", "pointerenter", "focusin"],
             ],
         )
 

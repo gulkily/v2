@@ -93,23 +93,31 @@ export function enhancePrimaryNav(doc = globalThis.document) {
   if (!doc || typeof doc.querySelector !== "function") {
     return false;
   }
-  const navRoot = doc.querySelector("[data-primary-nav]");
-  if (!navRoot || typeof navRoot.addEventListener !== "function") {
+  if (typeof doc.querySelectorAll !== "function") {
     return false;
   }
-  navRoot.addEventListener("click", (event) => {
-    handlePrimaryNavActivation(event, navRoot);
-  });
-  const prefetchHandler = (event) => {
-    const target = event?.target;
-    if (!target || typeof target.closest !== "function") {
-      return;
+  const navRoots = Array.from(doc.querySelectorAll("[data-primary-nav]"));
+  if (navRoots.length === 0) {
+    return false;
+  }
+  for (const navRoot of navRoots) {
+    if (!navRoot || typeof navRoot.addEventListener !== "function") {
+      continue;
     }
-    const link = target.closest("[data-primary-nav-link]");
-    prefetchPrimaryNavLink(link, doc);
-  };
-  navRoot.addEventListener("pointerenter", prefetchHandler, true);
-  navRoot.addEventListener("focusin", prefetchHandler);
+    navRoot.addEventListener("click", (event) => {
+      handlePrimaryNavActivation(event, navRoot);
+    });
+    const prefetchHandler = (event) => {
+      const target = event?.target;
+      if (!target || typeof target.closest !== "function") {
+        return;
+      }
+      const link = target.closest("[data-primary-nav-link]");
+      prefetchPrimaryNavLink(link, doc);
+    };
+    navRoot.addEventListener("pointerenter", prefetchHandler, true);
+    navRoot.addEventListener("focusin", prefetchHandler);
+  }
   return true;
 }
 
