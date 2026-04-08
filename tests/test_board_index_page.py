@@ -146,6 +146,16 @@ class BoardIndexPageTests(ForumRepoTestCase):
         self.assertIn('/assets/profile_nav.js', body)
         self.assertIn('data-username-claim-cta', body)
 
+    def test_board_index_uses_indexed_posts_without_raw_record_parsing(self) -> None:
+        ensure_post_index_current(self.repo_root)
+
+        with mock.patch("forum_web.web.load_posts", side_effect=AssertionError("raw post parsing should not run")):
+            status, _, body = self.get("/")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Hello world", body)
+        self.assertIn("/threads/root-001", body)
+
     def test_board_index_source_uses_multiline_stats_and_thread_rows(self) -> None:
         status, _, body = self.get("/")
 

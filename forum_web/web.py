@@ -30,7 +30,14 @@ from forum_core.operation_events import (
     record_current_operation_step,
     start_operation,
 )
-from forum_core.post_index import IndexedPostRow, ensure_post_index_current, load_indexed_root_posts, post_index_readiness, rebuild_post_index
+from forum_core.post_index import (
+    IndexedPostRow,
+    ensure_post_index_current,
+    load_indexed_posts,
+    load_indexed_root_posts,
+    post_index_readiness,
+    rebuild_post_index,
+)
 from forum_core.proof_of_work import first_post_pow_difficulty, first_post_pow_enabled
 from forum_core.proof_of_work import pow_requirement_for_fingerprint, pow_requirement_for_public_key
 from forum_core.runtime_env import env_flag_enabled, ensure_generated_env_default, load_repo_env, notify_missing_env_defaults
@@ -1497,9 +1504,15 @@ def render_account_key_page() -> str:
 
 def render_board_index(*, board_tag: str | None = None) -> str:
     repo_root = get_repo_root()
-    posts, threads, board_tags, _, moderation_state, _ = timed_request_step(
-        "board_load_repository_state",
-        load_repository_state,
+    posts = timed_request_step(
+        "board_load_indexed_posts",
+        lambda: load_indexed_posts(repo_root),
+    )
+    threads = timed_request_step("board_group_indexed_threads", lambda: group_threads(posts))
+    board_tags = timed_request_step("board_list_indexed_tags", lambda: list_board_tags(posts))
+    moderation_state = timed_request_step(
+        "board_load_moderation_state",
+        lambda: derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root))),
     )
     title_updates = timed_request_step(
         "board_load_title_updates",
