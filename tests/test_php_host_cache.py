@@ -597,7 +597,7 @@ process.stdout.write(signature);
         self.assertIn("<title>zenmemes</title>", response["body"])
         self.assertIn('class="site-header-title"><a href="/">zenmemes</a>', response["body"])
         self.assertEqual(response["body"].count('aria-current="page"'), 1)
-        self.assertIn('<a href="/" aria-current="page">Home</a>', response["body"])
+        self.assertIn('<a data-primary-nav-link href="/" aria-current="page">Home</a>', response["body"])
         self.assertIn("posts loaded", response["body"])
         self.assertIn('href="/?format=rss"', response["body"])
 

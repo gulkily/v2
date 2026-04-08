@@ -30,3 +30,13 @@
   - Result: `OK`
 - Notes:
   - Personalized destinations such as `My profile` are intentionally excluded from prefetch in this slice.
+
+## Stage 4 - Harden integrated nav-response verification
+- Changes:
+  - Added an explicit coexistence regression in [test_primary_nav_asset.py](/home/wsl/v2/tests/test_primary_nav_asset.py) proving `profile_nav.js` can still resolve `My profile` before `primary_nav.js` marks the same link pending.
+  - Updated the remaining PHP snapshot assertion in [test_php_host_cache.py](/home/wsl/v2/tests/test_php_host_cache.py) to match the new shared primary-nav contract.
+- Verification:
+  - Ran `python -m unittest tests.test_primary_nav_asset tests.test_profile_nav_asset tests.test_primary_nav_active_state tests.test_board_index_page tests.test_compose_thread_page tests.test_php_host_cache`
+  - Result: `OK` (`Ran 72 tests in 16.885s`)
+- Notes:
+  - The final verification pass covers both nav assets, Python-rendered pages, and the PHP host so the click-response contract is exercised across all shared-header paths in scope.

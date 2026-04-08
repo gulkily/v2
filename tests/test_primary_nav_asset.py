@@ -272,6 +272,116 @@ process.stdout.write(JSON.stringify({{
             [{"rel": "prefetch", "href": "/activity/", "as": "document"}],
         )
 
+    def test_primary_nav_pending_contract_coexists_with_resolved_profile_nav(self) -> None:
+        primary_asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "primary_nav.js").as_uri()
+        profile_asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "profile_nav.js").as_uri()
+        vendor_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "vendor" / "openpgp.min.mjs"
+        ).as_uri()
+        loader_url = (
+            Path(__file__).resolve().parent.parent / "templates" / "assets" / "openpgp_loader.js"
+        ).as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+import * as openpgp from {json.dumps(vendor_url)};
+
+const primaryAssetSource = await fs.readFile(new URL({json.dumps(primary_asset_url)}), "utf8");
+const primaryAssetModuleUrl = `data:text/javascript;base64,${{Buffer.from(primaryAssetSource).toString("base64")}}`;
+const loaderSource = await fs.readFile(new URL({json.dumps(loader_url)}), "utf8");
+const rewrittenLoaderSource = loaderSource.replace(
+  "./vendor/openpgp.min.mjs",
+  {json.dumps(vendor_url)},
+);
+const loaderModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenLoaderSource).toString("base64")}}`;
+const profileAssetSource = await fs.readFile(new URL({json.dumps(profile_asset_url)}), "utf8");
+const rewrittenProfileAssetSource = profileAssetSource.replace(
+  "./openpgp_loader.js",
+  loaderModuleUrl,
+);
+const profileAssetModuleUrl = `data:text/javascript;base64,${{Buffer.from(rewrittenProfileAssetSource).toString("base64")}}`;
+const {{ handlePrimaryNavActivation }} = await import(primaryAssetModuleUrl);
+const {{ enhanceProfileNav }} = await import(profileAssetModuleUrl);
+
+const generated = await openpgp.generateKey({{
+  type: "ecc",
+  curve: "ed25519",
+  userIDs: [{{ name: "Primary Nav Profile Test" }}],
+  format: "armored",
+}});
+const publicKey = await openpgp.readKey({{ armoredKey: generated.publicKey }});
+const fingerprint = publicKey.getFingerprint().toLowerCase();
+const navRoot = {{
+  attributes: {{}},
+  setAttribute(name, value) {{
+    this.attributes[name] = value;
+  }},
+}};
+const navLink = {{
+  attributes: {{
+    "data-merge-feature-enabled": "0",
+    "data-profile-nav-state": "unresolved",
+  }},
+  textContent: "My profile",
+  setAttribute(name, value) {{
+    this.attributes[name] = value;
+    this[name] = value;
+  }},
+  removeAttribute(name) {{
+    delete this.attributes[name];
+    delete this[name];
+  }},
+  getAttribute(name) {{
+    return this.attributes[name] || "";
+  }},
+}};
+const doc = {{
+  querySelector(selector) {{
+    return selector === "[data-profile-nav-link]" ? navLink : null;
+  }},
+}};
+const storage = {{
+  getItem(key) {{
+    return key === "forum_public_key_armored" ? generated.publicKey : "";
+  }},
+}};
+const fetchImpl = async () => {{
+  return {{
+    ok: true,
+    async text() {{
+      return "";
+    }},
+  }};
+}};
+
+await enhanceProfileNav(doc, storage, fetchImpl);
+const handled = handlePrimaryNavActivation({{
+  defaultPrevented: false,
+  button: 0,
+  metaKey: false,
+  ctrlKey: false,
+  shiftKey: false,
+  altKey: false,
+  target: {{
+    closest(selector) {{
+      return selector === "[data-primary-nav-link]" ? navLink : null;
+    }},
+  }},
+}}, navRoot);
+process.stdout.write(JSON.stringify({{
+  handled,
+  href: navLink.href,
+  navRoot: navRoot.attributes,
+  navLink: navLink.attributes,
+  fingerprint,
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertTrue(payload["handled"])
+        self.assertEqual(payload["href"], f"/profiles/openpgp-{payload['fingerprint']}?self=1")
+        self.assertEqual(payload["navRoot"]["data-primary-nav-pending"], "true")
+        self.assertEqual(payload["navLink"]["data-primary-nav-pending"], "true")
+
 
 if __name__ == "__main__":
     unittest.main()
