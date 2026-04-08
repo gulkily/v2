@@ -1106,6 +1106,7 @@ class PostIndexBuildTests(unittest.TestCase):
                     approved_by_target=True,
                     approved_by_moderator=False,
                     dismissed=False,
+                    revoked=False,
                     active_merge=True,
                     pending=False,
                 ),

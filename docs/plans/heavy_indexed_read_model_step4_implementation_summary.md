@@ -41,3 +41,13 @@
   - Result: `OK`
 - Notes:
   - This stage covers public profile reads and downstream snapshot preparation only; account-management and other non-hot profile subpages still use the older dynamic path.
+
+## Stage 5 - Harden integrated verification for indexed hot reads
+- Changes:
+  - Ran the full indexed-read regression suite across post-index reconstruction, board reads, thread/permalink reads, public profile reads, and PHP-native snapshot consumers.
+  - Updated the merge-request fixture in [test_post_index.py](/home/wsl/v2/tests/test_post_index.py) to include the current `MergeRequestState.revoked` field so the broad suite exercises the indexed identity caches against the current merge-request schema.
+- Verification:
+  - Ran `python -m unittest tests.test_post_index tests.test_board_index_page tests.test_task_thread_pages tests.test_profile_update_page tests.test_php_native_reads`
+  - Result: `OK` (`Ran 74 tests in 16.018s`)
+- Notes:
+  - Hot public reads now have an integrated verification pass proving they can render from `post_index.sqlite3` without falling back to raw post reparsing.
