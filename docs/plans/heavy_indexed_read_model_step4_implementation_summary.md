@@ -19,3 +19,14 @@
   - Result: `OK`
 - Notes:
   - This stage only moved the board page itself; board-adjacent feeds and non-hot routes still use the older dynamic path.
+
+## Stage 3 - Move thread and post reads onto indexed posts
+- Changes:
+  - Updated thread and post read routes in [web.py](/home/wsl/v2/forum_web/web.py) to load post/thread data from the indexed SQLite path instead of reparsing canonical post files.
+  - Passed indexed post collections through shared render helpers so thread and post rendering no longer fall back to raw `load_posts(...)` during card/profile-link generation.
+  - Added focused regressions in [test_task_thread_pages.py](/home/wsl/v2/tests/test_task_thread_pages.py) proving thread and permalink pages still render when `forum_web.web.load_posts` is patched to fail.
+- Verification:
+  - Ran `python -m unittest tests.test_task_thread_pages.TaskThreadPagesTests.test_task_thread_page_uses_indexed_posts_without_raw_record_parsing tests.test_task_thread_pages.TaskThreadPagesTests.test_post_permalink_page_uses_indexed_posts_without_raw_record_parsing tests.test_task_thread_pages.TaskThreadPagesTests.test_task_thread_page_renders_structured_metadata tests.test_task_thread_pages.TaskThreadPagesTests.test_post_permalink_page_uses_same_compact_metadata`
+  - Result: `OK`
+- Notes:
+  - This stage keeps moderation and title-update records on their current authoritative paths; only post/thread materialization moved to the index.

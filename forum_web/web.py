@@ -1942,9 +1942,21 @@ def render_board_section(tag: str, threads, moderation_state) -> str:
 
 def render_thread(thread_id: str) -> str:
     repo_root = get_repo_root()
-    posts, grouped_threads, _, _, moderation_state, identity_context = timed_request_step(
-        "thread_load_repository_state",
-        load_repository_state,
+    posts = timed_request_step(
+        "thread_load_indexed_posts",
+        lambda: load_indexed_posts(repo_root, root_thread_id=thread_id),
+    )
+    grouped_threads = timed_request_step(
+        "thread_group_indexed_posts",
+        lambda: group_threads(posts),
+    )
+    moderation_state = timed_request_step(
+        "thread_load_moderation_state",
+        lambda: derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root))),
+    )
+    identity_context = timed_request_step(
+        "thread_load_identity_context",
+        lambda: load_identity_context(repo_root=repo_root, posts=posts),
     )
     title_updates = timed_request_step(
         "thread_load_title_updates",
@@ -1997,6 +2009,7 @@ def render_thread(thread_id: str) -> str:
                     reply,
                     root_thread_id=thread.root.post_id,
                     identity_context=identity_context,
+                    all_posts=posts,
                     hidden=post_is_hidden(moderation_state, reply.post_id, thread.root.post_id),
                     compact_thread_view=True,
                 )
@@ -2036,6 +2049,7 @@ def render_thread(thread_id: str) -> str:
                     thread.root,
                     root_thread_id=thread.root.post_id,
                     identity_context=identity_context,
+                    all_posts=posts,
                     compact_thread_view=True,
                     show_subject=False,
                 ),
@@ -2096,7 +2110,14 @@ def render_thread_rss(thread_id: str) -> bytes:
 
 
 def render_post(post_id: str) -> str:
-    posts, _, _, _, moderation_state, identity_context = load_repository_state()
+    repo_root = get_repo_root()
+    target_posts = load_indexed_posts(repo_root, post_ids=(post_id,))
+    if not target_posts:
+        raise LookupError(f"unknown post: {post_id}")
+    thread_target = target_posts[0].root_thread_id
+    posts = load_indexed_posts(repo_root, root_thread_id=thread_target)
+    moderation_state = derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root)))
+    identity_context = load_identity_context(repo_root=repo_root, posts=posts)
     posts_index = index_posts(posts)
     post = posts_index.get(post_id)
     if post is None:
@@ -2104,7 +2125,6 @@ def render_post(post_id: str) -> str:
     if thread_is_hidden(moderation_state, post.root_thread_id):
         raise LookupError(f"unknown post: {post_id}")
 
-    thread_target = post.root_thread_id
     thread_root = posts_index.get(thread_target)
     heading = post.subject or post.post_id
     hidden = post_is_hidden(moderation_state, post.post_id, thread_target)
@@ -2122,6 +2142,7 @@ def render_post(post_id: str) -> str:
             post,
             root_thread_id=thread_target,
             identity_context=identity_context,
+            all_posts=posts,
             hidden=hidden,
             compact_thread_view=True,
         ),

@@ -138,6 +138,17 @@ class TaskThreadPagesTests(unittest.TestCase):
         self.assertIn('href="/threads/T01?format=rss"', body)
         self.assertNotIn('thread-chip--rss', body)
 
+    def test_task_thread_page_uses_indexed_posts_without_raw_record_parsing(self) -> None:
+        status, _, body = self.get("/threads/T01")
+        self.assertEqual(status, "200 OK")
+
+        with mock.patch("forum_web.web.load_posts", side_effect=AssertionError("raw post parsing should not run")):
+            status, _, body = self.get("/threads/T01")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Example task thread", body)
+        self.assertIn("Follow-up task note.", body)
+
     def test_task_views_use_resolved_thread_title_when_update_record_exists(self) -> None:
         self.write_record(
             "records/thread-title-updates/thread-title-update-task.txt",
@@ -203,6 +214,16 @@ class TaskThreadPagesTests(unittest.TestCase):
             body.index("Follow-up task note."),
             body.index("reply to this post"),
         )
+
+    def test_post_permalink_page_uses_indexed_posts_without_raw_record_parsing(self) -> None:
+        status, _, body = self.get("/posts/reply-20260316093045-follow-up-note-12345678")
+        self.assertEqual(status, "200 OK")
+
+        with mock.patch("forum_web.web.load_posts", side_effect=AssertionError("raw post parsing should not run")):
+            status, _, body = self.get("/posts/reply-20260316093045-follow-up-note-12345678")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn("Follow-up task note.", body)
 
     def test_thread_page_source_uses_multiline_post_cards(self) -> None:
         status, _, body = self.get("/threads/T01")
