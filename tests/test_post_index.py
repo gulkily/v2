@@ -25,7 +25,9 @@ from forum_core.post_index import (
     index_schema_is_current,
     load_indexed_authors,
     load_indexed_identity_members,
+    load_indexed_posts,
     load_indexed_root_posts,
+    load_indexed_threads,
     load_indexed_username_roots,
     open_post_index,
     post_commit_timestamps,
@@ -666,6 +668,157 @@ class PostIndexBuildTests(unittest.TestCase):
             ),
         )
         self.assertEqual(root_posts["root-001"].author_id, "openpgp:author")
+
+    def test_load_indexed_posts_reconstructs_posts_with_task_metadata_and_signing_fields(self) -> None:
+        self.write_post(
+            "records/posts/T01.txt",
+            """
+            Post-ID: T01
+            Board-Tags: planning tasks
+            Subject: Example task
+            Thread-Type: task
+            Task-Status: proposed
+            Task-Presentability-Impact: 0.80
+            Task-Implementation-Difficulty: 0.35
+            Task-Depends-On: T00
+            Task-Sources: todo.txt; docs/spec.md
+            Proof-Of-Work: abc123
+
+            Ship the indexed read path.
+            """,
+        )
+        self.write_post(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: planning
+            Thread-ID: T01
+            Parent-ID: T01
+
+            Reply body.
+            """,
+        )
+        (self.repo_root / "records" / "posts" / "T01.txt.asc").write_text("sig\n", encoding="ascii")
+        (self.repo_root / "records" / "posts" / "T01.txt.pub.asc").write_text("pub\n", encoding="ascii")
+        self.commit_all("Add task thread", "2026-03-18T09:00:00+00:00")
+
+        patched_posts = [
+            parse_post_text(
+                dedent(
+                    """
+                    Post-ID: T01
+                    Board-Tags: planning tasks
+                    Subject: Example task
+                    Thread-Type: task
+                    Task-Status: proposed
+                    Task-Presentability-Impact: 0.80
+                    Task-Implementation-Difficulty: 0.35
+                    Task-Depends-On: T00
+                    Task-Sources: todo.txt; docs/spec.md
+                    Proof-Of-Work: abc123
+
+                    Ship the indexed read path.
+                    """
+                ).lstrip(),
+                source_path=self.repo_root / "records" / "posts" / "T01.txt",
+            ).__class__(
+                **{
+                    **parse_post_text(
+                        dedent(
+                            """
+                            Post-ID: T01
+                            Board-Tags: planning tasks
+                            Subject: Example task
+                            Thread-Type: task
+                            Task-Status: proposed
+                            Task-Presentability-Impact: 0.80
+                            Task-Implementation-Difficulty: 0.35
+                            Task-Depends-On: T00
+                            Task-Sources: todo.txt; docs/spec.md
+                            Proof-Of-Work: abc123
+
+                            Ship the indexed read path.
+                            """
+                        ).lstrip(),
+                        source_path=self.repo_root / "records" / "posts" / "T01.txt",
+                    ).__dict__,
+                    "identity_id": build_identity_id("ABCDEF0123456789"),
+                    "signer_fingerprint": "ABCDEF0123456789",
+                    "public_key_path": self.repo_root / "records" / "posts" / "T01.txt.pub.asc",
+                    "signature_path": self.repo_root / "records" / "posts" / "T01.txt.asc",
+                }
+            ),
+            parse_post_text(
+                dedent(
+                    """
+                    Post-ID: reply-001
+                    Board-Tags: planning
+                    Thread-ID: T01
+                    Parent-ID: T01
+
+                    Reply body.
+                    """
+                ).lstrip(),
+                source_path=self.repo_root / "records" / "posts" / "reply-001.txt",
+            ),
+        ]
+        with mock.patch("forum_core.post_index.load_identity_context") as mock_context_loader:
+            mock_context = mock.Mock()
+            mock_context.canonical_identity_id.return_value = build_identity_id("ABCDEF0123456789")
+            mock_context.resolved_display_name.return_value = None
+            mock_context.resolution.members_by_canonical_identity_id = {}
+            mock_context.merge_request_states = ()
+            mock_context.profile_update_records = ()
+            mock_context_loader.return_value = mock_context
+            with mock.patch("forum_core.post_index.load_posts", return_value=patched_posts):
+                rebuild_post_index(self.repo_root)
+
+        posts = load_indexed_posts(self.repo_root, root_thread_id="T01")
+
+        self.assertEqual([post.post_id for post in posts], ["T01", "reply-001"])
+        self.assertEqual(posts[0].board_tags, ("planning", "tasks"))
+        self.assertEqual(posts[0].proof_of_work, "abc123")
+        self.assertEqual(posts[0].identity_id, build_identity_id("ABCDEF0123456789"))
+        self.assertIsNotNone(posts[0].signature_path)
+        self.assertIsNotNone(posts[0].public_key_path)
+        self.assertIsNotNone(posts[0].task_metadata)
+        assert posts[0].task_metadata is not None
+        self.assertEqual(posts[0].task_metadata.dependencies, ("T00",))
+        self.assertEqual(posts[0].task_metadata.sources, ("docs/spec.md", "todo.txt"))
+        self.assertEqual(posts[1].thread_id, "T01")
+        self.assertEqual(posts[1].parent_id, "T01")
+
+    def test_load_indexed_threads_groups_indexed_posts_without_raw_record_parsing(self) -> None:
+        self.write_post(
+            "records/posts/root-001.txt",
+            """
+            Post-ID: root-001
+            Board-Tags: general
+            Subject: Hello
+
+            Root body.
+            """,
+        )
+        self.write_post(
+            "records/posts/reply-001.txt",
+            """
+            Post-ID: reply-001
+            Board-Tags: general
+            Thread-ID: root-001
+            Parent-ID: root-001
+
+            Reply body.
+            """,
+        )
+        self.commit_all("Add thread", "2026-03-18T09:00:00+00:00")
+        rebuild_post_index(self.repo_root)
+
+        with mock.patch("forum_core.post_index.load_posts", side_effect=AssertionError("raw post parsing should not run")):
+            threads = load_indexed_threads(self.repo_root)
+
+        self.assertEqual(len(threads), 1)
+        self.assertEqual(threads[0].root.post_id, "root-001")
+        self.assertEqual([reply.post_id for reply in threads[0].replies], ["reply-001"])
 
     def test_store_post_refreshes_index_after_successful_commit(self) -> None:
         payload_text = dedent(

@@ -13,6 +13,8 @@ from forum_core.identity import normalize_fingerprint, short_identity_label
 from forum_core.merge_requests import derive_approved_merge_links
 from forum_core.operation_events import emit_operation_timing, tracked_operation
 from forum_web.repository import Post, load_posts
+from forum_web.repository import TaskRootMetadata, Thread
+from forum_web.repository import group_threads
 from forum_web.profiles import (
     IdentityContext,
     load_identity_context,
@@ -1288,6 +1290,155 @@ def load_indexed_root_posts(repo_root: Path, *, board_tag: str | None = None) ->
         }
     finally:
         index.connection.close()
+
+
+def load_indexed_posts(
+    repo_root: Path,
+    *,
+    board_tag: str | None = None,
+    root_thread_id: str | None = None,
+    post_ids: tuple[str, ...] = (),
+    author_id: str | None = None,
+) -> list[Post]:
+    index = ensure_post_index_current(repo_root)
+    try:
+        parameters: list[str] = []
+        sql = """
+            SELECT
+                posts.post_id,
+                posts.relative_path,
+                posts.subject,
+                posts.thread_id,
+                posts.parent_id,
+                posts.body,
+                posts.thread_type,
+                posts.signer_fingerprint,
+                posts.identity_id,
+                posts.proof_of_work,
+                posts.task_status,
+                posts.task_presentability_impact,
+                posts.task_implementation_difficulty
+            FROM posts
+            WHERE 1 = 1
+        """
+        if board_tag is not None:
+            sql += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM post_board_tags
+                    WHERE post_board_tags.post_id = posts.post_id
+                      AND post_board_tags.board_tag = ?
+                )
+            """
+            parameters.append(board_tag)
+        if root_thread_id is not None:
+            sql += " AND posts.root_thread_id = ?"
+            parameters.append(root_thread_id)
+        if post_ids:
+            placeholders = ", ".join("?" for _ in post_ids)
+            sql += f" AND posts.post_id IN ({placeholders})"
+            parameters.extend(post_ids)
+        if author_id is not None:
+            sql += " AND posts.author_id = ?"
+            parameters.append(author_id)
+        sql += " ORDER BY posts.post_id"
+        rows = index.connection.execute(sql, parameters).fetchall()
+        if not rows:
+            return []
+
+        loaded_post_ids = [str(row["post_id"]) for row in rows]
+        tag_rows = index.connection.execute(
+            f"""
+            SELECT post_id, board_tag
+            FROM post_board_tags
+            WHERE post_id IN ({", ".join("?" for _ in loaded_post_ids)})
+            ORDER BY post_id, board_tag
+            """,
+            loaded_post_ids,
+        ).fetchall()
+        dependency_rows = index.connection.execute(
+            f"""
+            SELECT post_id, dependency_post_id
+            FROM post_task_dependencies
+            WHERE post_id IN ({", ".join("?" for _ in loaded_post_ids)})
+            ORDER BY post_id, dependency_post_id
+            """,
+            loaded_post_ids,
+        ).fetchall()
+        source_rows = index.connection.execute(
+            f"""
+            SELECT post_id, source_name
+            FROM post_task_sources
+            WHERE post_id IN ({", ".join("?" for _ in loaded_post_ids)})
+            ORDER BY post_id, source_name
+            """,
+            loaded_post_ids,
+        ).fetchall()
+
+        tags_by_post_id: dict[str, list[str]] = {post_id: [] for post_id in loaded_post_ids}
+        for row in tag_rows:
+            tags_by_post_id[str(row["post_id"])].append(str(row["board_tag"]))
+        dependencies_by_post_id: dict[str, list[str]] = {post_id: [] for post_id in loaded_post_ids}
+        for row in dependency_rows:
+            dependencies_by_post_id[str(row["post_id"])].append(str(row["dependency_post_id"]))
+        sources_by_post_id: dict[str, list[str]] = {post_id: [] for post_id in loaded_post_ids}
+        for row in source_rows:
+            sources_by_post_id[str(row["post_id"])].append(str(row["source_name"]))
+
+        loaded_posts: list[Post] = []
+        for row in rows:
+            post_id = str(row["post_id"])
+            thread_type = str(row["thread_type"]) if row["thread_type"] is not None else None
+            task_metadata = None
+            if thread_type == "task":
+                task_metadata = TaskRootMetadata(
+                    status=str(row["task_status"] or ""),
+                    presentability_impact=float(row["task_presentability_impact"] or 0.0),
+                    implementation_difficulty=float(row["task_implementation_difficulty"] or 0.0),
+                    dependencies=tuple(dependencies_by_post_id.get(post_id, [])),
+                    sources=tuple(sources_by_post_id.get(post_id, [])),
+                )
+            post_path = repo_root / str(row["relative_path"])
+            signature_path = post_path.with_name(f"{post_path.name}.asc")
+            public_key_path = post_path.with_name(f"{post_path.name}.pub.asc")
+            loaded_posts.append(
+                Post(
+                    post_id=post_id,
+                    board_tags=tuple(tags_by_post_id.get(post_id, [])),
+                    subject=str(row["subject"]),
+                    thread_id=str(row["thread_id"]) if row["thread_id"] is not None else None,
+                    parent_id=str(row["parent_id"]) if row["parent_id"] is not None else None,
+                    body=str(row["body"]),
+                    path=post_path,
+                    thread_type=thread_type,
+                    task_metadata=task_metadata,
+                    signature_path=signature_path if signature_path.exists() else None,
+                    public_key_path=public_key_path if public_key_path.exists() else None,
+                    signer_fingerprint=str(row["signer_fingerprint"]) if row["signer_fingerprint"] is not None else None,
+                    identity_id=str(row["identity_id"]) if row["identity_id"] is not None else None,
+                    proof_of_work=str(row["proof_of_work"]) if row["proof_of_work"] is not None else None,
+                )
+            )
+        return loaded_posts
+    finally:
+        index.connection.close()
+
+
+def load_indexed_threads(
+    repo_root: Path,
+    *,
+    board_tag: str | None = None,
+    root_thread_id: str | None = None,
+    author_id: str | None = None,
+) -> list[Thread]:
+    return group_threads(
+        load_indexed_posts(
+            repo_root,
+            board_tag=board_tag,
+            root_thread_id=root_thread_id,
+            author_id=author_id,
+        )
+    )
 
 
 def load_indexed_authors(repo_root: Path) -> dict[str, IndexedAuthorRow]:
