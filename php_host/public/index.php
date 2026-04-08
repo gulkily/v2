@@ -912,10 +912,10 @@ function forum_render_primary_nav(?string $activeSection = null): string
         $href = forum_html_escape((string) ($link['href'] ?? ''));
         $label = forum_html_escape((string) ($link['label'] ?? ''));
         $activeAttribute = ($section !== '' && $section === $activeSection) ? ' aria-current="page"' : '';
-        $items[] = '  <a href="' . $href . '"' . $activeAttribute . '>' . $label . '</a>';
+        $items[] = '  <a data-primary-nav-link href="' . $href . '"' . $activeAttribute . '>' . $label . '</a>';
     }
-    $items[] = '  <a href="" data-profile-nav-link data-profile-nav-state="unresolved" data-merge-feature-enabled="' . $mergeEnabled . '" aria-disabled="true" tabindex="-1">My profile</a>';
-    return "<nav class=\"site-header-nav\" aria-label=\"Primary\">\n" . implode("\n", $items) . "\n</nav>";
+    $items[] = '  <a data-primary-nav-link data-profile-nav-link data-profile-nav-state="unresolved" data-merge-feature-enabled="' . $mergeEnabled . '" href="" aria-disabled="true" tabindex="-1">My profile</a>';
+    return "<nav class=\"site-header-nav\" data-primary-nav aria-label=\"Primary\">\n" . implode("\n", $items) . "\n</nav>";
 }
 
 function forum_render_page_header(?string $activeSection = null): string
@@ -993,6 +993,10 @@ function forum_render_page_scripts_html(bool $includeUsernameClaimScript = true)
 {
     $shell = forum_page_shell_content();
     $scripts = [];
+    $primaryNavScript = (string) ($shell['primary_nav_script_source'] ?? '/assets/primary_nav.js');
+    if ($primaryNavScript !== '') {
+        $scripts[] = '<script type="module" src="' . forum_html_escape($primaryNavScript) . '"></script>';
+    }
     foreach (($shell['shared_script_sources'] ?? []) as $source) {
         $scripts[] = '<script type="module" src="' . forum_html_escape((string) $source) . '"></script>';
     }

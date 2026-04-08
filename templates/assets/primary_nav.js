@@ -1,3 +1,5 @@
+const PREFETCHABLE_PRIMARY_NAV_HREFS = new Set(["/", "/activity/", "/tasks"]);
+
 function eventHasModifiedNavigation(event) {
   return Boolean(
     event?.defaultPrevented
@@ -35,6 +37,42 @@ export function markPrimaryNavPending(navRoot, link) {
   link.setAttribute("data-primary-nav-pending", "true");
 }
 
+export function canPrefetchPrimaryNavHref(href) {
+  return PREFETCHABLE_PRIMARY_NAV_HREFS.has(typeof href === "string" ? href : "");
+}
+
+export function prefetchPrimaryNavHref(href, doc = globalThis.document) {
+  if (!canPrefetchPrimaryNavHref(href)) {
+    return false;
+  }
+  if (!doc || !doc.head || typeof doc.createElement !== "function") {
+    return false;
+  }
+  const existingSelector = `link[rel="prefetch"][href="${href}"]`;
+  if (typeof doc.querySelector === "function" && doc.querySelector(existingSelector)) {
+    return false;
+  }
+  const hint = doc.createElement("link");
+  if (!hint || typeof hint.setAttribute !== "function") {
+    return false;
+  }
+  hint.setAttribute("rel", "prefetch");
+  hint.setAttribute("href", href);
+  hint.setAttribute("as", "document");
+  if (typeof doc.head.appendChild !== "function") {
+    return false;
+  }
+  doc.head.appendChild(hint);
+  return true;
+}
+
+export function prefetchPrimaryNavLink(link, doc = globalThis.document) {
+  if (!isNavigablePrimaryNavLink(link)) {
+    return false;
+  }
+  return prefetchPrimaryNavHref(link.getAttribute("href") || "", doc);
+}
+
 export function handlePrimaryNavActivation(event, navRoot) {
   if (eventHasModifiedNavigation(event)) {
     return false;
@@ -62,6 +100,16 @@ export function enhancePrimaryNav(doc = globalThis.document) {
   navRoot.addEventListener("click", (event) => {
     handlePrimaryNavActivation(event, navRoot);
   });
+  const prefetchHandler = (event) => {
+    const target = event?.target;
+    if (!target || typeof target.closest !== "function") {
+      return;
+    }
+    const link = target.closest("[data-primary-nav-link]");
+    prefetchPrimaryNavLink(link, doc);
+  };
+  navRoot.addEventListener("pointerenter", prefetchHandler, true);
+  navRoot.addEventListener("focusin", prefetchHandler);
   return true;
 }
 

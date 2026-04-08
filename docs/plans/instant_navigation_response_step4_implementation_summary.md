@@ -19,3 +19,14 @@
   - Result: `OK`
 - Notes:
   - Stage 2 intentionally keeps the new asset off PHP-served pages; the PHP shell rollout and prefetch allowlist remain in Stage 3.
+
+## Stage 3 - Mirror shared nav behavior on PHP pages and add allowlisted prefetch
+- Changes:
+  - Extended the shared nav asset in [primary_nav.js](/home/wsl/v2/templates/assets/primary_nav.js) with a strict prefetch allowlist for `/`, `/activity/`, and `/tasks`, plus pointer/focus-triggered prefetch hooks that ignore non-allowlisted destinations.
+  - Mirrored the shared primary-nav markup hooks in [index.php](/home/wsl/v2/php_host/public/index.php) and added the dedicated `primary_nav_script_source` include to the PHP page shell.
+  - Added PHP-host assertions in [test_php_host_cache.py](/home/wsl/v2/tests/test_php_host_cache.py) and extended [test_primary_nav_asset.py](/home/wsl/v2/tests/test_primary_nav_asset.py) to cover allowlisted prefetch behavior.
+- Verification:
+  - Ran `python -m unittest tests.test_primary_nav_asset tests.test_php_host_cache.PhpHostCacheTests.test_php_host_serves_copy_field_asset_as_javascript tests.test_php_host_cache.PhpHostCacheTests.test_php_host_serves_primary_nav_asset_as_javascript tests.test_php_host_cache.PhpHostCacheTests.test_php_host_renders_primary_nav_hooks_and_script`
+  - Result: `OK`
+- Notes:
+  - Personalized destinations such as `My profile` are intentionally excluded from prefetch in this slice.

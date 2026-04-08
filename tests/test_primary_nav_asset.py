@@ -184,12 +184,14 @@ const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
 const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(assetSource).toString("base64")}}`;
 const {{ enhancePrimaryNav }} = await import(assetModuleUrl);
 
-let registeredEventType = "";
-let registeredHandler = null;
+const registered = [];
 const navRoot = {{
-  addEventListener(type, handler) {{
-    registeredEventType = type;
-    registeredHandler = handler;
+  addEventListener(type, handler, options) {{
+    registered.push({{
+      type,
+      hasHandler: typeof handler === "function",
+      useCapture: options === true,
+    }});
   }},
 }};
 const doc = {{
@@ -201,15 +203,74 @@ const doc = {{
 const enhanced = enhancePrimaryNav(doc);
 process.stdout.write(JSON.stringify({{
   enhanced,
-  registeredEventType,
-  hasHandler: typeof registeredHandler === "function",
+  registered,
 }}));
 """
         payload = json.loads(self.run_node(script))
 
         self.assertTrue(payload["enhanced"])
-        self.assertEqual(payload["registeredEventType"], "click")
-        self.assertTrue(payload["hasHandler"])
+        self.assertEqual(
+            payload["registered"],
+            [
+                {"type": "click", "hasHandler": True, "useCapture": False},
+                {"type": "pointerenter", "hasHandler": True, "useCapture": True},
+                {"type": "focusin", "hasHandler": True, "useCapture": False},
+            ],
+        )
+
+    def test_prefetch_primary_nav_href_only_prefetches_allowlisted_destinations(self) -> None:
+        asset_url = (Path(__file__).resolve().parent.parent / "templates" / "assets" / "primary_nav.js").as_uri()
+        script = f"""
+import fs from "node:fs/promises";
+const assetSource = await fs.readFile(new URL({json.dumps(asset_url)}), "utf8");
+const assetModuleUrl = `data:text/javascript;base64,${{Buffer.from(assetSource).toString("base64")}}`;
+const {{ prefetchPrimaryNavHref }} = await import(assetModuleUrl);
+
+const appended = [];
+const prefetched = new Set();
+const doc = {{
+  head: {{
+    appendChild(node) {{
+      appended.push(node.attributes);
+      prefetched.add(node.attributes.href);
+    }},
+  }},
+  querySelector(selector) {{
+    const match = selector.match(/href="([^"]+)"/);
+    if (!match) {{
+      return null;
+    }}
+    return prefetched.has(match[1]) ? {{}} : null;
+  }},
+  createElement() {{
+    return {{
+      attributes: {{}},
+      setAttribute(name, value) {{
+        this.attributes[name] = value;
+      }},
+    }};
+  }},
+}};
+
+const firstAllowed = prefetchPrimaryNavHref("/activity/", doc);
+const duplicateAllowed = prefetchPrimaryNavHref("/activity/", doc);
+const disallowed = prefetchPrimaryNavHref("/profiles/openpgp-test?self=1", doc);
+process.stdout.write(JSON.stringify({{
+  firstAllowed,
+  duplicateAllowed,
+  disallowed,
+  appended,
+}}));
+"""
+        payload = json.loads(self.run_node(script))
+
+        self.assertTrue(payload["firstAllowed"])
+        self.assertFalse(payload["duplicateAllowed"])
+        self.assertFalse(payload["disallowed"])
+        self.assertEqual(
+            payload["appended"],
+            [{"rel": "prefetch", "href": "/activity/", "as": "document"}],
+        )
 
 
 if __name__ == "__main__":

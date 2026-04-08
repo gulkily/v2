@@ -366,6 +366,25 @@ process.stdout.write(signature);
         self.assertIn('document.addEventListener("click"', response["body"])
         self.assertEqual(self.cache_files(), [])
 
+    def test_php_host_serves_primary_nav_asset_as_javascript(self) -> None:
+        response = self.php_request("/assets/primary_nav.js")
+
+        self.assertEqual(response["status"], 200)
+        self.assertIn("X-Forum-Php-Cache: MISS", response["headers"])
+        self.assertIn("Cache-Control: public, max-age=3600", response["headers"])
+        self.assertIn("Content-Type: text/javascript; charset=utf-8", response["headers"])
+        self.assertIn("export function enhancePrimaryNav", response["body"])
+        self.assertEqual(self.cache_files(), [])
+
+    def test_php_host_renders_primary_nav_hooks_and_script(self) -> None:
+        response = self.php_request("/")
+
+        self.assertEqual(response["status"], 200)
+        self.assertIn('<nav class="site-header-nav" data-primary-nav aria-label="Primary">', response["body"])
+        self.assertIn('<a data-primary-nav-link href="/" aria-current="page">Home</a>', response["body"])
+        self.assertIn('data-profile-nav-link', response["body"])
+        self.assertIn('<script type="module" src="/assets/primary_nav.js"></script>', response["body"])
+
     def test_static_html_request_only_allows_safe_anonymous_html_routes(self) -> None:
         self.assertEqual(
             self.php_cache_helper("echo forum_static_html_request() ? 'yes' : 'no';", path="/threads/example-thread"),
