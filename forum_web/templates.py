@@ -117,7 +117,12 @@ def render_username_claim_bar_html(
     )
 
 
-def render_primary_nav(*, aria_label: str = "Primary", active_section: str | None = None) -> str:
+def render_primary_nav(
+    *,
+    aria_label: str = "Primary",
+    active_section: str | None = None,
+    current_profile_href: str = "",
+) -> str:
     shell_content = load_page_shell_content()
     raw_links = shell_content["primary_nav"]
     if not isinstance(raw_links, list):
@@ -141,12 +146,18 @@ def render_primary_nav(*, aria_label: str = "Primary", active_section: str | Non
         )
         for section, path, label in links
     )
-    items += (
-        "\n"
-        '<a href="" data-profile-nav-link data-profile-nav-state="unresolved" '
-        f'data-merge-feature-enabled="{"1" if merge_feature_enabled() else "0"}" '
-        'aria-disabled="true" tabindex="-1">My profile</a>'
-    )
+    profile_attributes = [
+        'data-profile-nav-link',
+        f'data-profile-nav-state="{"resolved" if current_profile_href else "unresolved"}"',
+        f'data-merge-feature-enabled="{"1" if merge_feature_enabled() else "0"}"',
+    ]
+    if active_section == "profile":
+        profile_attributes.append('aria-current="page"')
+    if current_profile_href:
+        profile_attributes.append(f'href="{html.escape(current_profile_href, quote=True)}"')
+    else:
+        profile_attributes.extend(['href=""', 'aria-disabled="true"', 'tabindex="-1"'])
+    items += "\n" + f'<a {" ".join(profile_attributes)}>My profile</a>'
     return _html_block(
         f"""
         <nav class="site-header-nav" aria-label="{html.escape(aria_label)}">
@@ -164,6 +175,7 @@ def render_site_header(
     hero_action_html: str = "",
     include_page_intro: bool = True,
     active_section: str | None = None,
+    current_profile_href: str = "",
 ) -> str:
     shell_content = load_page_shell_content()
     intro_html = ""
@@ -202,7 +214,7 @@ def render_site_header(
                   <p class="site-header-tagline">{html.escape(str(shell_content["site_tagline"]))}</p>
                   </div>
                 </div>
-              {_indent_html_block(render_primary_nav(active_section=active_section), 2)}
+              {_indent_html_block(render_primary_nav(active_section=active_section, current_profile_href=current_profile_href), 2)}
             </div>
             """
         ),
@@ -310,6 +322,7 @@ def render_page(
     page_footer_html: str = "",
     head_extras_html: str = "",
     active_section: str | None = None,
+    current_profile_href: str = "",
 ) -> str:
     base = load_template("base.html")
     if page_header_html is None:
@@ -319,6 +332,7 @@ def render_page(
             hero_text=hero_text,
             hero_action_html=hero_action_html,
             active_section=active_section,
+            current_profile_href=current_profile_href,
         )
     if not page_footer_html:
         page_footer_html = render_site_footer()

@@ -80,9 +80,12 @@ class ProfileUpdatePageTests(unittest.TestCase):
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}", "self=1")
 
         self.assertEqual(status, "200 OK")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn(f'<a data-profile-nav-link data-profile-nav-state="resolved" data-merge-feature-enabled="0" aria-current="page" href="/profiles/{PROFILE_SLUG}?self=1">My profile</a>', body)
+        self.assertNotIn('<a href="/" aria-current="page">Home</a>', body)
         self.assertIn('data-profile-username-settings-bar', body)
         self.assertIn("Account setup", body)
-        self.assertIn("Now that you're participating, you can choose a username.", body)
+        self.assertIn("Now that you&#x27;re participating, you can choose a username.", body)
         self.assertIn(f'href="/profiles/{PROFILE_SLUG}/update"', body)
         self.assertIn(">Choose your username<", body)
 

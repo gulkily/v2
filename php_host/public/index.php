@@ -1272,7 +1272,7 @@ function forum_render_php_native_thread_page(array $snapshot): string
         $title,
         $contentHtml,
         forum_render_feed_head_link_html($feedHref),
-        FORUM_PRIMARY_NAV_SECTION_HOME,
+        null,
     );
 }
 

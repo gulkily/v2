@@ -137,6 +137,7 @@ IDENTITY_HINT_SYNC_PATH = "/api/set_identity_hint"
 T = TypeVar("T")
 PRIMARY_NAV_SECTION_HOME = "home"
 PRIMARY_NAV_SECTION_POST = "post"
+PRIMARY_NAV_SECTION_PROFILE = "profile"
 PRIMARY_NAV_SECTION_PROJECT_INFO = "project-info"
 PRIMARY_NAV_SECTION_ACTIVITY = "activity"
 
@@ -170,6 +171,10 @@ def _html_block(raw_text: str) -> str:
 
 def _join_html_blocks(*blocks: str) -> str:
     return "\n".join(block.strip() for block in blocks if block and block.strip())
+
+
+def self_profile_href(profile_slug: str) -> str:
+    return f"/profiles/{profile_slug}?self=1"
 
 
 def ensure_runtime_post_index_startup(repo_root: Path) -> None:
@@ -1462,7 +1467,8 @@ def render_profile_page(
             hero_title="",
             hero_text="",
             include_page_intro=False,
-            active_section=PRIMARY_NAV_SECTION_HOME,
+            active_section=PRIMARY_NAV_SECTION_PROFILE if self_request else None,
+            current_profile_href=self_profile_href(profile_slug) if self_request else "",
         ),
     )
 
@@ -2005,7 +2011,7 @@ def render_thread(thread_id: str) -> str:
                 hero_title="",
                 hero_text="",
                 include_page_intro=False,
-                active_section=PRIMARY_NAV_SECTION_HOME,
+                active_section=None,
             ),
             content_html=load_template("thread.html").substitute(
                 thread_heading=html.escape(current_title),
@@ -2117,7 +2123,7 @@ def render_post(post_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
-            active_section=PRIMARY_NAV_SECTION_HOME,
+            active_section=None,
         ),
         content_html=content,
     )
@@ -2272,6 +2278,7 @@ def render_profile(identity_id: str) -> str:
 
 
 def render_unpublished_profile_page(identity_id: str) -> str:
+    profile_slug = identity_slug(identity_id)
     content = load_template("profile_empty_state.html").substitute(
         identity_id=html.escape(identity_id),
     )
@@ -2286,7 +2293,8 @@ def render_unpublished_profile_page(identity_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
-            active_section=PRIMARY_NAV_SECTION_HOME,
+            active_section=PRIMARY_NAV_SECTION_PROFILE,
+            current_profile_href=self_profile_href(profile_slug),
         ),
     )
 
@@ -2386,7 +2394,8 @@ def render_profile_update_page(identity_id: str) -> str:
             hero_title="",
             hero_text="",
             include_page_intro=False,
-            active_section=PRIMARY_NAV_SECTION_HOME,
+            active_section=PRIMARY_NAV_SECTION_PROFILE,
+            current_profile_href=self_profile_href(profile_slug),
         ),
         page_banner_html="",
     )
@@ -2549,7 +2558,8 @@ def render_merge_management_page(identity_id: str) -> str:
         hero_title="Manage identity merges",
         hero_text="Review same-name identity matches, send merge requests, and respond to incoming approvals from one focused management page.",
         content_html=content,
-        active_section=PRIMARY_NAV_SECTION_HOME,
+        active_section=PRIMARY_NAV_SECTION_PROFILE,
+        current_profile_href=self_profile_href(profile_slug),
     )
 
 
@@ -2634,7 +2644,8 @@ def render_merge_request_action_page(
         hero_text="Prepare a signed merge workflow action in the browser and submit it through the canonical merge-request API.",
         content_html=content,
         page_script_html='<script type="module" src="/assets/merge_request_signing.js"></script>',
-        active_section=PRIMARY_NAV_SECTION_HOME,
+        active_section=PRIMARY_NAV_SECTION_PROFILE,
+        current_profile_href=self_profile_href(profile_slug),
     )
 
 
@@ -3009,7 +3020,7 @@ def render_task_priorities_page(*, view_mode: str) -> str:
         content_html=content,
         page_script_html='<script src="/assets/task_priorities.js"></script>',
         page_shell_class="page-shell-wide",
-        active_section=PRIMARY_NAV_SECTION_HOME,
+        active_section=None,
     )
 
 
@@ -3150,7 +3161,7 @@ def render_task_detail_page(
         hero_title=current_title,
         hero_text="This task view is derived from one task-typed root thread. The root carries structured task metadata, and the same thread remains the discussion surface.",
         content_html=content,
-        active_section=PRIMARY_NAV_SECTION_HOME,
+        active_section=None,
     )
 
 

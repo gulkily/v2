@@ -122,6 +122,7 @@ class TaskThreadPagesTests(unittest.TestCase):
         status, _, body = self.get("/threads/T01")
 
         self.assertEqual(status, "200 OK")
+        self.assertNotIn('aria-current="page"', body)
         self.assertIn("Task metadata", body)
         self.assertIn("This typed root post is the current task record", body)
         self.assertIn("0.80", body)
@@ -216,6 +217,7 @@ class TaskThreadPagesTests(unittest.TestCase):
 
         self.assertEqual(status, "200 OK")
         self.assertIn('class="site-header site-header--page"', body)
+        self.assertNotIn('aria-current="page"', body)
         self.assertIn("Task actions", body)
         self.assertIn("/planning/tasks/T01/mark-done", body)
         self.assertIn("mark task done", body)

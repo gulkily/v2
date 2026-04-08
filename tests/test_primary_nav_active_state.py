@@ -25,6 +25,17 @@ class PrimaryNavActiveStateTests(unittest.TestCase):
 
         self.assertNotIn('aria-current="page"', html)
 
+    def test_render_primary_nav_can_mark_profile_link_active(self) -> None:
+        html = render_primary_nav(active_section="profile", current_profile_href="/profiles/openpgp-alpha?self=1")
+
+        self.assertEqual(html.count('aria-current="page"'), 1)
+        self.assertIn(
+            '<a data-profile-nav-link data-profile-nav-state="resolved" data-merge-feature-enabled="0" '
+            'aria-current="page" href="/profiles/openpgp-alpha?self=1">My profile</a>',
+            html,
+        )
+        self.assertNotIn('<a href="/" aria-current="page">Home</a>', html)
+
     def test_render_page_passes_active_section_to_default_header(self) -> None:
         html = render_page(
             title="Compose",

@@ -47,6 +47,12 @@ class MyProfileEmptyStateTests(unittest.TestCase):
         status, _, body = self.get("/profiles/openpgp-alpha", "self=1")
 
         self.assertEqual(status, "200 OK")
+        self.assertEqual(body.count('aria-current="page"'), 1)
+        self.assertIn(
+            '<a data-profile-nav-link data-profile-nav-state="resolved" data-merge-feature-enabled="0" '
+            'aria-current="page" href="/profiles/openpgp-alpha?self=1">My profile</a>',
+            body,
+        )
         self.assertIn('data-profile-empty-state', body)
         self.assertIn("Your profile is ready to start", body)
         self.assertIn("publish your first signed post", body)

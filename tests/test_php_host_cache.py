@@ -730,8 +730,7 @@ process.stdout.write(signature);
 
         self.assertEqual(thread_response["status"], 200)
         self.assertIn("X-Forum-Php-Native: HIT", thread_response["headers"])
-        self.assertEqual(thread_response["body"].count('aria-current="page"'), 1)
-        self.assertIn('<a href="/" aria-current="page">Home</a>', thread_response["body"])
+        self.assertNotIn('aria-current="page"', thread_response["body"])
         self.assertIn("Native thread", thread_response["body"])
         self.assertIn("compose a reply", thread_response["body"])
         self.assertIn("change title", thread_response["body"])
