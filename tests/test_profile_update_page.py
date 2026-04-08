@@ -76,6 +76,16 @@ class ProfileUpdatePageTests(unittest.TestCase):
         self.assertNotIn(">Choose your username<", body)
         self.assertNotIn("You can still claim one username for this profile.", body)
 
+    def test_profile_page_uses_indexed_posts_without_raw_record_parsing(self) -> None:
+        status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
+        self.assertEqual(status, "200 OK")
+
+        with mock.patch("forum_web.web.load_posts", side_effect=AssertionError("raw post parsing should not run")):
+            status, _, body = self.get(f"/profiles/{PROFILE_SLUG}")
+
+        self.assertEqual(status, "200 OK")
+        self.assertIn(DISPLAY_NAME, body)
+
     def test_self_profile_page_shows_username_settings_link_when_eligible(self) -> None:
         status, _, body = self.get(f"/profiles/{PROFILE_SLUG}", "self=1")
 

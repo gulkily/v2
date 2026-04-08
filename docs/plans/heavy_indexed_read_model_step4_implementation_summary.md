@@ -30,3 +30,14 @@
   - Result: `OK`
 - Notes:
   - This stage keeps moderation and title-update records on their current authoritative paths; only post/thread materialization moved to the index.
+
+## Stage 4 - Move public profile reads and snapshots onto indexed posts
+- Changes:
+  - Updated public profile reads in [web.py](/home/wsl/v2/forum_web/web.py) to load indexed posts before deriving identity context and profile summaries.
+  - Updated PHP-native board/profile snapshot builders in [php_native_reads.py](/home/wsl/v2/forum_core/php_native_reads.py) to consume indexed posts instead of reparsing canonical post records.
+  - Added a focused public-profile regression in [test_profile_update_page.py](/home/wsl/v2/tests/test_profile_update_page.py) proving `/profiles/...` still renders when raw `forum_web.web.load_posts` is unavailable.
+- Verification:
+  - Ran `python -m unittest tests.test_profile_update_page.ProfileUpdatePageTests.test_profile_page_uses_indexed_posts_without_raw_record_parsing tests.test_profile_update_page.ProfileUpdatePageTests.test_self_profile_page_shows_username_settings_link_when_eligible tests.test_php_native_reads`
+  - Result: `OK`
+- Notes:
+  - This stage covers public profile reads and downstream snapshot preparation only; account-management and other non-hot profile subpages still use the older dynamic path.

@@ -8,7 +8,7 @@ from typing import Iterable
 
 from forum_core.moderation import derive_moderation_state, load_moderation_records, moderation_records_dir, post_is_hidden, thread_is_hidden
 from forum_core.moderation import parse_moderation_record
-from forum_core.post_index import IndexedPostRow, load_indexed_root_posts
+from forum_core.post_index import IndexedPostRow, load_indexed_posts, load_indexed_root_posts
 from forum_core.php_native_reads_db import connect_php_native_reads_db, delete_php_native_snapshot, php_native_reads_db_path, save_php_native_snapshot
 from forum_core.thread_title_updates import parse_thread_title_update_record
 from forum_core.thread_title_updates import load_thread_title_update_records, resolve_current_thread_title, thread_title_updates_dir
@@ -89,7 +89,7 @@ def _thread_timestamp_text(indexed_root: IndexedPostRow | None) -> str | None:
 
 
 def build_board_index_snapshot(repo_root: Path) -> dict[str, object]:
-    posts = load_posts(post_records_dir(repo_root))
+    posts = load_indexed_posts(repo_root)
     threads = group_threads(posts)
     moderation_state = derive_moderation_state(load_moderation_records(moderation_records_dir(repo_root)))
     indexed_roots = load_indexed_root_posts(repo_root)
@@ -247,7 +247,7 @@ def build_profile_snapshot(identity_id: str, repo_root: Path) -> dict[str, objec
     from forum_web.web import render_profile_page
     from forum_web.profiles import find_profile_summary, load_identity_context
 
-    posts = load_posts(post_records_dir(repo_root))
+    posts = load_indexed_posts(repo_root)
     identity_context = load_identity_context(repo_root=repo_root, posts=posts)
     summary = find_profile_summary(
         repo_root=repo_root,

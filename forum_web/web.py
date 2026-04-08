@@ -2334,14 +2334,19 @@ def render_unpublished_profile_page(identity_id: str) -> str:
 
 
 def render_profile_for_request(identity_id: str, *, self_request: bool) -> str:
-    posts, _, _, _, _, identity_context = timed_request_step(
-        "profile_load_repository_state",
-        load_repository_state,
+    repo_root = get_repo_root()
+    posts = timed_request_step(
+        "profile_load_indexed_posts",
+        lambda: load_indexed_posts(repo_root),
+    )
+    identity_context = timed_request_step(
+        "profile_load_identity_context",
+        lambda: load_identity_context(repo_root=repo_root, posts=posts),
     )
     summary = timed_request_step(
         "profile_lookup_summary",
         lambda: find_profile_summary(
-            repo_root=get_repo_root(),
+            repo_root=repo_root,
             posts=posts,
             identity_id=identity_id,
             identity_context=identity_context,
@@ -2364,14 +2369,19 @@ def render_profile_for_request(identity_id: str, *, self_request: bool) -> str:
 
 
 def render_profile_by_username(username: str) -> str:
-    posts, _, _, _, _, identity_context = timed_request_step(
-        "profile_load_repository_state",
-        load_repository_state,
+    repo_root = get_repo_root()
+    posts = timed_request_step(
+        "profile_load_indexed_posts",
+        lambda: load_indexed_posts(repo_root),
+    )
+    identity_context = timed_request_step(
+        "profile_load_identity_context",
+        lambda: load_identity_context(repo_root=repo_root, posts=posts),
     )
     summary = timed_request_step(
         "profile_lookup_summary",
         lambda: resolve_profile_summary_by_username(
-            repo_root=get_repo_root(),
+            repo_root=repo_root,
             posts=posts,
             username=username,
             identity_context=identity_context,
